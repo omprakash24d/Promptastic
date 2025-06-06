@@ -24,8 +24,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const FONT_OPTIONS = [
-  { label: "Inter (Default)", value: "Inter, sans-serif" },
-  { label: "Arial", value: "Arial, sans-serif" },
+  { label: "Arial (Default)", value: "Arial, sans-serif" },
+  { label: "Inter", value: "Inter, sans-serif" },
   { label: "Verdana", value: "Verdana, sans-serif" },
   { label: "Georgia", value: "Georgia, serif" },
   { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
@@ -230,3 +230,5 @@ export function SettingsPanel() {
     </div>
   );
 }
+
+    

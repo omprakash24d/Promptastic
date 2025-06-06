@@ -9,9 +9,16 @@ import { loadFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
 const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
-const INITIAL_TEXT_COLOR_LIGHT = 'hsl(215 25% 27%)'; // Matches --foreground
-const INITIAL_TEXT_COLOR_DARK = 'hsl(210 30% 95%)'; // Matches dark --foreground
-const INITIAL_FONT_FAMILY = 'Inter';
+
+// Previous default colors, for migration/checking if user had these set
+const PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT = 'hsl(215 25% 27%)'; 
+const PREVIOUS_DEFAULT_TEXT_COLOR_DARK = 'hsl(210 30% 95%)';
+
+// New default text colors
+const INITIAL_TEXT_COLOR_LIGHT_MODE = 'hsl(0 0% 0%)'; // Black
+const INITIAL_TEXT_COLOR_DARK_MODE = 'hsl(0 0% 100%)'; // White
+
+const INITIAL_FONT_FAMILY = 'Arial, sans-serif'; // Default to Arial
 
 interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
@@ -47,6 +54,14 @@ interface TeleprompterState extends TeleprompterSettings {
   setSettingsPanelOpen: (isOpen: boolean) => void;
 }
 
+// Determine initial dark mode preference
+let systemPrefersDark = false;
+if (typeof window !== 'undefined') {
+  systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+const initialDarkModeState = loadFromLocalStorage('promptastic-store', { darkMode: undefined }).darkMode ?? systemPrefersDark;
+
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => ({
@@ -59,9 +74,9 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       scrollSpeed: INITIAL_SCROLL_SPEED,
       lineHeight: INITIAL_LINE_HEIGHT,
       isMirrored: false,
-      darkMode: false, 
+      darkMode: initialDarkModeState, 
       isAutoSyncEnabled: false,
-      textColor: INITIAL_TEXT_COLOR_LIGHT, // Default to light mode text color
+      textColor: initialDarkModeState ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE,
       fontFamily: INITIAL_FONT_FAMILY,
       
       isPlaying: false,
@@ -109,16 +124,32 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }),
       setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
       setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
-      setDarkMode: (darkMode) => {
+      
+      setDarkMode: (newDarkModeValue) => {
+        const currentTextColor = get().textColor;
+        const newDefaultTextColorForMode = newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
+        
+        let finalTextColor = currentTextColor;
+
+        // If current color is one of the known global defaults (old or new), then update it.
+        if (
+          currentTextColor === PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT ||
+          currentTextColor === PREVIOUS_DEFAULT_TEXT_COLOR_DARK ||
+          currentTextColor === INITIAL_TEXT_COLOR_LIGHT_MODE ||
+          currentTextColor === INITIAL_TEXT_COLOR_DARK_MODE ||
+          !currentTextColor // handles undefined/empty case
+        ) {
+          finalTextColor = newDefaultTextColorForMode;
+        }
+        // If it's a custom color, it remains as currentTextColor (which is already assigned to finalTextColor)
+
         set({ 
-          darkMode,
-          // Adjust default text color based on dark mode, if it's currently set to one of the defaults
-          textColor: get().textColor === INITIAL_TEXT_COLOR_LIGHT || get().textColor === INITIAL_TEXT_COLOR_DARK 
-                     ? (darkMode ? INITIAL_TEXT_COLOR_DARK : INITIAL_TEXT_COLOR_LIGHT)
-                     : get().textColor
+          darkMode: newDarkModeValue,
+          textColor: finalTextColor
         });
+
         if (typeof document !== 'undefined') {
-          if (darkMode) {
+          if (newDarkModeValue) {
             document.documentElement.classList.add('dark');
           } else {
             document.documentElement.classList.remove('dark');
@@ -156,53 +187,71 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         textColor: state.textColor,
         fontFamily: state.fontFamily,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (error) { console.warn('Hydration error in Zustand:', error); return; }
         if (state) {
-          // Ensure dark mode class is set on HTML element after rehydration
+          // Apply dark mode class
           if (typeof document !== 'undefined') {
             if (state.darkMode) {
               document.documentElement.classList.add('dark');
-               // If textColor is default light, change to default dark
-              if (state.textColor === INITIAL_TEXT_COLOR_LIGHT) {
-                state.textColor = INITIAL_TEXT_COLOR_DARK;
-              }
             } else {
               document.documentElement.classList.remove('dark');
-              // If textColor is default dark, change to default light
-              if (state.textColor === INITIAL_TEXT_COLOR_DARK) {
-                state.textColor = INITIAL_TEXT_COLOR_LIGHT;
-              }
             }
           }
+
+          // Adjust textColor if it's a default that mismatches the hydrated darkMode
+          // or if it's one of the very old defaults.
+          const isPreviousDefaultLight = state.textColor === PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT;
+          const isPreviousDefaultDark = state.textColor === PREVIOUS_DEFAULT_TEXT_COLOR_DARK;
+          const isNewDefaultLight = state.textColor === INITIAL_TEXT_COLOR_LIGHT_MODE;
+          const isNewDefaultDark = state.textColor === INITIAL_TEXT_COLOR_DARK_MODE;
+
+          if (state.darkMode) { // Should be dark text color (white)
+            // If color is any light default (old or new), or unset, set to dark default
+            if (isPreviousDefaultLight || isNewDefaultLight || !state.textColor) {
+              state.textColor = INITIAL_TEXT_COLOR_DARK_MODE;
+            }
+          } else { // Should be light text color (black)
+            // If color is any dark default (old or new), or unset, set to light default
+            if (isPreviousDefaultDark || isNewDefaultDark || !state.textColor) {
+              state.textColor = INITIAL_TEXT_COLOR_LIGHT_MODE;
+            }
+          }
+          // If user had a custom color (not matching any of these defaults), it remains untouched.
         }
       }
     }
   )
 );
 
+// This block runs once on client-side initialization to set up dark mode based on system preference
+// IF no value was hydrated from localStorage for darkMode.
+// It also ensures the textColor is correctly initialized based on the determined darkMode.
 if (typeof window !== 'undefined') {
-  const initialStoreState = useTeleprompterStore.getState();
-  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  
-  // Check if darkMode is already set (e.g. from localStorage)
-  let currentDarkMode = initialStoreState.darkMode;
+  const store = useTeleprompterStore.getState();
+  let currentDarkMode = store.darkMode; // This will be the hydrated value or initial value
 
-  // If darkMode wasn't in persisted state, use system preference
-  if (initialStoreState.darkMode === undefined || initialStoreState.darkMode === null) {
-      currentDarkMode = systemPrefersDark;
-      useTeleprompterStore.setState({ darkMode: currentDarkMode });
-  }
+  // If darkMode was undefined from hydration (e.g. first visit, nothing in localStorage),
+  // then systemPrefersDark (calculated above) would have been used for initialDarkModeState.
+  // So, currentDarkMode should be correctly set at this point.
 
-  // Apply dark mode class and initial text color
   if (currentDarkMode) {
     document.documentElement.classList.add('dark');
-    if (initialStoreState.textColor === INITIAL_TEXT_COLOR_LIGHT || !initialStoreState.textColor) {
-       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_DARK });
+    // If textColor is the light default or unset, switch to dark default
+    if (store.textColor === INITIAL_TEXT_COLOR_LIGHT_MODE || 
+        store.textColor === PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT || 
+        !store.textColor) {
+       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_DARK_MODE });
     }
   } else {
     document.documentElement.classList.remove('dark');
-    if (initialStoreState.textColor === INITIAL_TEXT_COLOR_DARK || !initialStoreState.textColor) {
-       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_LIGHT });
+    // If textColor is the dark default or unset, switch to light default
+    if (store.textColor === INITIAL_TEXT_COLOR_DARK_MODE || 
+        store.textColor === PREVIOUS_DEFAULT_TEXT_COLOR_DARK || 
+        !store.textColor) {
+       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_LIGHT_MODE });
     }
   }
 }
+
+    

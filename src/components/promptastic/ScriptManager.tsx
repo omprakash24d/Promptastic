@@ -13,11 +13,12 @@ import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2 }
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
-// The workerSrc path might need adjustment based on your project structure and bundler
-// For Next.js, you might need to copy the worker file to the public directory
+import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
+
+// Set workerSrc for pdf.js. It's important for Next.js environments.
+// Use the .mjs worker for ESM environments.
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
 }
 
 
@@ -160,7 +161,7 @@ export function ScriptManager() {
           processFileContent(content, fileName);
         } else if (file.type === "application/pdf") {
           const arrayBuffer = await file.arrayBuffer();
-          const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+          const pdf = await getDocument({data: arrayBuffer}).promise;
           let textContent = "";
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -294,3 +295,5 @@ export function ScriptManager() {
     </div>
   );
 }
+
+    
