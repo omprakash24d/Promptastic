@@ -6,6 +6,11 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { cn } from '@/lib/utils';
 
+// Define SSR-safe defaults directly or import from a shared constants location if preferred
+const SERVER_DEFAULT_TEXT_COLOR = 'hsl(0 0% 0%)'; // Black (matches INITIAL_TEXT_COLOR_LIGHT_MODE)
+const SERVER_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; // Matches INITIAL_FONT_FAMILY
+const SERVER_DEFAULT_DARK_MODE = false; // Light mode
+
 export function TeleprompterView() {
   const {
     scriptText,
@@ -13,9 +18,9 @@ export function TeleprompterView() {
     scrollSpeed,
     lineHeight,
     isMirrored,
-    darkMode, // Used for default text color if not overridden
-    textColor, // New: from store
-    fontFamily, // New: from store
+    darkMode, 
+    textColor, 
+    fontFamily, 
     isPlaying,
     currentScrollPosition,
     setCurrentScrollPosition,
@@ -26,8 +31,14 @@ export function TeleprompterView() {
   const animationFrameIdRef = useRef<number | null>(null);
   const lastTimestampRef = useRef<number>(0);
   const userInteractedRef = useRef<boolean>(false);
-  const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
+  const paragraphRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
+
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     paragraphRefs.current = paragraphRefs.current.slice(0, scriptText.split('\n\n').length);
@@ -55,31 +66,29 @@ export function TeleprompterView() {
     }
      if (newHighlightedIndex === null && container.scrollTop === 0 && paragraphRefs.current.length > 0) {
       const firstPRef = paragraphRefs.current[0];
-      if (firstPRef && firstPRef.offsetTop < container.clientHeight / 3 + firstPRef.offsetHeight / 2) { // check if first para is in focus zone
+      if (firstPRef && firstPRef.offsetTop < container.clientHeight / 3 + firstPRef.offsetHeight / 2) {
         newHighlightedIndex = 0;
       }
     }
     setHighlightedParagraphIndex(newHighlightedIndex);
-  }, [scriptText]); // scriptText dependency is important
+  }, [scriptText]); 
 
-  // Split by double newlines to treat blocks of text as paragraphs for highlighting
   const formattedScriptText = scriptText.split('\n\n').map((paragraphBlock, index) => (
     <div
       key={index}
       ref={(el) => (paragraphRefs.current[index] = el)}
       className={cn(
-        "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out", // Use opacity for highlighting
+        "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out", 
         highlightedParagraphIndex === index ? "opacity-100" : "opacity-60",
       )}
     >
       {paragraphBlock.split('\n').map((line, lineIndex) => (
-        <p key={lineIndex} className="mb-1 last:mb-0"> {/* Smaller margin between lines within a block */}
+        <p key={lineIndex} className="mb-1 last:mb-0"> 
           {line || <>&nbsp;</>}
         </p>
       ))}
     </div>
   ));
-
 
   const scrollLoop = useCallback((timestamp: number) => {
     if (!isPlaying || !scrollContainerRef.current) {
@@ -131,12 +140,10 @@ export function TeleprompterView() {
 
   useEffect(() => {
     if (scrollContainerRef.current) {
-      // Only set scrollTop if not playing to allow animation to control it
       if(!isPlaying) {
         scrollContainerRef.current.scrollTop = currentScrollPosition;
       }
     }
-    // Always check highlight, even if scroll was set by animation
     checkHighlightedParagraph();
   }, [currentScrollPosition, checkHighlightedParagraph, isPlaying]);
   
@@ -149,20 +156,18 @@ export function TeleprompterView() {
       if (!isPlaying) {
          setCurrentScrollPosition(currentPhysicalScroll);
       } else {
-        // If playing and user manually scrolls significantly, pause playback
-        if (Math.abs(currentPhysicalScroll - get().currentScrollPosition) > scrollSpeed / 60 * 5 ) { // 5 frames worth of scroll
+        if (Math.abs(currentPhysicalScroll - useTeleprompterStore.getState().currentScrollPosition) > scrollSpeed / 60 * 5 ) { 
           userInteractedRef.current = true;
           setIsPlaying(false);
-          setCurrentScrollPosition(currentPhysicalScroll); // Update store with user's scroll
+          setCurrentScrollPosition(currentPhysicalScroll); 
         }
       }
       checkHighlightedParagraph();
     };
     
-    // Debounce or throttle might be good here if performance issues arise
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [isPlaying, setIsPlaying, setCurrentScrollPosition, scrollSpeed, checkHighlightedParagraph, useTeleprompterStore.getState]); // Add getState for direct access in listener
+  }, [isPlaying, setIsPlaying, setCurrentScrollPosition, scrollSpeed, checkHighlightedParagraph]); 
 
   useEffect(() => {
     setHighlightedParagraphIndex(null); 
@@ -170,7 +175,7 @@ export function TeleprompterView() {
        checkHighlightedParagraph();
     }, 0);
     return () => clearTimeout(timer);
-  }, [scriptText, checkHighlightedParagraph, fontFamily, fontSize, lineHeight]); // Re-check on style changes that affect layout
+  }, [scriptText, checkHighlightedParagraph, fontFamily, fontSize, lineHeight]); 
 
   return (
     <div
@@ -178,14 +183,15 @@ export function TeleprompterView() {
       className={cn(
         "w-full h-full overflow-y-auto p-8 md:p-16 focus:outline-none",
         "transition-colors duration-300 ease-in-out",
-        darkMode ? "bg-gray-900" : "bg-gray-50",
+        // Use SSR-safe default for className logic before client hydration
+        (!isMounted ? SERVER_DEFAULT_DARK_MODE : darkMode) ? "bg-gray-900" : "bg-gray-50",
       )}
       style={{
-        // Apply custom text color and font family from store
-        color: textColor, 
-        fontFamily: fontFamily,
-        fontSize: `${fontSize}px`,
-        lineHeight: lineHeight,
+        // Use SSR-safe defaults for style properties before client hydration
+        color: !isMounted ? SERVER_DEFAULT_TEXT_COLOR : textColor, 
+        fontFamily: !isMounted ? SERVER_DEFAULT_FONT_FAMILY : fontFamily,
+        fontSize: `${fontSize}px`, // fontSize is generally safe if its initial store value is static
+        lineHeight: lineHeight,    // lineHeight is also generally safe
         transform: isMirrored ? 'scaleX(-1)' : 'none',
       }}
       tabIndex={0}
@@ -194,12 +200,8 @@ export function TeleprompterView() {
         className="select-none"
         style={{ 
           transform: isMirrored ? 'scaleX(-1)' : 'none',
-          // Centering text can be nice for teleprompters
-          // textAlign: 'center', // Uncomment if centered text is desired
         }}
       >
-        {/* Ensure highlighted text has primary color if not using opacity based highlighting */}
-        {/* This requires modifying the formattedScriptText logic if we bring back text-primary for highlight */}
         {formattedScriptText}
       </div>
     </div>
