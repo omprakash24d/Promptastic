@@ -13,7 +13,9 @@ export function TeleprompterView() {
     scrollSpeed,
     lineHeight,
     isMirrored,
-    darkMode,
+    darkMode, // Used for default text color if not overridden
+    textColor, // New: from store
+    fontFamily, // New: from store
     isPlaying,
     currentScrollPosition,
     setCurrentScrollPosition,
@@ -27,9 +29,8 @@ export function TeleprompterView() {
   const paragraphRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
 
-  // Ensure paragraphRefs array has the correct length
   useEffect(() => {
-    paragraphRefs.current = paragraphRefs.current.slice(0, scriptText.split('\n').length);
+    paragraphRefs.current = paragraphRefs.current.slice(0, scriptText.split('\n\n').length);
   }, [scriptText]);
 
   const checkHighlightedParagraph = useCallback(() => {
@@ -38,7 +39,6 @@ export function TeleprompterView() {
       return;
     }
     const container = scrollContainerRef.current;
-    // Focus line is about 1/3rd from the top of the visible area
     const focusLine = container.scrollTop + container.clientHeight / 3;
 
     let newHighlightedIndex: number | null = null;
@@ -53,28 +53,33 @@ export function TeleprompterView() {
         }
       }
     }
-    if (newHighlightedIndex === null && container.scrollTop === 0 && paragraphRefs.current.length > 0) {
-      // If at the top and nothing is highlighted, highlight the first paragraph if visible
+     if (newHighlightedIndex === null && container.scrollTop === 0 && paragraphRefs.current.length > 0) {
       const firstPRef = paragraphRefs.current[0];
-      if (firstPRef && firstPRef.offsetTop < container.clientHeight / 3) {
+      if (firstPRef && firstPRef.offsetTop < container.clientHeight / 3 + firstPRef.offsetHeight / 2) { // check if first para is in focus zone
         newHighlightedIndex = 0;
       }
     }
     setHighlightedParagraphIndex(newHighlightedIndex);
-  }, [scriptText]); // Re-evaluate if scriptText changes
+  }, [scriptText]); // scriptText dependency is important
 
-  const formattedScriptText = scriptText.split('\n').map((paragraph, index) => (
-    <p
+  // Split by double newlines to treat blocks of text as paragraphs for highlighting
+  const formattedScriptText = scriptText.split('\n\n').map((paragraphBlock, index) => (
+    <div
       key={index}
       ref={(el) => (paragraphRefs.current[index] = el)}
       className={cn(
-        "mb-2 last:mb-0 transition-colors duration-150 ease-in-out",
-        highlightedParagraphIndex === index ? "text-primary" : (darkMode ? "text-gray-300" : "text-gray-700")
+        "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out", // Use opacity for highlighting
+        highlightedParagraphIndex === index ? "opacity-100" : "opacity-60",
       )}
     >
-      {paragraph || <>&nbsp;</>}
-    </p>
+      {paragraphBlock.split('\n').map((line, lineIndex) => (
+        <p key={lineIndex} className="mb-1 last:mb-0"> {/* Smaller margin between lines within a block */}
+          {line || <>&nbsp;</>}
+        </p>
+      ))}
+    </div>
   ));
+
 
   const scrollLoop = useCallback((timestamp: number) => {
     if (!isPlaying || !scrollContainerRef.current) {
@@ -104,7 +109,7 @@ export function TeleprompterView() {
       animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
     }
     checkHighlightedParagraph();
-  }, [isPlaying, scrollSpeed, setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph, scriptText]);
+  }, [isPlaying, scrollSpeed, setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -126,44 +131,46 @@ export function TeleprompterView() {
 
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = currentScrollPosition;
+      // Only set scrollTop if not playing to allow animation to control it
+      if(!isPlaying) {
+        scrollContainerRef.current.scrollTop = currentScrollPosition;
+      }
     }
-    checkHighlightedParagraph(); // Check highlight when position changes programmatically
-  }, [currentScrollPosition, checkHighlightedParagraph]);
+    // Always check highlight, even if scroll was set by animation
+    checkHighlightedParagraph();
+  }, [currentScrollPosition, checkHighlightedParagraph, isPlaying]);
   
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
+      const currentPhysicalScroll = container.scrollTop;
       if (!isPlaying) {
-         setCurrentScrollPosition(container.scrollTop);
+         setCurrentScrollPosition(currentPhysicalScroll);
       } else {
-        if (Math.abs(container.scrollTop - currentScrollPosition) > scrollSpeed / 60 * 2 ) {
-          if (isPlaying) {
-              userInteractedRef.current = true;
-              setIsPlaying(false);
-          }
-          setCurrentScrollPosition(container.scrollTop);
+        // If playing and user manually scrolls significantly, pause playback
+        if (Math.abs(currentPhysicalScroll - get().currentScrollPosition) > scrollSpeed / 60 * 5 ) { // 5 frames worth of scroll
+          userInteractedRef.current = true;
+          setIsPlaying(false);
+          setCurrentScrollPosition(currentPhysicalScroll); // Update store with user's scroll
         }
       }
-      checkHighlightedParagraph(); // Check highlight on any scroll
+      checkHighlightedParagraph();
     };
-
+    
+    // Debounce or throttle might be good here if performance issues arise
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [isPlaying, setIsPlaying, setCurrentScrollPosition, scrollSpeed, currentScrollPosition, checkHighlightedParagraph]);
+  }, [isPlaying, setIsPlaying, setCurrentScrollPosition, scrollSpeed, checkHighlightedParagraph, useTeleprompterStore.getState]); // Add getState for direct access in listener
 
-  // Initial highlight check or when script text changes
   useEffect(() => {
-    setHighlightedParagraphIndex(null); // Reset on script change
-    // Timeout to allow DOM to update with new paragraph refs
+    setHighlightedParagraphIndex(null); 
     const timer = setTimeout(() => {
        checkHighlightedParagraph();
     }, 0);
     return () => clearTimeout(timer);
-  }, [scriptText, checkHighlightedParagraph]);
-
+  }, [scriptText, checkHighlightedParagraph, fontFamily, fontSize, lineHeight]); // Re-check on style changes that affect layout
 
   return (
     <div
@@ -171,9 +178,12 @@ export function TeleprompterView() {
       className={cn(
         "w-full h-full overflow-y-auto p-8 md:p-16 focus:outline-none",
         "transition-colors duration-300 ease-in-out",
-        darkMode ? "bg-gray-900" : "bg-gray-50", // Base text color is set by paragraph class
+        darkMode ? "bg-gray-900" : "bg-gray-50",
       )}
       style={{
+        // Apply custom text color and font family from store
+        color: textColor, 
+        fontFamily: fontFamily,
         fontSize: `${fontSize}px`,
         lineHeight: lineHeight,
         transform: isMirrored ? 'scaleX(-1)' : 'none',
@@ -182,8 +192,14 @@ export function TeleprompterView() {
     >
       <div 
         className="select-none"
-        style={{ transform: isMirrored ? 'scaleX(-1)' : 'none' }}
+        style={{ 
+          transform: isMirrored ? 'scaleX(-1)' : 'none',
+          // Centering text can be nice for teleprompters
+          // textAlign: 'center', // Uncomment if centered text is desired
+        }}
       >
+        {/* Ensure highlighted text has primary color if not using opacity based highlighting */}
+        {/* This requires modifying the formattedScriptText logic if we bring back text-primary for highlight */}
         {formattedScriptText}
       </div>
     </div>

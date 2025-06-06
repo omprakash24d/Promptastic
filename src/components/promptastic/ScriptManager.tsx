@@ -9,9 +9,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp } from 'lucide-react';
+import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+// The workerSrc path might need adjustment based on your project structure and bundler
+// For Next.js, you might need to copy the worker file to the public directory
+if (typeof window !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+}
+
 
 export function ScriptManager() {
   const { toast } = useToast();
@@ -38,7 +46,7 @@ export function ScriptManager() {
       if (active) setCurrentEditingScriptText(active.content);
       else setCurrentEditingScriptText(""); 
     } else {
-      setCurrentEditingScriptText(scriptText);
+      setCurrentEditingScriptText(scriptText); // Keep current text if no active script (e.g., for new script)
     }
   }, [activeScriptName, scripts, scriptText]);
 
@@ -55,7 +63,7 @@ export function ScriptManager() {
     }
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName("");
+    if (!activeScriptName) setNewScriptName(""); // Clear new script name only if it was a new save
   };
 
   const handleLoad = (name: string) => {
@@ -66,17 +74,21 @@ export function ScriptManager() {
   const handleDelete = (name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
       const wasActive = activeScriptName === name;
+      const currentScripts = scripts.filter(s => s.name !== name); // scripts before deletion
       deleteScript(name);
       toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
+      
       if (wasActive) {
-        if (scripts.length > 1) { 
-            const newActiveScript = scripts.find(s => s.name !== name); 
+        if (currentScripts.length > 0) { 
+            const newActiveScript = currentScripts[0]; // Load the first script from the remaining list
             if (newActiveScript) {
                 loadScript(newActiveScript.name);
             }
         } else {
+             // No scripts left
              setScriptText(""); 
              setCurrentEditingScriptText("");
+             setActiveScriptName(null);
         }
       }
     }
@@ -99,8 +111,8 @@ export function ScriptManager() {
 
   const handleNewScript = () => {
     setActiveScriptName(null); 
-    setScriptText(""); 
-    setCurrentEditingScriptText(""); 
+    setScriptText(""); // Clear main script text
+    setCurrentEditingScriptText(""); // Clear editor
     setNewScriptName("");
     toast({ title: "New Script", description: "Ready for your new script."});
   };
@@ -110,7 +122,7 @@ export function ScriptManager() {
       toast({ title: "Error", description: "No script content to export.", variant: "destructive" });
       return;
     }
-    const filename = (activeScriptName || "promptastic_script") + ".txt";
+    const filename = (activeScriptName || newScriptName || "promptastic_script") + ".txt";
     const blob = new Blob([currentEditingScriptText], { type: "text/plain;charset=utf-8" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -122,29 +134,52 @@ export function ScriptManager() {
     toast({ title: "Script Exported", description: `Script exported as ${filename}.` });
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
+  const triggerFileInput = (acceptTypes: string) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = acceptTypes;
+      fileInputRef.current.click();
+    }
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const processFileContent = (content: string, fileName: string) => {
+    setActiveScriptName(null);
+    setScriptText(content);
+    setCurrentEditingScriptText(content);
+    const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
+    setNewScriptName(fileNameWithoutExtension);
+    toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it.` });
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.type === "text/plain") {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          setActiveScriptName(null); 
-          setScriptText(content); 
-          setCurrentEditingScriptText(content); 
-          const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, "");
-          setNewScriptName(fileNameWithoutExtension); 
-          toast({ title: "File Imported", description: `Content of "${file.name}" loaded. You can now save it.` });
-        };
-        reader.readAsText(file);
-      } else {
-        toast({ title: "Import Error", description: "Please select a .txt file.", variant: "destructive" });
+      const fileName = file.name;
+      try {
+        if (file.type === "text/plain") {
+          const content = await file.text();
+          processFileContent(content, fileName);
+        } else if (file.type === "application/pdf") {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+          let textContent = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const text = await page.getTextContent();
+            textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
+          }
+          processFileContent(textContent, fileName);
+        } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.name.endsWith(".docx")) {
+           const arrayBuffer = await file.arrayBuffer();
+           const result = await mammoth.extractRawText({ arrayBuffer });
+           processFileContent(result.value, fileName);
+        } else {
+          toast({ title: "Import Error", description: "Unsupported file type. Please select .txt, .pdf, or .docx.", variant: "destructive" });
+        }
+      } catch (error) {
+        console.error("Error importing file:", error);
+        toast({ title: "Import Error", description: "Could not read file content. " + (error instanceof Error ? error.message : ""), variant: "destructive" });
       }
-      if (event.target) event.target.value = ""; 
+      if (event.target) event.target.value = ""; // Reset file input
     }
   };
 
@@ -185,11 +220,17 @@ export function ScriptManager() {
             <Button onClick={handleNewScript} variant="outline" className="flex-grow sm:flex-grow-0">
               <FilePlus2 className="mr-2 h-4 w-4" /> New
             </Button>
-            <Button onClick={handleExportTxt} variant="outline" className="flex-grow sm:flex-grow-0">
-              <Download className="mr-2 h-4 w-4" /> Export
+             <Button onClick={handleExportTxt} variant="outline" className="flex-grow sm:flex-grow-0">
+              <Download className="mr-2 h-4 w-4" /> Export .txt
             </Button>
-            <Button onClick={handleImportClick} variant="outline" className="flex-grow sm:flex-grow-0">
-              <FileUp className="mr-2 h-4 w-4" /> Import
+            <Button onClick={() => triggerFileInput('.txt')} variant="outline" className="flex-grow sm:flex-grow-0">
+              <FileUp className="mr-2 h-4 w-4" /> Import .txt
+            </Button>
+            <Button onClick={() => triggerFileInput('.pdf')} variant="outline" className="flex-grow sm:flex-grow-0">
+              <FileCode2 className="mr-2 h-4 w-4" /> Import .pdf
+            </Button>
+            <Button onClick={() => triggerFileInput('.docx')} variant="outline" className="flex-grow sm:flex-grow-0">
+              <FileText className="mr-2 h-4 w-4" /> Import .docx
             </Button>
         </CardFooter>
       </Card>
@@ -198,7 +239,7 @@ export function ScriptManager() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
-        accept=".txt"
+        // Accept will be set dynamically
         className="hidden"
       />
 

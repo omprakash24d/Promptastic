@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -8,6 +9,9 @@ import { loadFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
 const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
+const INITIAL_TEXT_COLOR_LIGHT = 'hsl(215 25% 27%)'; // Matches --foreground
+const INITIAL_TEXT_COLOR_DARK = 'hsl(210 30% 95%)'; // Matches dark --foreground
+const INITIAL_FONT_FAMILY = 'Inter';
 
 interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
@@ -31,6 +35,8 @@ interface TeleprompterState extends TeleprompterSettings {
   setIsMirrored: (mirrored: boolean) => void;
   setDarkMode: (darkMode: boolean) => void;
   setIsAutoSyncEnabled: (enabled: boolean) => void;
+  setTextColor: (color: string) => void;
+  setFontFamily: (font: string) => void;
 
   togglePlayPause: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -53,15 +59,17 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       scrollSpeed: INITIAL_SCROLL_SPEED,
       lineHeight: INITIAL_LINE_HEIGHT,
       isMirrored: false,
-      darkMode: false, // System preference can be checked in useEffect in page.tsx
+      darkMode: false, 
       isAutoSyncEnabled: false,
+      textColor: INITIAL_TEXT_COLOR_LIGHT, // Default to light mode text color
+      fontFamily: INITIAL_FONT_FAMILY,
       
       isPlaying: false,
       currentScrollPosition: 0,
       isSettingsPanelOpen: false,
 
       // Actions
-      setScriptText: (text) => set({ scriptText: text, activeScriptName: null }), // Clear active script if text is manually changed
+      setScriptText: (text) => set({ scriptText: text, activeScriptName: null }),
       setActiveScriptName: (name) => set({ activeScriptName: name }),
       
       loadScript: (name) => {
@@ -97,12 +105,18 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         }));
       },
 
-      setFontSize: (size) => set({ fontSize: Math.max(12, size) }), // Min font size 12px
-      setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }), // Min speed 1
-      setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }), // Min line height 1
+      setFontSize: (size) => set({ fontSize: Math.max(12, size) }),
+      setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }),
+      setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
       setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
       setDarkMode: (darkMode) => {
-        set({ darkMode });
+        set({ 
+          darkMode,
+          // Adjust default text color based on dark mode, if it's currently set to one of the defaults
+          textColor: get().textColor === INITIAL_TEXT_COLOR_LIGHT || get().textColor === INITIAL_TEXT_COLOR_DARK 
+                     ? (darkMode ? INITIAL_TEXT_COLOR_DARK : INITIAL_TEXT_COLOR_LIGHT)
+                     : get().textColor
+        });
         if (typeof document !== 'undefined') {
           if (darkMode) {
             document.documentElement.classList.add('dark');
@@ -112,6 +126,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         }
       },
       setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
+      setTextColor: (color) => set({ textColor: color }),
+      setFontFamily: (font) => set({ fontFamily: font }),
 
       togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
       setIsPlaying: (playing) => set({ isPlaying: playing }),
@@ -122,13 +138,13 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       setSettingsPanelOpen: (isOpen) => set({isSettingsPanelOpen: isOpen}),
     }),
     {
-      name: 'promptastic-store', // name of the item in the storage (must be unique)
+      name: 'promptastic-store',
       storage: createJSONStorage(() => ({
         getItem: (name) => JSON.stringify(loadFromLocalStorage(name, {})),
         setItem: (name, value) => saveToLocalStorage(name, JSON.parse(value)),
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
-      partialize: (state) => ({ // Persist only these parts of the state
+      partialize: (state) => ({
         scripts: state.scripts,
         activeScriptName: state.activeScriptName,
         fontSize: state.fontSize,
@@ -137,23 +153,56 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isMirrored: state.isMirrored,
         darkMode: state.darkMode,
         isAutoSyncEnabled: state.isAutoSyncEnabled,
-        // Do not persist scriptText, isPlaying, currentScrollPosition, isSettingsPanelOpen by default
+        textColor: state.textColor,
+        fontFamily: state.fontFamily,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Ensure dark mode class is set on HTML element after rehydration
+          if (typeof document !== 'undefined') {
+            if (state.darkMode) {
+              document.documentElement.classList.add('dark');
+               // If textColor is default light, change to default dark
+              if (state.textColor === INITIAL_TEXT_COLOR_LIGHT) {
+                state.textColor = INITIAL_TEXT_COLOR_DARK;
+              }
+            } else {
+              document.documentElement.classList.remove('dark');
+              // If textColor is default dark, change to default light
+              if (state.textColor === INITIAL_TEXT_COLOR_DARK) {
+                state.textColor = INITIAL_TEXT_COLOR_LIGHT;
+              }
+            }
+          }
+        }
+      }
     }
   )
 );
 
-// Initialize dark mode based on persisted state or system preference
 if (typeof window !== 'undefined') {
-  const initialDarkMode = useTeleprompterStore.getState().darkMode;
+  const initialStoreState = useTeleprompterStore.getState();
   const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const darkMode = initialDarkMode ?? systemPrefersDark; // Use persisted if available, else system
   
-  if (darkMode) {
+  // Check if darkMode is already set (e.g. from localStorage)
+  let currentDarkMode = initialStoreState.darkMode;
+
+  // If darkMode wasn't in persisted state, use system preference
+  if (initialStoreState.darkMode === undefined || initialStoreState.darkMode === null) {
+      currentDarkMode = systemPrefersDark;
+      useTeleprompterStore.setState({ darkMode: currentDarkMode });
+  }
+
+  // Apply dark mode class and initial text color
+  if (currentDarkMode) {
     document.documentElement.classList.add('dark');
-    useTeleprompterStore.setState({ darkMode: true }); // Ensure store is updated if system preference was used
+    if (initialStoreState.textColor === INITIAL_TEXT_COLOR_LIGHT || !initialStoreState.textColor) {
+       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_DARK });
+    }
   } else {
     document.documentElement.classList.remove('dark');
-     useTeleprompterStore.setState({ darkMode: false });
+    if (initialStoreState.textColor === INITIAL_TEXT_COLOR_DARK || !initialStoreState.textColor) {
+       useTeleprompterStore.setState({ textColor: INITIAL_TEXT_COLOR_LIGHT });
+    }
   }
 }

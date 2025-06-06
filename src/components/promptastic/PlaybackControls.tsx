@@ -2,55 +2,106 @@
 "use client";
 
 import type React from 'react';
+import { useRef, useState } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Mic } from 'lucide-react'; // Removed Zap as it's not used
+import { Play, Pause, RotateCcw, Mic, MicOff } from 'lucide-react';
 import { scrollSyncWithSpeech, type ScrollSyncWithSpeechInput } from '@/ai/flows/scroll-sync-with-speech';
 import { useToast } from '@/hooks/use-toast';
-
-// A placeholder for a very short, silent WAV file encoded as a data URI.
-const MOCK_AUDIO_DATA_URI = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-
 
 export function PlaybackControls() {
   const { toast } = useToast();
   const {
     isPlaying, togglePlayPause,
     resetScroll,
-    scriptText, isAutoSyncEnabled, setScrollSpeed
+    scriptText, isAutoSyncEnabled, setScrollSpeed,
+    darkMode // to potentially adjust toast appearance if needed, though typically handled by Toaster
   } = useTeleprompterStore();
 
-  const handleAiSync = async () => {
-    if (!isAutoSyncEnabled) {
-      toast({
-        title: "AI Sync Disabled",
-        description: "Please enable AI Scroll Sync in settings to use this feature.",
-        variant: "default",
-      });
-      return;
-    }
-    if (!scriptText.trim()) {
-      toast({ title: "Error", description: "Cannot sync scroll: Script is empty.", variant: "destructive" });
-      return;
-    }
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
 
-    toast({ title: "AI Syncing...", description: "Attempting to sync scroll speed with speech." });
+  const requestMicPermission = async () => {
+    setPermissionError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Close the stream immediately if we only need permission status
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err) {
+      console.error("Microphone permission denied:", err);
+      setPermissionError("Microphone access is required for AI Sync. Please enable it in your browser settings.");
+      toast({
+        title: "Microphone Permission Denied",
+        description: "AI Sync needs microphone access. Please enable it in your browser settings and try again.",
+        variant: "destructive",
+        duration: 7000,
+      });
+      return false;
+    }
+  };
+
+  const startRecording = async () => {
+    if (!(await requestMicPermission())) return;
 
     try {
-      // In a real app, you'd get audioDataUri from a MediaRecorder or similar.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorderRef.current.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); // Popular, good quality
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const audioDataUri = reader.result as string;
+          stream.getTracks().forEach(track => track.stop()); // Stop microphone tracks
+          setIsRecording(false);
+          await processAiSync(audioDataUri);
+        };
+      };
+
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      toast({ title: "Recording...", description: "Speak a few lines from your script." });
+
+      // Stop recording after a short duration (e.g., 5 seconds)
+      setTimeout(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }, 5000); // Adjust duration as needed
+
+    } catch (err) {
+      console.error("Error starting recording:", err);
+      toast({ title: "Recording Error", description: "Could not start audio recording.", variant: "destructive" });
+      setIsRecording(false);
+    }
+  };
+
+  const processAiSync = async (audioDataUri: string) => {
+    toast({ title: "AI Syncing...", description: "Analyzing speech to adjust scroll speed." });
+    try {
       const input: ScrollSyncWithSpeechInput = {
         scriptText,
-        audioDataUri: MOCK_AUDIO_DATA_URI, 
+        audioDataUri, 
         isAutoSyncEnabled: true, 
       };
       const output = await scrollSyncWithSpeech(input);
       
+      // Ensure speed is within a reasonable range (e.g., 10-200)
       const newSpeed = Math.max(10, Math.min(output.adjustedScrollSpeed, 200));
       setScrollSpeed(newSpeed);
 
       toast({
         title: "AI Sync Complete",
-        description: `Scroll speed adjusted to ${newSpeed}. Detected speech rate: ${output.speechRate} WPM.`,
+        description: `Scroll speed adjusted to ${newSpeed}. Detected speech rate: ${output.speechRate} WPM. (Note: Speech analysis is currently a placeholder).`,
       });
     } catch (error) {
       console.error("AI Sync Error:", error);
@@ -60,6 +111,27 @@ export function PlaybackControls() {
         variant: "destructive",
       });
     }
+  };
+
+
+  const handleAiSyncClick = async () => {
+    if (!isAutoSyncEnabled) {
+      toast({
+        title: "AI Sync Disabled",
+        description: "Please enable AI Scroll Sync in settings to use this feature.",
+      });
+      return;
+    }
+    if (!scriptText.trim()) {
+      toast({ title: "Error", description: "Cannot sync scroll: Script is empty.", variant: "destructive" });
+      return;
+    }
+    if (isRecording) {
+      if (mediaRecorderRef.current) mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      return;
+    }
+    await startRecording();
   };
 
   return (
@@ -73,9 +145,19 @@ export function PlaybackControls() {
         <span className="ml-2">Reset</span>
       </Button>
       {isAutoSyncEnabled && (
-        <Button onClick={handleAiSync} variant="outline" size="lg" className="bg-accent/20 hover:bg-accent/30 border-accent text-accent-foreground" aria-label="Sync with AI Speech">
-          <Mic className="h-6 w-6" />
-          <span className="ml-2">AI Sync</span>
+        <Button 
+          onClick={handleAiSyncClick} 
+          variant="outline" 
+          size="lg" 
+          className={`
+            ${isRecording ? "bg-red-500/30 hover:bg-red-600/40 border-red-500 text-red-700 dark:text-red-300" 
+                          : "bg-accent/20 hover:bg-accent/30 border-accent text-accent-foreground"}
+          `}
+          aria-label={isRecording ? "Stop AI Sync Recording" : "Start AI Sync with Speech"}
+          disabled={permissionError !== null && !isRecording}
+        >
+          {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          <span className="ml-2">{isRecording ? 'Stop Sync' : 'AI Sync'}</span>
         </Button>
       )}
     </div>

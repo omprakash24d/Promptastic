@@ -1,3 +1,4 @@
+
 export interface Script {
   name: string;
   content: string;
@@ -12,11 +13,13 @@ export interface TeleprompterSettings {
   isMirrored: boolean;
   darkMode: boolean;
   isAutoSyncEnabled: boolean;
+  textColor: string; // e.g., '#FFFFFF' or 'hsl(0, 0%, 100%)'
+  fontFamily: string; // e.g., 'Inter', 'Arial'
 }
 
 export interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
-  activeScript: Script | null;
+  activeScript: Script | null; // This was in the interface but not used in store, kept for consistency
   isPlaying: boolean;
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
