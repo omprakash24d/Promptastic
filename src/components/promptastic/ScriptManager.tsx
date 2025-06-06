@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { FilePlus2, Save, Trash2, Edit3, Download, FileUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function ScriptManager() {
   const { toast } = useToast();
@@ -35,9 +36,8 @@ export function ScriptManager() {
     if (activeScriptName) {
       const active = scripts.find(s => s.name === activeScriptName);
       if (active) setCurrentEditingScriptText(active.content);
-      else setCurrentEditingScriptText(""); // Clear if active script name is invalid/deleted
+      else setCurrentEditingScriptText(""); 
     } else {
-      // If no active script name, reflect the global scriptText (e.g. after import or new script)
       setCurrentEditingScriptText(scriptText);
     }
   }, [activeScriptName, scripts, scriptText]);
@@ -55,12 +55,11 @@ export function ScriptManager() {
     }
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName(""); // Clear input only if it was a new script
+    if (!activeScriptName) setNewScriptName("");
   };
 
   const handleLoad = (name: string) => {
-    loadScript(name); // This will update global scriptText and activeScriptName
-    // The useEffect above will then update currentEditingScriptText
+    loadScript(name); 
     toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
   };
 
@@ -70,14 +69,13 @@ export function ScriptManager() {
       deleteScript(name);
       toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
       if (wasActive) {
-         // If the deleted script was active, try to load the first available script or clear
-        if (scripts.length > 1) { // scripts array in store is already updated by deleteScript
-            const newActiveScript = scripts.find(s => s.name !== name); // find first script that is not the deleted one
+        if (scripts.length > 1) { 
+            const newActiveScript = scripts.find(s => s.name !== name); 
             if (newActiveScript) {
                 loadScript(newActiveScript.name);
             }
         } else {
-             setScriptText(""); // Clear script text if no other scripts are left
+             setScriptText(""); 
              setCurrentEditingScriptText("");
         }
       }
@@ -100,9 +98,9 @@ export function ScriptManager() {
   };
 
   const handleNewScript = () => {
-    setActiveScriptName(null); // Important: set this first
-    setScriptText(""); // This updates global scriptText
-    setCurrentEditingScriptText(""); // This updates local textarea content
+    setActiveScriptName(null); 
+    setScriptText(""); 
+    setCurrentEditingScriptText(""); 
     setNewScriptName("");
     toast({ title: "New Script", description: "Ready for your new script."});
   };
@@ -135,38 +133,68 @@ export function ScriptManager() {
         const reader = new FileReader();
         reader.onload = (e) => {
           const content = e.target?.result as string;
-          setActiveScriptName(null); // Set active to null for imported script
-          setScriptText(content); // Update global state
-          setCurrentEditingScriptText(content); // Update local state for textarea
+          setActiveScriptName(null); 
+          setScriptText(content); 
+          setCurrentEditingScriptText(content); 
           const fileNameWithoutExtension = file.name.replace(/\.[^/.]+$/, "");
-          setNewScriptName(fileNameWithoutExtension); // Suggest filename for saving
+          setNewScriptName(fileNameWithoutExtension); 
           toast({ title: "File Imported", description: `Content of "${file.name}" loaded. You can now save it.` });
         };
         reader.readAsText(file);
       } else {
         toast({ title: "Import Error", description: "Please select a .txt file.", variant: "destructive" });
       }
-      // Reset file input to allow importing the same file again if needed
       if (event.target) event.target.value = ""; 
     }
   };
 
-
   return (
-    <div className="space-y-6 p-4">
-      <div>
-        <Label htmlFor="script-textarea" className="text-lg font-semibold mb-2 block">
-          {activeScriptName ? `Editing: ${activeScriptName}` : "Script Content (New/Imported)"}
-        </Label>
-        <Textarea
-          id="script-textarea"
-          value={currentEditingScriptText}
-          onChange={(e) => setCurrentEditingScriptText(e.target.value)}
-          placeholder="Paste or type your script here..."
-          className="min-h-[200px] text-base bg-background"
-          rows={10}
-        />
-      </div>
+    <div className="space-y-4 p-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            {activeScriptName ? `Editing: ${activeScriptName}` : "New/Imported Script"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            id="script-textarea"
+            value={currentEditingScriptText}
+            onChange={(e) => setCurrentEditingScriptText(e.target.value)}
+            placeholder="Paste or type your script here..."
+            className="min-h-[150px] text-sm bg-background"
+            rows={8}
+          />
+          {!activeScriptName && (
+            <div>
+              <Label htmlFor="new-script-name" className="text-xs">Script Name (for saving new/imported)</Label>
+              <Input
+                id="new-script-name"
+                value={newScriptName}
+                onChange={(e) => setNewScriptName(e.target.value)}
+                placeholder="Enter script name"
+                className="bg-background mt-1 text-sm"
+              />
+            </div>
+          )}
+        </CardContent>
+        <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
+          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:gap-2">
+            <Button onClick={handleSave} className="w-full sm:w-auto">
+              <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save Script'}
+            </Button>
+            <Button onClick={handleNewScript} variant="outline" className="w-full sm:w-auto">
+              <FilePlus2 className="mr-2 h-4 w-4" /> New
+            </Button>
+            <Button onClick={handleExportTxt} variant="outline" className="w-full sm:w-auto">
+              <Download className="mr-2 h-4 w-4" /> Export
+            </Button>
+            <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
+              <FileUp className="mr-2 h-4 w-4" /> Import
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
       
       <input
         type="file"
@@ -176,76 +204,53 @@ export function ScriptManager() {
         className="hidden"
       />
 
-      <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 items-end">
-        {!activeScriptName && (
-           <div className="flex-grow col-span-2 sm:col-auto">
-            <Label htmlFor="new-script-name">Script Name (for saving)</Label>
-            <Input
-              id="new-script-name"
-              value={newScriptName}
-              onChange={(e) => setNewScriptName(e.target.value)}
-              placeholder="Enter script name to save"
-              className="bg-background"
-            />
-          </div>
-        )}
-         <Button onClick={handleSave} className="w-full sm:w-auto">
-          <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save New Script'}
-        </Button>
-        <Button onClick={handleNewScript} variant="outline" className="w-full sm:w-auto">
-          <FilePlus2 className="mr-2 h-4 w-4" /> New
-        </Button>
-         <Button onClick={handleExportTxt} variant="outline" className="w-full sm:w-auto">
-          <Download className="mr-2 h-4 w-4" /> Export .txt
-        </Button>
-        <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
-          <FileUp className="mr-2 h-4 w-4" /> Import .txt
-        </Button>
-      </div>
-
       {scripts.length > 0 && (
-        <div>
-          <h3 className="text-lg font-semibold mb-2">Saved Scripts</h3>
-          <ScrollArea className="h-[200px] w-full rounded-md border p-2 bg-muted/20">
-            <ul className="space-y-2">
-              {scripts.map((script) => (
-                <li key={script.name} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                  {renamingScript === script.name ? (
-                    <div className="flex-grow flex items-center gap-2">
-                      <Input
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        className="h-8 bg-background"
-                        autoFocus
-                        onKeyDown={(e) => e.key === 'Enter' && handleRename(script.name)}
-                      />
-                      <Button size="sm" onClick={() => handleRename(script.name)}>Save</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setRenamingScript(null)}>Cancel</Button>
-                    </div>
-                  ) : (
-                    <>
-                      <span 
-                        className={`cursor-pointer hover:underline truncate flex-1 ${activeScriptName === script.name ? 'font-bold text-primary' : ''}`}
-                        onClick={() => handleLoad(script.name)}
-                        title={script.name}
-                      >
-                        {script.name}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label="Rename script">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(script.name)} aria-label="Delete script">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Saved Scripts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[200px] w-full rounded-md border p-1 bg-muted/20">
+              <ul className="space-y-1">
+                {scripts.map((script) => (
+                  <li key={script.name} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-sm">
+                    {renamingScript === script.name ? (
+                      <div className="flex-grow flex items-center gap-2">
+                        <Input
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          className="h-8 bg-background text-sm"
+                          autoFocus
+                          onKeyDown={(e) => e.key === 'Enter' && handleRename(script.name)}
+                        />
+                        <Button size="sm" onClick={() => handleRename(script.name)}>Save</Button>
+                        <Button size="sm" variant="ghost" onClick={() => setRenamingScript(null)}>Cancel</Button>
                       </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </ScrollArea>
-        </div>
+                    ) : (
+                      <>
+                        <span 
+                          className={`cursor-pointer hover:underline truncate flex-1 ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
+                          onClick={() => handleLoad(script.name)}
+                          title={script.name}
+                        >
+                          {script.name}
+                        </span>
+                        <div className="flex gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label="Rename script">
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label="Delete script">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
