@@ -4,13 +4,12 @@
 import type React from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Zap, Mic } from 'lucide-react';
+import { Play, Pause, RotateCcw, Mic } from 'lucide-react'; // Removed Zap as it's not used
 import { scrollSyncWithSpeech, type ScrollSyncWithSpeechInput } from '@/ai/flows/scroll-sync-with-speech';
 import { useToast } from '@/hooks/use-toast';
 
 // A placeholder for a very short, silent WAV file encoded as a data URI.
-// This specific URI might not represent valid audio but serves as a placeholder.
-const MOCK_AUDIO_DATA_URI = "data:audio/wav;base66,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+const MOCK_AUDIO_DATA_URI = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
 
 
 export function PlaybackControls() {
@@ -41,16 +40,11 @@ export function PlaybackControls() {
       // In a real app, you'd get audioDataUri from a MediaRecorder or similar.
       const input: ScrollSyncWithSpeechInput = {
         scriptText,
-        audioDataUri: MOCK_AUDIO_DATA_URI, // Placeholder
-        isAutoSyncEnabled: true, // Assuming if button is clicked, user wants it
+        audioDataUri: MOCK_AUDIO_DATA_URI, 
+        isAutoSyncEnabled: true, 
       };
       const output = await scrollSyncWithSpeech(input);
       
-      // The AI output is 'adjustedScrollSpeed'. This needs to be mapped to the store's scrollSpeed concept.
-      // The AI returns a number; let's assume it's a relative speed factor or target WPM.
-      // For now, let's interpret `adjustedScrollSpeed` as a direct value for our `scrollSpeed`.
-      // This might need calibration. The AI currently returns 50 if autoSync is off in input, or a value based on mock speech rate.
-      // Let's cap it to a reasonable range, e.g. 10-200.
       const newSpeed = Math.max(10, Math.min(output.adjustedScrollSpeed, 200));
       setScrollSpeed(newSpeed);
 

@@ -11,20 +11,20 @@ import { TeleprompterView } from '@/components/promptastic/TeleprompterView';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Settings, BookOpen, X } from 'lucide-react';
+import { BookOpen, X } from 'lucide-react'; // Changed Settings to BookOpen
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function PromptasticPage() {
   const { 
     isSettingsPanelOpen, 
     setSettingsPanelOpen, 
     darkMode, 
-    setDarkMode,
     scripts,
     activeScriptName,
-    loadScript: loadScriptFromStore, // aliasing to avoid conflict if needed
+    loadScript: loadScriptFromStore,
   } = useTeleprompterStore();
 
-  // Effect to apply dark mode class and load initial script if any
+  // Effect to apply dark mode class
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -33,15 +33,15 @@ export default function PromptasticPage() {
     }
   }, [darkMode]);
 
-  // Load last active script or first script on mount
-   useEffect(() => {
-    if (activeScriptName) {
+  // Load last active script or first script on mount/data change
+  useEffect(() => {
+    if (activeScriptName && scripts.some(s => s.name === activeScriptName)) {
       loadScriptFromStore(activeScriptName);
     } else if (scripts.length > 0) {
       loadScriptFromStore(scripts[0].name);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on mount
+    // If scripts.length is 0 and no activeScriptName, the default scriptText from store initial state will be used.
+  }, [activeScriptName, scripts, loadScriptFromStore]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
@@ -50,7 +50,7 @@ export default function PromptasticPage() {
         <Sheet open={isSettingsPanelOpen} onOpenChange={setSettingsPanelOpen}>
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" aria-label="Open settings and script manager">
-              <Settings className="h-5 w-5" />
+              <BookOpen className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:max-w-md p-0">
@@ -89,11 +89,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
-// Minimal Tabs implementation for switching between Settings and Scripts in Sheet
-// This avoids adding a full Tabs component from shadcn if not already present or for simplicity.
-// If shadcn Tabs are available, they should be used. For now, simple state switch.
-// UPDATE: Using Shadcn Tabs as they are available.
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
