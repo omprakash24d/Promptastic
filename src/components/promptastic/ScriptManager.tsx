@@ -149,7 +149,7 @@ export function ScriptManager() {
   };
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
@@ -178,21 +178,19 @@ export function ScriptManager() {
             </div>
           )}
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row gap-2 pt-4">
-          <div className="grid grid-cols-2 gap-2 w-full sm:flex sm:w-auto sm:gap-2">
-            <Button onClick={handleSave} className="w-full sm:w-auto">
+        <CardFooter className="flex flex-wrap justify-start gap-2 pt-4">
+            <Button onClick={handleSave} className="flex-grow sm:flex-grow-0">
               <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save Script'}
             </Button>
-            <Button onClick={handleNewScript} variant="outline" className="w-full sm:w-auto">
+            <Button onClick={handleNewScript} variant="outline" className="flex-grow sm:flex-grow-0">
               <FilePlus2 className="mr-2 h-4 w-4" /> New
             </Button>
-            <Button onClick={handleExportTxt} variant="outline" className="w-full sm:w-auto">
+            <Button onClick={handleExportTxt} variant="outline" className="flex-grow sm:flex-grow-0">
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
-            <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
+            <Button onClick={handleImportClick} variant="outline" className="flex-grow sm:flex-grow-0">
               <FileUp className="mr-2 h-4 w-4" /> Import
             </Button>
-          </div>
         </CardFooter>
       </Card>
       
