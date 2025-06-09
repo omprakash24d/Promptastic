@@ -11,7 +11,7 @@ import { loadFromLocalStorage } from '@/lib/localStorage';
 import Header from '@/components/layout/Header';
 import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { FileText, SlidersHorizontal, X, Maximize, Minimize } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -36,9 +36,11 @@ export default function PromptasticPage() {
     const settingsFromStorage = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
     
     if (settingsFromStorage.darkMode === undefined) {
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (systemPrefersDark !== useTeleprompterStore.getState().darkMode) {
-         setDarkMode(systemPrefersDark);
+      if (typeof window !== 'undefined') {
+        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (systemPrefersDark !== useTeleprompterStore.getState().darkMode) {
+           setDarkMode(systemPrefersDark);
+        }
       }
     } else {
       if (settingsFromStorage.darkMode !== useTeleprompterStore.getState().darkMode) {
@@ -65,11 +67,12 @@ export default function PromptasticPage() {
       const targetScript = storeState.scripts.find(s => s.name === scriptToLoadName);
       if (targetScript && (storeState.scriptText !== targetScript.content || !storeState.scriptText)) {
         loadScriptFromStore(scriptToLoadName);
+      } else if (!targetScript && !storeState.scriptText && storeState.scripts.length > 0) {
+        // If no script is actively loaded but scripts exist, load the first one
+        loadScriptFromStore(storeState.scripts[0].name);
       }
     } else if (storeState.scriptText === "" && storeState.activeScriptName) {
-      // If no scripts exist but an activeScriptName is somehow set (e.g. last script deleted), clear it.
-      // Or if it was the very first load and activeScriptName got set from storage with no actual scripts
-      loadScriptFromStore(storeState.activeScriptName); // This might clear scriptText if script not found
+      loadScriptFromStore(storeState.activeScriptName); 
     }
   }, [activeScriptName, scripts, loadScriptFromStore, currentGlobalScriptText]);
 
@@ -100,13 +103,11 @@ export default function PromptasticPage() {
       if (event.code === 'Space') {
         const activeElement = document.activeElement;
         if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'button')) {
-          // Don't interfere if typing in an input, textarea, or a button is focused
           return;
         }
         event.preventDefault();
         togglePlayPause();
       }
-       // Optional: Esc to exit fullscreen
       if (event.key === 'Escape' && document.fullscreenElement) {
         document.exitFullscreen();
       }
@@ -135,17 +136,20 @@ export default function PromptasticPage() {
           isFullScreen={isFullScreen}
           onToggleFullScreen={handleToggleFullScreen}
         />
+        <p className="text-xs text-muted-foreground text-center mt-3">
+          Designed and developed by Om Prakash
+        </p>
       </div>
       
       <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-           <SheetHeader className="p-4 border-b">
-            <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
-          </SheetHeader>
-          <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+           <SheetClose>
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
           </SheetClose>
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
+          </SheetHeader>
           <ScrollArea className="flex-1 p-4">
             <ScriptManager />
           </ScrollArea>
@@ -154,13 +158,13 @@ export default function PromptasticPage() {
 
       <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
-           <SheetHeader className="p-4 border-b">
-            <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
-          </SheetHeader>
-          <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <SheetClose>
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
           </SheetClose>
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
+          </SheetHeader>
           <ScrollArea className="flex-1 p-4">
             <SettingsPanel />
           </ScrollArea>
@@ -169,4 +173,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
