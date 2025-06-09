@@ -1,4 +1,3 @@
-
 "use client";
 
 import { create } from 'zustand';
@@ -10,11 +9,6 @@ const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
 
-// Previous default colors, for migration/checking if user had these set
-const PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT = 'hsl(215 25% 27%)'; 
-const PREVIOUS_DEFAULT_TEXT_COLOR_DARK = 'hsl(210 30% 95%)';
-
-// New default text colors
 const INITIAL_TEXT_COLOR_LIGHT_MODE = 'hsl(0 0% 0%)'; // Black
 const INITIAL_TEXT_COLOR_DARK_MODE = 'hsl(0 0% 100%)'; // White
 
@@ -32,7 +26,6 @@ interface TeleprompterState extends TeleprompterSettings {
   activeScriptName: string | null;
   isPlaying: boolean;
   currentScrollPosition: number;
-  isSettingsPanelOpen: boolean;
   
   // Actions
   setScriptText: (text: string) => void;
@@ -55,15 +48,11 @@ interface TeleprompterState extends TeleprompterSettings {
   setIsPlaying: (playing: boolean) => void;
   setCurrentScrollPosition: (position: number) => void;
   resetScroll: () => void;
-
-  toggleSettingsPanel: () => void;
-  setSettingsPanelOpen: (isOpen: boolean) => void;
 }
 
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => ({
-      // Initial State for SSR and first client render before components are fully mounted client-side
       scriptText: "Welcome to Promptastic!\n\nPaste your script here or load an existing one.\n\nAdjust settings using the gear icon.",
       scripts: [],
       activeScriptName: null,
@@ -79,9 +68,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       
       isPlaying: false,
       currentScrollPosition: 0,
-      isSettingsPanelOpen: false,
 
-      // Actions
       setScriptText: (text) => set({ scriptText: text, activeScriptName: null }),
       setActiveScriptName: (name) => set({ activeScriptName: name }),
       
@@ -126,19 +113,14 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       setDarkMode: (newDarkModeValue) => {
         const currentTextColor = get().textColor;
         const newDefaultTextColorForMode = newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
-        
-        // Determine the default for the mode we are coming FROM (or SSR default)
         const previousModeDefaultTextColor = !newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
         
         let finalTextColor = currentTextColor;
 
-        // If current color is one of the known global defaults, or the SSR default, update it.
         if (
-          currentTextColor === PREVIOUS_DEFAULT_TEXT_COLOR_LIGHT ||
-          currentTextColor === PREVIOUS_DEFAULT_TEXT_COLOR_DARK ||
           currentTextColor === previousModeDefaultTextColor ||
-          currentTextColor === SERVER_DEFAULT_TEXT_COLOR || // Explicitly check against SSR default
-          !currentTextColor // handles undefined/empty case
+          currentTextColor === SERVER_DEFAULT_TEXT_COLOR || 
+          !currentTextColor 
         ) {
           finalTextColor = newDefaultTextColorForMode;
         }
@@ -156,9 +138,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       setIsPlaying: (playing) => set({ isPlaying: playing }),
       setCurrentScrollPosition: (position) => set({ currentScrollPosition: position }),
       resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false }),
-
-      toggleSettingsPanel: () => set(state => ({ isSettingsPanelOpen: !state.isSettingsPanelOpen })),
-      setSettingsPanelOpen: (isOpen) => set({isSettingsPanelOpen: isOpen}),
     }),
     {
       name: 'promptastic-store',
@@ -168,7 +147,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
-        // Only persist user-configurable settings and script data
         scripts: state.scripts,
         activeScriptName: state.activeScriptName,
         fontSize: state.fontSize,
@@ -180,8 +158,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         textColor: state.textColor,
         fontFamily: state.fontFamily,
       }),
-      // Removed onRehydrateStorage as DOM manipulations and complex state init
-      // should be handled in component useEffects after hydration.
     }
   )
 );

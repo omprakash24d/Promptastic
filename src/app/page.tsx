@@ -1,8 +1,7 @@
-
 "use client";
 
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
@@ -11,38 +10,30 @@ import { TeleprompterView } from '@/components/promptastic/TeleprompterView';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { BookOpen, X } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { loadFromLocalStorage } from '@/lib/localStorage'; // Import loadFromLocalStorage
+import { FileText, SlidersHorizontal, X } from 'lucide-react';
+import { loadFromLocalStorage } from '@/lib/localStorage';
 
 export default function PromptasticPage() {
   const { 
-    isSettingsPanelOpen, 
-    setSettingsPanelOpen, 
     darkMode,
-    setDarkMode, // Added setDarkMode
+    setDarkMode,
     scripts,
     activeScriptName,
     loadScript: loadScriptFromStore,
   } = useTeleprompterStore();
 
+  const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
+  const [scriptsSheetOpen, setScriptsSheetOpen] = useState(false);
+
   useEffect(() => {
-    // Initialize darkMode based on localStorage or system preference
-    // This runs after the store is initialized and potentially rehydrated by `persist`
     const settingsFromStorage = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
     
-    if (settingsFromStorage.darkMode === undefined) { // If darkMode was not in localStorage
+    if (settingsFromStorage.darkMode === undefined) {
       const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      // Only update if system preference is different from the current store's darkMode.
-      // The store's darkMode at this point is either the SSR default or what persist loaded if this effect runs after persist.
-      // Calling setDarkMode will ensure consistency (e.g. for textColor).
       if (systemPrefersDark !== useTeleprompterStore.getState().darkMode) {
          setDarkMode(systemPrefersDark);
       }
     } else {
-      // If darkMode was in localStorage, `persist` middleware has already updated the store.
-      // We call setDarkMode with the persisted value to ensure textColor logic runs.
-      // This is safe because setDarkMode is idempotent if the value is already correct.
       if (settingsFromStorage.darkMode !== useTeleprompterStore.getState().darkMode) {
         setDarkMode(settingsFromStorage.darkMode);
       }
@@ -50,7 +41,6 @@ export default function PromptasticPage() {
   }, [setDarkMode]);
 
   useEffect(() => {
-    // Apply the 'dark' class to the HTML element based on the darkMode state
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -59,13 +49,14 @@ export default function PromptasticPage() {
   }, [darkMode]);
 
   useEffect(() => {
-    // Load initial or persisted active script
     if (scripts.length > 0) {
       const scriptToLoad = activeScriptName && scripts.some(s => s.name === activeScriptName)
         ? activeScriptName
         : scripts[0].name;
-      if (scriptToLoad) {
+      if (scriptToLoad && !useTeleprompterStore.getState().scriptText) { // Load only if scriptText is currently empty
         loadScriptFromStore(scriptToLoad);
+      } else if (!activeScriptName && scripts.length > 0 && !useTeleprompterStore.getState().scriptText) {
+        loadScriptFromStore(scripts[0].name);
       }
     }
   }, [activeScriptName, scripts, loadScriptFromStore]);
@@ -75,36 +66,47 @@ export default function PromptasticPage() {
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
       <header className="p-2 border-b flex justify-between items-center print:hidden">
         <h1 className="text-xl font-bold text-primary">Promptastic!</h1>
-        <Sheet open={isSettingsPanelOpen} onOpenChange={setSettingsPanelOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" aria-label="Open settings and script manager">
-              <BookOpen className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle className="text-lg">Settings & Scripts</SheetTitle>
-              <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </SheetClose>
-            </SheetHeader>
-            <Tabs defaultValue="settings" className="flex-1 flex flex-col overflow-hidden">
-              <TabsList className="grid w-full grid-cols-2 sticky top-0 bg-background z-10 p-1 border-b">
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-                <TabsTrigger value="scripts">Scripts</TabsTrigger>
-              </TabsList>
+        <div className="flex gap-2">
+          <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Open script manager">
+                <FileText className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
+                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </SheetClose>
+              </SheetHeader>
               <ScrollArea className="flex-1 p-4">
-                <TabsContent value="settings" className="p-0 mt-0">
-                  <SettingsPanel />
-                </TabsContent>
-                <TabsContent value="scripts" className="p-0 mt-0">
-                  <ScriptManager />
-                </TabsContent>
+                <ScriptManager />
               </ScrollArea>
-            </Tabs>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="Open settings">
+                <SlidersHorizontal className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
+                 <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </SheetClose>
+              </SheetHeader>
+              <ScrollArea className="flex-1 p-4">
+                <SettingsPanel />
+              </ScrollArea>
+            </SheetContent>
+          </Sheet>
+        </div>
       </header>
 
       <main className="flex-1 overflow-hidden">

@@ -1,4 +1,3 @@
-
 "use client";
 
 import type React from 'react';
@@ -15,8 +14,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import mammoth from 'mammoth';
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
 
-// Set workerSrc for pdf.js. It's important for Next.js environments.
-// Use the .mjs worker for ESM environments.
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
 }
@@ -41,16 +38,6 @@ export function ScriptManager() {
     setCurrentEditingScriptText(scriptText);
   }, [scriptText]);
   
-  useEffect(() => {
-    if (activeScriptName) {
-      const active = scripts.find(s => s.name === activeScriptName);
-      if (active) setCurrentEditingScriptText(active.content);
-      else setCurrentEditingScriptText(""); 
-    } else {
-      setCurrentEditingScriptText(scriptText); // Keep current text if no active script (e.g., for new script)
-    }
-  }, [activeScriptName, scripts, scriptText]);
-
 
   const handleSave = () => {
     if (!newScriptName.trim() && !activeScriptName) {
@@ -64,7 +51,7 @@ export function ScriptManager() {
     }
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName(""); // Clear new script name only if it was a new save
+    if (!activeScriptName) setNewScriptName(""); 
   };
 
   const handleLoad = (name: string) => {
@@ -75,18 +62,17 @@ export function ScriptManager() {
   const handleDelete = (name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
       const wasActive = activeScriptName === name;
-      const currentScripts = scripts.filter(s => s.name !== name); // scripts before deletion
+      const remainingScripts = scripts.filter(s => s.name !== name); 
       deleteScript(name);
       toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
       
       if (wasActive) {
-        if (currentScripts.length > 0) { 
-            const newActiveScript = currentScripts[0]; // Load the first script from the remaining list
+        if (remainingScripts.length > 0) { 
+            const newActiveScript = remainingScripts[0];
             if (newActiveScript) {
                 loadScript(newActiveScript.name);
             }
         } else {
-             // No scripts left
              setScriptText(""); 
              setCurrentEditingScriptText("");
              setActiveScriptName(null);
@@ -112,8 +98,8 @@ export function ScriptManager() {
 
   const handleNewScript = () => {
     setActiveScriptName(null); 
-    setScriptText(""); // Clear main script text
-    setCurrentEditingScriptText(""); // Clear editor
+    setScriptText(""); 
+    setCurrentEditingScriptText(""); 
     setNewScriptName("");
     toast({ title: "New Script", description: "Ready for your new script."});
   };
@@ -144,8 +130,8 @@ export function ScriptManager() {
 
   const processFileContent = (content: string, fileName: string) => {
     setActiveScriptName(null);
-    setScriptText(content);
-    setCurrentEditingScriptText(content);
+    setScriptText(content); // This will update the store's scriptText
+    // setCurrentEditingScriptText(content); // This will be handled by useEffect on scriptText
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
     setNewScriptName(fileNameWithoutExtension);
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it.` });
@@ -180,12 +166,12 @@ export function ScriptManager() {
         console.error("Error importing file:", error);
         toast({ title: "Import Error", description: "Could not read file content. " + (error instanceof Error ? error.message : ""), variant: "destructive" });
       }
-      if (event.target) event.target.value = ""; // Reset file input
+      if (event.target) event.target.value = ""; 
     }
   };
 
   return (
-    <div className="space-y-6"> {/* Increased spacing between cards */}
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
@@ -198,8 +184,8 @@ export function ScriptManager() {
             value={currentEditingScriptText}
             onChange={(e) => setCurrentEditingScriptText(e.target.value)}
             placeholder="Paste or type your script here..."
-            className="min-h-[200px] text-sm bg-background" // Increased min-height
-            rows={10} // Increased default rows
+            className="min-h-[250px] text-sm bg-background" 
+            rows={15} 
           />
           {!activeScriptName && (
             <div>
@@ -240,7 +226,6 @@ export function ScriptManager() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
-        // Accept will be set dynamically
         className="hidden"
       />
 
@@ -295,5 +280,3 @@ export function ScriptManager() {
     </div>
   );
 }
-
-    
