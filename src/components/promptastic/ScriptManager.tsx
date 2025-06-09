@@ -185,7 +185,7 @@ export function ScriptManager() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6"> {/* Increased spacing between cards */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
@@ -198,8 +198,8 @@ export function ScriptManager() {
             value={currentEditingScriptText}
             onChange={(e) => setCurrentEditingScriptText(e.target.value)}
             placeholder="Paste or type your script here..."
-            className="min-h-[150px] text-sm bg-background"
-            rows={8}
+            className="min-h-[200px] text-sm bg-background" // Increased min-height
+            rows={10} // Increased default rows
           />
           {!activeScriptName && (
             <div>
