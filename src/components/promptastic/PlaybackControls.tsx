@@ -5,17 +5,21 @@ import type React from 'react';
 import { useRef, useState } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Mic, MicOff } from 'lucide-react';
+import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize } from 'lucide-react';
 import { scrollSyncWithSpeech, type ScrollSyncWithSpeechInput } from '@/ai/flows/scroll-sync-with-speech';
 import { useToast } from '@/hooks/use-toast';
 
-export function PlaybackControls() {
+interface PlaybackControlsProps {
+  isFullScreen: boolean;
+  onToggleFullScreen: () => void;
+}
+
+export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackControlsProps) {
   const { toast } = useToast();
   const {
     isPlaying, togglePlayPause,
     resetScroll,
     scriptText, isAutoSyncEnabled, setScrollSpeed,
-    darkMode // to potentially adjust toast appearance if needed, though typically handled by Toaster
   } = useTeleprompterStore();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -27,7 +31,6 @@ export function PlaybackControls() {
     setPermissionError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Close the stream immediately if we only need permission status
       stream.getTracks().forEach(track => track.stop());
       return true;
     } catch (err) {
@@ -56,12 +59,12 @@ export function PlaybackControls() {
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); // Popular, good quality
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const audioDataUri = reader.result as string;
-          stream.getTracks().forEach(track => track.stop()); // Stop microphone tracks
+          stream.getTracks().forEach(track => track.stop()); 
           setIsRecording(false);
           await processAiSync(audioDataUri);
         };
@@ -71,12 +74,11 @@ export function PlaybackControls() {
       setIsRecording(true);
       toast({ title: "Recording...", description: "Speak a few lines from your script." });
 
-      // Stop recording after a short duration (e.g., 5 seconds)
       setTimeout(() => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
           mediaRecorderRef.current.stop();
         }
-      }, 5000); // Adjust duration as needed
+      }, 5000); 
 
     } catch (err) {
       console.error("Error starting recording:", err);
@@ -95,7 +97,6 @@ export function PlaybackControls() {
       };
       const output = await scrollSyncWithSpeech(input);
       
-      // Ensure speed is within a reasonable range (e.g., 10-200)
       const newSpeed = Math.max(10, Math.min(output.adjustedScrollSpeed, 200));
       setScrollSpeed(newSpeed);
 
@@ -160,6 +161,10 @@ export function PlaybackControls() {
           <span className="ml-2">{isRecording ? 'Stop Sync' : 'AI Sync'}</span>
         </Button>
       )}
+       <Button onClick={onToggleFullScreen} variant="outline" size="lg" aria-label={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}>
+        {isFullScreen ? <Minimize className="h-6 w-6" /> : <Maximize className="h-6 w-6" />}
+        <span className="ml-2 hidden sm:inline">{isFullScreen ? 'Exit Full' : 'Full Screen'}</span>
+      </Button>
     </div>
   );
 }

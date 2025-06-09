@@ -6,17 +6,16 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
 import { Menu, X, FileText, SlidersHorizontal } from 'lucide-react';
-import { ScriptManager } from '@/components/promptastic/ScriptManager';
-import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 
-export default function Header() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
-  const [scriptsSheetOpen, setScriptsSheetOpen] = useState(false);
-  const { darkMode, setDarkMode } = useTeleprompterStore();
+interface HeaderProps {
+  onOpenScripts: () => void;
+  onOpenSettings: () => void;
+}
 
+export default function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { darkMode, setDarkMode } = useTeleprompterStore(); // Keep for potential theme toggle in header later
 
   return (
     <header className="bg-card shadow-sm py-3 border-b">
@@ -31,100 +30,29 @@ export default function Header() {
             <span className="ml-3 text-xl font-semibold text-foreground">Promptastic!</span>
           </div>
 
-          {/* Desktop Navigation & Controls */}
-          <div className="hidden md:flex items-center space-x-6">
-            {/* Future navigation links can go here if needed */}
-            {/* <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Home</a> */}
-            
-            <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Open script manager">
-                  <FileText className="h-5 w-5 mr-1" />
-                  Scripts
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
-                </SheetHeader>
-                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </SheetClose>
-                <ScrollArea className="flex-1 p-4">
-                  <ScriptManager />
-                </ScrollArea>
-              </SheetContent>
-            </Sheet>
-
-            <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Open settings">
-                  <SlidersHorizontal className="h-5 w-5 mr-1" />
-                  Settings
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
-                </SheetHeader>
-                <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </SheetClose>
-                <ScrollArea className="flex-1 p-4">
-                  <SettingsPanel />
-                </ScrollArea>
-              </SheetContent>
-            </Sheet>
-            {/* Example "Get Started" button if needed later 
-            <Button size="sm">Get Started</Button>
-            */}
+          {/* Desktop Controls */}
+          <div className="hidden md:flex items-center space-x-2">
+            <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager">
+              <FileText className="h-5 w-5 mr-1" />
+              Scripts
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings">
+              <SlidersHorizontal className="h-5 w-5 mr-1" />
+              Settings
+            </Button>
           </div>
 
-          {/* Mobile Menu Button & Controls */}
+          {/* Mobile Controls Trigger (using existing sheet pattern for consistency if more links added later) */}
           <div className="md:hidden flex items-center">
-             <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="mr-1" aria-label="Open script manager">
-                  <FileText className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
-                </SheetHeader>
-                 <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </SheetClose>
-                <ScrollArea className="flex-1 p-4">
-                  <ScriptManager />
-                </ScrollArea>
-              </SheetContent>
-            </Sheet>
-
-            <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open settings">
-                  <SlidersHorizontal className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
-                <SheetHeader className="p-4 border-b">
-                  <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
-                </SheetHeader>
-                 <SheetClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Close</span>
-                </SheetClose>
-                <ScrollArea className="flex-1 p-4">
-                  <SettingsPanel />
-                </ScrollArea>
-              </SheetContent>
-            </Sheet>
-
-            {/* Mobile menu for future nav links
+            <Button variant="ghost" size="icon" className="mr-1" onClick={onOpenScripts} aria-label="Open script manager">
+              <FileText className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onOpenSettings} aria-label="Open settings">
+              <SlidersHorizontal className="h-5 w-5" />
+            </Button>
+            
+            {/* 
+            // If a generic mobile menu is needed later, it can be re-enabled.
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Open menu">
@@ -140,11 +68,7 @@ export default function Header() {
                     <span className="sr-only">Close</span>
                 </SheetClose>
                 <nav className="flex flex-col space-y-3">
-                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Home</a>
-                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Products</a>
-                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>Features</a>
-                  <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => setMobileMenuOpen(false)}>About</a>
-                  <Button className="w-full mt-4" onClick={() => setMobileMenuOpen(false)}>Get Started</Button>
+                   // Example: <a href="#" className="text-muted-foreground hover:text-foreground" onClick={() => setMobileMenuOpen(false)}>Home</a>
                 </nav>
               </SheetContent>
             </Sheet>
