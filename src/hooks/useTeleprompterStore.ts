@@ -13,13 +13,17 @@ const INITIAL_LINE_HEIGHT = 1.5;
 // Default text colors for different modes
 const INITIAL_TEXT_COLOR_LIGHT_MODE = 'hsl(0 0% 0%)'; // Black
 const INITIAL_TEXT_COLOR_DARK_MODE = 'hsl(0 0% 100%)'; // White
+const BLACK_HEX = '#000000';
+const WHITE_HEX = '#ffffff';
+
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
 // SSR-safe defaults for initial store state before hydration from localStorage
 const SERVER_DEFAULT_DARK_MODE = false; // App defaults to light mode on first load / SSR
-const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_LIGHT_MODE; // Default text color for SSR / initial light mode
-const SERVER_DEFAULT_FONT_FAMILY = INITIAL_FONT_FAMILY;
+// SERVER_DEFAULT_TEXT_COLOR is the text color that the app's initial state (pre-hydration) will have.
+// Since SERVER_DEFAULT_DARK_MODE is false (light mode), the corresponding text color is black.
+const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_LIGHT_MODE;
 
 
 interface TeleprompterState extends TeleprompterSettings {
@@ -54,100 +58,114 @@ interface TeleprompterState extends TeleprompterSettings {
 
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
-    (set, get) => ({
-      scriptText: "Welcome to Promptastic!\n\nPaste your script here or load an existing one.\n\nAdjust settings using the gear icon.",
-      scripts: [],
-      activeScriptName: null,
+    (set, get) => {
+      const isEffectivelyBlack = (color: string | undefined | null): boolean => {
+        if (!color) return false;
+        const c = color.toLowerCase();
+        return c === INITIAL_TEXT_COLOR_LIGHT_MODE || c === BLACK_HEX;
+      };
       
-      fontSize: INITIAL_FONT_SIZE,
-      scrollSpeed: INITIAL_SCROLL_SPEED,
-      lineHeight: INITIAL_LINE_HEIGHT,
-      isMirrored: false,
-      darkMode: SERVER_DEFAULT_DARK_MODE, 
-      isAutoSyncEnabled: false,
-      textColor: SERVER_DEFAULT_TEXT_COLOR,
-      fontFamily: SERVER_DEFAULT_FONT_FAMILY,
-      
-      isPlaying: false,
-      currentScrollPosition: 0,
+      const isEffectivelyWhite = (color: string | undefined | null): boolean => {
+        if (!color) return false;
+        const c = color.toLowerCase();
+        return c === INITIAL_TEXT_COLOR_DARK_MODE || c === WHITE_HEX;
+      };
 
-      setScriptText: (text) => set({ scriptText: text, activeScriptName: null }),
-      setActiveScriptName: (name) => set({ activeScriptName: name }),
-      
-      loadScript: (name) => {
-        const script = get().scripts.find(s => s.name === name);
-        if (script) {
-          set({ scriptText: script.content, activeScriptName: name, currentScrollPosition: 0 });
-        }
-      },
-      saveScript: (name, content) => {
-        const scriptContent = content ?? get().scriptText;
-        const now = Date.now();
-        let scripts = get().scripts;
-        const existingScriptIndex = scripts.findIndex(s => s.name === name);
-
-        if (existingScriptIndex > -1) {
-          scripts[existingScriptIndex] = { ...scripts[existingScriptIndex], content: scriptContent, updatedAt: now };
-        } else {
-          scripts.push({ name, content: scriptContent, createdAt: now, updatedAt: now });
-        }
-        set({ scripts: [...scripts], activeScriptName: name });
-      },
-      deleteScript: (name) => {
-        set(state => ({
-          scripts: state.scripts.filter(s => s.name !== name),
-          activeScriptName: state.activeScriptName === name ? null : state.activeScriptName,
-          scriptText: state.activeScriptName === name ? "" : state.scriptText,
-        }));
-      },
-      renameScript: (oldName, newName) => {
-        set(state => ({
-          scripts: state.scripts.map(s => s.name === oldName ? { ...s, name: newName } : s),
-          activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
-        }));
-      },
-
-      setFontSize: (size) => set({ fontSize: Math.max(12, size) }),
-      setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }),
-      setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
-      setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
-      
-      setDarkMode: (newDarkModeValue) => {
-        const currentTextColor = get().textColor;
-        // Determine the appropriate default text color for the mode we are switching TO.
-        const newDefaultTextColorForMode = newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
-        // Determine what the default text color was for the mode we are switching FROM.
-        const previousModeDefaultTextColor = !newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
+      return {
+        scriptText: "Welcome to Promptastic!\n\nPaste your script here or load an existing one.\n\nAdjust settings using the gear icon.",
+        scripts: [],
+        activeScriptName: null,
         
-        let finalTextColor = currentTextColor;
-
-        // If the current text color was the default for the *previous* mode,
-        // or if it was the initial server default (which is light mode's default black),
-        // or if textColor is somehow undefined/empty (should not happen with initial defaults),
-        // then update textColor to the new mode's default.
-        // Otherwise, the user has selected a custom color, and it should be preserved.
-        if (
-          currentTextColor === previousModeDefaultTextColor ||
-          currentTextColor === SERVER_DEFAULT_TEXT_COLOR || 
-          !currentTextColor 
-        ) {
-          finalTextColor = newDefaultTextColorForMode;
-        }
+        fontSize: INITIAL_FONT_SIZE,
+        scrollSpeed: INITIAL_SCROLL_SPEED,
+        lineHeight: INITIAL_LINE_HEIGHT,
+        isMirrored: false,
+        darkMode: SERVER_DEFAULT_DARK_MODE, 
+        isAutoSyncEnabled: false,
+        textColor: SERVER_DEFAULT_TEXT_COLOR,
+        fontFamily: INITIAL_FONT_FAMILY,
         
-        set({ 
-          darkMode: newDarkModeValue,
-          textColor: finalTextColor
-        });
-      },
-      setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
-      setTextColor: (color) => set({ textColor: color }), // Allows user to set any custom color
-      setFontFamily: (font) => set({ fontFamily: font }),
+        isPlaying: false,
+        currentScrollPosition: 0,
 
-      togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
-      setIsPlaying: (playing) => set({ isPlaying: playing }),
-      setCurrentScrollPosition: (position) => set({ currentScrollPosition: position }),
-      resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false }),
-    }),
+        setScriptText: (text) => set({ scriptText: text, activeScriptName: null }),
+        setActiveScriptName: (name) => set({ activeScriptName: name }),
+        
+        loadScript: (name) => {
+          const script = get().scripts.find(s => s.name === name);
+          if (script) {
+            set({ scriptText: script.content, activeScriptName: name, currentScrollPosition: 0 });
+          }
+        },
+        saveScript: (name, content) => {
+          const scriptContent = content ?? get().scriptText;
+          const now = Date.now();
+          let scripts = get().scripts;
+          const existingScriptIndex = scripts.findIndex(s => s.name === name);
+
+          if (existingScriptIndex > -1) {
+            scripts[existingScriptIndex] = { ...scripts[existingScriptIndex], content: scriptContent, updatedAt: now };
+          } else {
+            scripts.push({ name, content: scriptContent, createdAt: now, updatedAt: now });
+          }
+          set({ scripts: [...scripts], activeScriptName: name });
+        },
+        deleteScript: (name) => {
+          set(state => ({
+            scripts: state.scripts.filter(s => s.name !== name),
+            activeScriptName: state.activeScriptName === name ? null : state.activeScriptName,
+            scriptText: state.activeScriptName === name ? "" : state.scriptText,
+          }));
+        },
+        renameScript: (oldName, newName) => {
+          set(state => ({
+            scripts: state.scripts.map(s => s.name === oldName ? { ...s, name: newName } : s),
+            activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
+          }));
+        },
+
+        setFontSize: (size) => set({ fontSize: Math.max(12, size) }),
+        setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }),
+        setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
+        setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
+        
+        setDarkMode: (newDarkModeValue) => {
+          const currentTextColor = get().textColor;
+          let newFinalTextColor = currentTextColor;
+
+          // If the app is initializing or the text color hasn't been set by user (is still the server default)
+          const isInitialServerDefaultColor = currentTextColor === SERVER_DEFAULT_TEXT_COLOR || !currentTextColor;
+
+          if (newDarkModeValue) { // Target is Dark Mode
+            // If current text is effectively black (common for light mode default) or it's the initial uncustomized server default,
+            // change to white.
+            if (isEffectivelyBlack(currentTextColor) || isInitialServerDefaultColor) {
+              newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE; // white HSL
+            }
+          } else { // Target is Light Mode
+            // If current text is effectively white (common for dark mode default), change to black.
+            // We don't need to check for isInitialServerDefaultColor here because SERVER_DEFAULT_TEXT_COLOR is already black.
+            if (isEffectivelyWhite(currentTextColor)) {
+              newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE; // black HSL
+            }
+          }
+          
+          set({ 
+            darkMode: newDarkModeValue,
+            textColor: newFinalTextColor
+          });
+        },
+        setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
+        // When user explicitly sets a text color, it's considered custom.
+        setTextColor: (color) => set({ textColor: color }), 
+        setFontFamily: (font) => set({ fontFamily: font }),
+
+        togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
+        setIsPlaying: (playing) => set({ isPlaying: playing }),
+        setCurrentScrollPosition: (position) => set({ currentScrollPosition: position }),
+        resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false }),
+      }
+    },
     {
       name: 'promptastic-store',
       storage: createJSONStorage(() => ({
@@ -165,7 +183,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isMirrored: state.isMirrored,
         darkMode: state.darkMode,
         isAutoSyncEnabled: state.isAutoSyncEnabled,
-        textColor: state.textColor,
+        textColor: state.textColor, // Persist custom text color
         fontFamily: state.fontFamily,
         // scriptText is intentionally not persisted here to avoid large localStorage items by default
         // currentScrollPosition and isPlaying are runtime states, not typically persisted
