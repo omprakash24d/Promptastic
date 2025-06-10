@@ -152,7 +152,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
           size="lg"
           className={`
             ${isRecording ? "bg-red-600 hover:bg-red-700 border-red-700 text-white"
-                          : "bg-accent/20 hover:bg-accent/30 border-accent text-accent-foreground"}
+                          : "bg-accent/20 hover:bg-accent/30 border-accent text-accent-foreground dark:text-foreground"}
           `}
           aria-label={isRecording ? "Stop AI Sync Recording" : "Start AI Sync with Speech"}
           disabled={permissionError !== null && !isRecording}
