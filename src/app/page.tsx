@@ -12,7 +12,7 @@ import Header from '@/components/layout/Header';
 import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { FileText, SlidersHorizontal, X, Maximize, Minimize } from 'lucide-react';
+import { FileText, SlidersHorizontal, Maximize, Minimize } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -41,13 +41,14 @@ export default function PromptasticPage() {
       if (typeof window !== 'undefined') {
         initialDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
       } else {
-        initialDarkMode = useTeleprompterStore.getState().darkMode; // Fallback to store's SSR default
+        // Fallback to store's SSR default if window is not available
+        initialDarkMode = useTeleprompterStore.getState().darkMode; 
       }
     }
-    // Only call setDarkMode if the determined initial mode differs from the current store state
-    if (initialDarkMode !== useTeleprompterStore.getState().darkMode) {
-      setDarkMode(initialDarkMode);
-    }
+    // Always call setDarkMode to ensure textColor is also correctly set 
+    // based on the determined initialDarkMode. The setDarkMode function 
+    // in the store will handle the textColor adjustment.
+    setDarkMode(initialDarkMode);
   }, [setDarkMode]);
 
 
@@ -73,11 +74,13 @@ export default function PromptasticPage() {
         loadScriptFromStore(storeState.scripts[0].name);
       }
     } else if (storeState.scriptText === "" && storeState.activeScriptName) {
+        // This case handles when a script was deleted, and activeScriptName might still be set
+        // but scriptText is empty. Attempt to load it, which might clear activeScriptName if not found.
         loadScriptFromStore(storeState.activeScriptName);
     } else if (storeState.scripts.length === 0 && storeState.scriptText === "" && !storeState.activeScriptName) {
-       // If no scripts, no active script, and scriptText is empty, ensure default is set (handled by store initial state)
-       // or explicitly set it if needed for some edge cases, though store should manage this.
-       // useTeleprompterStore.getState().setScriptText("Welcome to Promptastic!\n\nPaste your script here or load an existing one.\n\nAdjust settings using the gear icon.");
+       // If no scripts, no active script, and scriptText is empty, ensure default is set
+       // The store's initial state should handle the welcome message.
+       // No explicit action needed here as store provides the default.
     }
   }, [activeScriptName, scripts, loadScriptFromStore, currentGlobalScriptText]);
 
@@ -143,22 +146,20 @@ export default function PromptasticPage() {
           onToggleFullScreen={handleToggleFullScreen}
         />
         <p className="text-xs text-muted-foreground text-center mt-3">
-  Designed and developed by{" "}
-  <a
-    href="http://instagram.com/omprakash24d/"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="underline hover:text-primary"
-  >
-    Om Prakash
-  </a>
-</p>
-
+          Designed and developed by{" "}
+          <a
+            href="https://www.linkedin.com/in/om-prakash-yadav-0731b7256/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-primary"
+          >
+            Om Prakash
+          </a>
+        </p>
       </div>
 
       <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-          {/* SheetClose is now provided by SheetContent itself */}
           <SheetHeader className="p-4 border-b">
             <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
           </SheetHeader>
@@ -170,7 +171,6 @@ export default function PromptasticPage() {
 
       <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
-          {/* SheetClose is now provided by SheetContent itself */}
           <SheetHeader className="p-4 border-b">
             <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
           </SheetHeader>
@@ -182,3 +182,4 @@ export default function PromptasticPage() {
     </div>
   );
 }
+
