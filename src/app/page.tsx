@@ -10,10 +10,9 @@ import { TeleprompterView } from '@/components/promptastic/TeleprompterView';
 import { loadFromLocalStorage } from '@/lib/localStorage';
 import Header from '@/components/layout/Header';
 import { ScriptManager } from '@/components/promptastic/ScriptManager';
-import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { FileText, SlidersHorizontal, Maximize, Minimize } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function PromptasticPage() {
@@ -27,13 +26,13 @@ export default function PromptasticPage() {
     togglePlayPause,
   } = useTeleprompterStore();
 
+  const { toast } = useToast();
   const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
   const [scriptsSheetOpen, setScriptsSheetOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    // Initialize dark mode from localStorage or system preference
     const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
     let initialDarkMode = persistedStore.darkMode;
 
@@ -41,13 +40,9 @@ export default function PromptasticPage() {
       if (typeof window !== 'undefined') {
         initialDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
       } else {
-        // Fallback to store's SSR default if window is not available
         initialDarkMode = useTeleprompterStore.getState().darkMode; 
       }
     }
-    // Always call setDarkMode to ensure textColor is also correctly set 
-    // based on the determined initialDarkMode. The setDarkMode function 
-    // in the store will handle the textColor adjustment.
     setDarkMode(initialDarkMode);
   }, [setDarkMode]);
 
@@ -74,13 +69,9 @@ export default function PromptasticPage() {
         loadScriptFromStore(storeState.scripts[0].name);
       }
     } else if (storeState.scriptText === "" && storeState.activeScriptName) {
-        // This case handles when a script was deleted, and activeScriptName might still be set
-        // but scriptText is empty. Attempt to load it, which might clear activeScriptName if not found.
         loadScriptFromStore(storeState.activeScriptName);
     } else if (storeState.scripts.length === 0 && storeState.scriptText === "" && !storeState.activeScriptName) {
-       // If no scripts, no active script, and scriptText is empty, ensure default is set
-       // The store's initial state should handle the welcome message.
-       // No explicit action needed here as store provides the default.
+       // Store's initial state handles welcome message.
     }
   }, [activeScriptName, scripts, loadScriptFromStore, currentGlobalScriptText]);
 
@@ -91,10 +82,22 @@ export default function PromptasticPage() {
     if (!document.fullscreenElement) {
       mainRef.current.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        toast({
+          variant: "destructive",
+          title: "Fullscreen Error",
+          description: `Could not enter full-screen mode: ${err.message}`,
+        });
       });
     } else {
       if (document.exitFullscreen) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(err => {
+           console.error(`Error attempting to exit full-screen mode: ${err.message} (${err.name})`);
+           toast({
+            variant: "destructive",
+            title: "Fullscreen Error",
+            description: `Could not exit full-screen mode: ${err.message}`,
+          });
+        });
       }
     }
   };
@@ -118,7 +121,10 @@ export default function PromptasticPage() {
         togglePlayPause();
       }
       if (event.key === 'Escape' && document.fullscreenElement) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch(err => {
+          console.error(`Error attempting to exit full-screen mode via Escape: ${err.message} (${err.name})`);
+          // Optionally toast here as well, though browser usually handles Escape well.
+        });
       }
     };
 
@@ -136,11 +142,15 @@ export default function PromptasticPage() {
         onOpenSettings={() => setSettingsSheetOpen(true)}
       />
 
-      <main ref={mainRef} className="flex-1">
+      <main ref={mainRef} className="flex-1 bg-background">
         <TeleprompterView />
       </main>
 
-      <div className="p-4 border-t print:hidden bg-card shadow-md sticky bottom-0 z-20">
+      <div 
+        className="p-4 border-t print:hidden bg-card shadow-md sticky bottom-0 z-20"
+        role="toolbar"
+        aria-label="Playback Controls and Information"
+      >
         <PlaybackControls
           isFullScreen={isFullScreen}
           onToggleFullScreen={handleToggleFullScreen}
@@ -182,4 +192,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
