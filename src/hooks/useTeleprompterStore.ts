@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -9,14 +10,15 @@ const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
 
+// Default text colors for different modes
 const INITIAL_TEXT_COLOR_LIGHT_MODE = 'hsl(0 0% 0%)'; // Black
 const INITIAL_TEXT_COLOR_DARK_MODE = 'hsl(0 0% 100%)'; // White
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
-// SSR-safe defaults
-const SERVER_DEFAULT_DARK_MODE = false;
-const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_LIGHT_MODE;
+// SSR-safe defaults for initial store state before hydration from localStorage
+const SERVER_DEFAULT_DARK_MODE = false; // App defaults to light mode on first load / SSR
+const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_LIGHT_MODE; // Default text color for SSR / initial light mode
 const SERVER_DEFAULT_FONT_FAMILY = INITIAL_FONT_FAMILY;
 
 
@@ -112,11 +114,18 @@ export const useTeleprompterStore = create<TeleprompterState>()(
       
       setDarkMode: (newDarkModeValue) => {
         const currentTextColor = get().textColor;
+        // Determine the appropriate default text color for the mode we are switching TO.
         const newDefaultTextColorForMode = newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
+        // Determine what the default text color was for the mode we are switching FROM.
         const previousModeDefaultTextColor = !newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE : INITIAL_TEXT_COLOR_LIGHT_MODE;
         
         let finalTextColor = currentTextColor;
 
+        // If the current text color was the default for the *previous* mode,
+        // or if it was the initial server default (which is light mode's default black),
+        // or if textColor is somehow undefined/empty (should not happen with initial defaults),
+        // then update textColor to the new mode's default.
+        // Otherwise, the user has selected a custom color, and it should be preserved.
         if (
           currentTextColor === previousModeDefaultTextColor ||
           currentTextColor === SERVER_DEFAULT_TEXT_COLOR || 
@@ -124,14 +133,14 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         ) {
           finalTextColor = newDefaultTextColorForMode;
         }
-
+        
         set({ 
           darkMode: newDarkModeValue,
           textColor: finalTextColor
         });
       },
       setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
-      setTextColor: (color) => set({ textColor: color }),
+      setTextColor: (color) => set({ textColor: color }), // Allows user to set any custom color
       setFontFamily: (font) => set({ fontFamily: font }),
 
       togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
@@ -147,6 +156,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
+        // Only persist these specific parts of the state
         scripts: state.scripts,
         activeScriptName: state.activeScriptName,
         fontSize: state.fontSize,
@@ -157,6 +167,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isAutoSyncEnabled: state.isAutoSyncEnabled,
         textColor: state.textColor,
         fontFamily: state.fontFamily,
+        // scriptText is intentionally not persisted here to avoid large localStorage items by default
+        // currentScrollPosition and isPlaying are runtime states, not typically persisted
       }),
     }
   )
