@@ -143,8 +143,17 @@ export default function PromptasticPage() {
           onToggleFullScreen={handleToggleFullScreen}
         />
         <p className="text-xs text-muted-foreground text-center mt-3">
-          Designed and developed by Om Prakash
-        </p>
+  Designed and developed by{" "}
+  <a
+    href="http://instagram.com/omprakash24d/"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="underline hover:text-primary"
+  >
+    Om Prakash
+  </a>
+</p>
+
       </div>
 
       <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
