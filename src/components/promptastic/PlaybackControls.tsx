@@ -64,7 +64,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const audioDataUri = reader.result as string;
-          stream.getTracks().forEach(track => track.stop()); 
+          stream.getTracks().forEach(track => track.stop());
           setIsRecording(false);
           await processAiSync(audioDataUri);
         };
@@ -78,7 +78,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
           mediaRecorderRef.current.stop();
         }
-      }, 5000); 
+      }, 5000);
 
     } catch (err) {
       console.error("Error starting recording:", err);
@@ -92,11 +92,11 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     try {
       const input: ScrollSyncWithSpeechInput = {
         scriptText,
-        audioDataUri, 
-        isAutoSyncEnabled: true, 
+        audioDataUri,
+        isAutoSyncEnabled: true,
       };
       const output = await scrollSyncWithSpeech(input);
-      
+
       const newSpeed = Math.max(10, Math.min(output.adjustedScrollSpeed, 200));
       setScrollSpeed(newSpeed);
 
@@ -146,12 +146,12 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
         <span className="ml-2">Reset</span>
       </Button>
       {isAutoSyncEnabled && (
-        <Button 
-          onClick={handleAiSyncClick} 
-          variant="outline" 
-          size="lg" 
+        <Button
+          onClick={handleAiSyncClick}
+          variant="outline"
+          size="lg"
           className={`
-            ${isRecording ? "bg-red-500/30 hover:bg-red-600/40 border-red-500 text-red-700 dark:text-red-300" 
+            ${isRecording ? "bg-red-600 hover:bg-red-700 border-red-700 text-white"
                           : "bg-accent/20 hover:bg-accent/30 border-accent text-accent-foreground"}
           `}
           aria-label={isRecording ? "Stop AI Sync Recording" : "Start AI Sync with Speech"}

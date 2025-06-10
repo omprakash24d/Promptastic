@@ -11,19 +11,19 @@ import { loadFromLocalStorage } from '@/lib/localStorage';
 import Header from '@/components/layout/Header';
 import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { FileText, SlidersHorizontal, X, Maximize, Minimize } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function PromptasticPage() {
-  const { 
+  const {
     darkMode,
     setDarkMode,
     scripts,
     activeScriptName,
     loadScript: loadScriptFromStore,
-    scriptText: currentGlobalScriptText, 
+    scriptText: currentGlobalScriptText,
     togglePlayPause,
   } = useTeleprompterStore();
 
@@ -33,21 +33,23 @@ export default function PromptasticPage() {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const settingsFromStorage = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
-    
-    if (settingsFromStorage.darkMode === undefined) {
+    // Initialize dark mode from localStorage or system preference
+    const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
+    let initialDarkMode = persistedStore.darkMode;
+
+    if (initialDarkMode === undefined) {
       if (typeof window !== 'undefined') {
-        const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (systemPrefersDark !== useTeleprompterStore.getState().darkMode) {
-           setDarkMode(systemPrefersDark);
-        }
-      }
-    } else {
-      if (settingsFromStorage.darkMode !== useTeleprompterStore.getState().darkMode) {
-        setDarkMode(settingsFromStorage.darkMode);
+        initialDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      } else {
+        initialDarkMode = useTeleprompterStore.getState().darkMode; // Fallback to store's SSR default
       }
     }
+    // Only call setDarkMode if the determined initial mode differs from the current store state
+    if (initialDarkMode !== useTeleprompterStore.getState().darkMode) {
+      setDarkMode(initialDarkMode);
+    }
   }, [setDarkMode]);
+
 
   useEffect(() => {
     if (darkMode) {
@@ -68,17 +70,21 @@ export default function PromptasticPage() {
       if (targetScript && (storeState.scriptText !== targetScript.content || !storeState.scriptText)) {
         loadScriptFromStore(scriptToLoadName);
       } else if (!targetScript && !storeState.scriptText && storeState.scripts.length > 0) {
-        // If no script is actively loaded but scripts exist, load the first one
         loadScriptFromStore(storeState.scripts[0].name);
       }
     } else if (storeState.scriptText === "" && storeState.activeScriptName) {
-      loadScriptFromStore(storeState.activeScriptName); 
+        loadScriptFromStore(storeState.activeScriptName);
+    } else if (storeState.scripts.length === 0 && storeState.scriptText === "" && !storeState.activeScriptName) {
+       // If no scripts, no active script, and scriptText is empty, ensure default is set (handled by store initial state)
+       // or explicitly set it if needed for some edge cases, though store should manage this.
+       // useTeleprompterStore.getState().setScriptText("Welcome to Promptastic!\n\nPaste your script here or load an existing one.\n\nAdjust settings using the gear icon.");
     }
   }, [activeScriptName, scripts, loadScriptFromStore, currentGlobalScriptText]);
 
+
   const handleToggleFullScreen = () => {
     if (!mainRef.current) return;
-  
+
     if (!document.fullscreenElement) {
       mainRef.current.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
@@ -122,7 +128,7 @@ export default function PromptasticPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header 
+      <Header
         onOpenScripts={() => setScriptsSheetOpen(true)}
         onOpenSettings={() => setSettingsSheetOpen(true)}
       />
@@ -132,7 +138,7 @@ export default function PromptasticPage() {
       </main>
 
       <div className="p-4 border-t print:hidden bg-card shadow-md sticky bottom-0 z-20">
-        <PlaybackControls 
+        <PlaybackControls
           isFullScreen={isFullScreen}
           onToggleFullScreen={handleToggleFullScreen}
         />
@@ -140,13 +146,10 @@ export default function PromptasticPage() {
           Designed and developed by Om Prakash
         </p>
       </div>
-      
+
       <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
-           <SheetClose>
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-          </SheetClose>
+          {/* SheetClose is now provided by SheetContent itself */}
           <SheetHeader className="p-4 border-b">
             <SheetTitle className="text-lg">Manage Scripts</SheetTitle>
           </SheetHeader>
@@ -158,10 +161,7 @@ export default function PromptasticPage() {
 
       <Sheet open={settingsSheetOpen} onOpenChange={setSettingsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
-          <SheetClose>
-              <X className="h-4 w-4" />
-              <span className="sr-only">Close</span>
-          </SheetClose>
+          {/* SheetClose is now provided by SheetContent itself */}
           <SheetHeader className="p-4 border-b">
             <SheetTitle className="text-lg">Teleprompter Settings</SheetTitle>
           </SheetHeader>
