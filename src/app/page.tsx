@@ -149,14 +149,14 @@ export default function PromptasticPage() {
   const openHelpSheet = useCallback(() => setHelpSheetOpen(true), []);
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
       <Header
         onOpenScripts={openScriptsSheet}
         onOpenSettings={openSettingsSheet}
         onOpenHelp={openHelpSheet}
       />
 
-      <main ref={mainRef} className="flex-1 bg-background relative">
+      <main ref={mainRef} className="flex-1 bg-background relative overflow-hidden">
         <TeleprompterView />
       </main>
 
@@ -319,3 +319,5 @@ export default function PromptasticPage() {
     </div>
   );
 }
+
+    
