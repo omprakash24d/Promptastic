@@ -219,17 +219,18 @@ export default function PromptasticPage() {
             isPresentationMode={isPresentationMode}
             onTogglePresentationMode={togglePresentationMode}
           />
-          <p className="text-xs text-muted-foreground text-center mt-3">
-            Designed and developed by{" "}
-            <a
-              href="https://www.instagram.com/omprakash24d/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-primary"
-            >
-              Om Prakash
-            </a>
-          </p>
+          <footer className="mt-6 text-center text-muted-foreground text-sm leading-relaxed">
+  Designed and developed by{" "}
+  <a
+    href="https://www.instagram.com/omprakash24d/"
+    target="_blank"
+    rel="noopener noreferrer"
+    className="underline hover:text-primary font-medium transition-colors duration-200"
+  >
+    Om Prakash
+  </a>
+</footer>
+
         </div>
       )}
       {isPresentationMode && (

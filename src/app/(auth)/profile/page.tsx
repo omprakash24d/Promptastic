@@ -8,95 +8,117 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, UserCircle2, Camera, Save } from 'lucide-react';
+import { AlertCircle, CheckCircle2, UserCircle2, Camera, Save, Loader2 } from 'lucide-react'; // Added Loader2
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function ProfilePage() {
-  const { user, updateUserProfile, loading, error, successMessage, clearAuthMessages } = useAuth();
+  const { user, updateUserProfile, profileUpdateLoading, error, successMessage, clearAuthMessages } = useAuth(); // Used profileUpdateLoading
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user && !loading) {
-      router.push('/login'); // Redirect if not logged in and not loading
+    if (!user && !profileUpdateLoading && !error) { // Adjusted loading condition
+      router.push('/login');
     }
     if (user) {
       setDisplayName(user.displayName || '');
       setPhotoPreview(user.photoURL || null);
     }
-    // Clear messages when component mounts
     return () => {
       clearAuthMessages();
+      setLocalError(null);
     };
-  }, [user, loading, router, clearAuthMessages]);
+  }, [user, profileUpdateLoading, router, clearAuthMessages, error]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    clearAuthMessages();
+    setLocalError(null);
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      // Basic client-side validation (can be enhanced)
+      const MAX_FILE_SIZE_MB = 5;
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        setLocalError(`File is too large. Max size is ${MAX_FILE_SIZE_MB}MB.`);
+        setPhotoFile(null);
+        setPhotoPreview(user?.photoURL || null); // Revert preview
+        e.target.value = ""; // Clear file input
+        return;
+      }
+      const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!ALLOWED_TYPES.includes(file.type)) {
+        setLocalError('Invalid file type. Please upload a JPG, PNG, GIF, or WEBP image.');
+        setPhotoFile(null);
+        setPhotoPreview(user?.photoURL || null); // Revert preview
+        e.target.value = ""; // Clear file input
+        return;
+      }
+
       setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
+    } else {
+      // If no file selected (e.g., user cleared selection), reset to current user photo or null
+      setPhotoFile(null);
+      setPhotoPreview(user?.photoURL || null);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAuthMessages();
+    setLocalError(null);
 
     if (!user) {
-      // Should not happen if redirection works, but as a safeguard
-      alert("User not found. Please log in.");
+      setLocalError("User not found. Please log in.");
       return;
     }
 
-    const updates: { displayName?: string; photoURL?: string } = {};
-    if (displayName !== user.displayName) {
-      updates.displayName = displayName;
-    }
+    const updates: { displayName?: string } = {};
+    let hasChanges = false;
 
-    // Actual photoURL update via Firebase Storage is complex and not implemented here.
-    // This is a placeholder for the UI and basic logic.
-    // If you were to implement it, you'd upload `photoFile` to Firebase Storage,
-    // get the download URL, and then set `updates.photoURL = downloadURL;`
+    if (displayName.trim() !== (user.displayName || '')) {
+      updates.displayName = displayName.trim();
+      hasChanges = true;
+    }
+    
     if (photoFile) {
-        console.warn("Profile picture update: File selected, but actual upload to Firebase Storage and photoURL update in Auth is not implemented in this step. Display name will be updated if changed.");
-        // For now, we won't attempt to set photoURL from a local file preview
-        // updates.photoURL = photoPreview; // This would be incorrect without actual upload
+        hasChanges = true;
     }
 
 
-    if (Object.keys(updates).length > 0) {
-      await updateUserProfile(updates);
-    } else if (!photoFile) {
-        // No changes to display name and no new photo file selected
-        // We can treat this as a "no changes made" scenario or show a specific message.
-        // For now, let's just clear any previous success/error related to profile updates.
-        clearAuthMessages();
+    if (hasChanges) {
+      await updateUserProfile(updates, photoFile);
+      // If successful, photoFile should be cleared to prevent re-upload on subsequent "Save" without new selection
+      if (!error && !localError) { // Check if context error or local error was set during profile update
+        setPhotoFile(null); 
+      }
+    } else {
+        setSuccessMessage("No changes to save."); // Or clear any existing messages
     }
   };
 
-  if (loading && !user) { // Show full page loader only if user data is not yet available
+  if (profileUpdateLoading && !user && !error) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p>Loading profile...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Loading profile...</p>
       </div>
     );
   }
 
   if (!user) {
-    // This case should ideally be handled by the redirect in useEffect,
-    // but it's a fallback.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p>Please <Link href="/login" className="underline">login</Link> to view your profile.</p>
+        <p>Please <Link href="/login" className="underline hover:text-primary">login</Link> to view your profile.</p>
       </div>
     );
   }
@@ -118,22 +140,29 @@ export default function ProfilePage() {
                 className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-background"
                 onClick={() => document.getElementById('photoUpload')?.click()}
                 title="Change profile picture"
+                disabled={profileUpdateLoading}
             >
                 <Camera className="h-4 w-4" />
             </Button>
             <Input
                 id="photoUpload"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/gif,image/webp"
                 className="hidden"
                 onChange={handleFileChange}
+                disabled={profileUpdateLoading}
             />
           </div>
           <CardTitle className="text-2xl">Edit Profile</CardTitle>
           <CardDescription>Update your display name and profile picture.</CardDescription>
         </CardHeader>
         <CardContent>
-          {error && (
+          {localError && (
+            <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive">
+              <AlertCircle className="mr-2 inline h-4 w-4" /> {localError}
+            </div>
+          )}
+          {error && !localError && ( // Display context error if no local error
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>
@@ -163,23 +192,20 @@ export default function ProfilePage() {
                 id="displayName"
                 type="text"
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                    setDisplayName(e.target.value);
+                    clearAuthMessages();
+                    setLocalError(null);
+                }}
                 placeholder="Your Name"
-                required
                 className="mt-1"
+                disabled={profileUpdateLoading}
               />
             </div>
-
-            {/* Profile Picture Upload Information */}
-            {photoFile && <p className="text-xs text-muted-foreground">New photo selected: {photoFile.name}. Save to apply (actual upload not yet implemented).</p>}
-            {!photoFile && photoPreview && <p className="text-xs text-muted-foreground">Current profile picture shown. Select a new file to change.</p>}
-            {!photoFile && !photoPreview && <p className="text-xs text-muted-foreground">No profile picture set. Select a file to add one.</p>}
-             <p className="text-xs text-muted-foreground mt-1">Note: Profile picture updates require Firebase Storage setup, which is not fully implemented in this step. Only display name changes will persist for now.</p>
-
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              <Save className="mr-2 h-4 w-4" />
-              {loading ? 'Saving...' : 'Save Changes'}
+            {photoFile && <p className="text-xs text-muted-foreground">New photo selected: {photoFile.name}.</p>}
+            <Button type="submit" className="w-full" disabled={profileUpdateLoading || (!displayName.trim() && !photoFile && displayName === (user.displayName || ''))}>
+              {profileUpdateLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {profileUpdateLoading ? 'Saving...' : 'Save Changes'}
             </Button>
           </form>
         </CardContent>
