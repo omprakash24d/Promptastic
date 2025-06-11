@@ -21,6 +21,7 @@ const INITIAL_IS_AUTO_SYNC_ENABLED = false;
 const INITIAL_IS_MIRRORED = false;
 const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 const INITIAL_COUNTDOWN_ENABLED = false;
+const INITIAL_COUNTDOWN_DURATION = 3; // seconds
 const INITIAL_HORIZONTAL_PADDING = 0; // 0%
 
 const SERVER_DEFAULT_DARK_MODE = true;
@@ -116,6 +117,7 @@ interface TeleprompterState extends TeleprompterSettings {
   setFocusLinePercentage: (percentage: number) => void;
   setFocusLineStyle: (style: FocusLineStyle) => void;
   setCountdownEnabled: (enabled: boolean) => void;
+  setCountdownDuration: (duration: number) => void;
   setHorizontalPadding: (padding: number) => void;
 
   resetSettingsToDefaults: () => void;
@@ -150,6 +152,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
         focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
         countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
+        countdownDuration: INITIAL_COUNTDOWN_DURATION,
         horizontalPadding: INITIAL_HORIZONTAL_PADDING,
         
         isPlaying: false,
@@ -229,7 +232,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)), activeLayoutPresetName: null }),
         setFocusLineStyle: (style) => set({ focusLineStyle: style, activeLayoutPresetName: null }),
         setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled }),
-        setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }), // Max 25% padding on each side
+        setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(10, duration)) }),
+        setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }),
         
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
@@ -252,19 +256,20 @@ export const useTeleprompterStore = create<TeleprompterState>()(
             focusLinePercentage: defaultPreset.settings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
             focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
             countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
+            countdownDuration: INITIAL_COUNTDOWN_DURATION,
             horizontalPadding: INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
         },
 
         togglePlayPause: () => {
-          const { isPlaying, countdownEnabled, setCountdownValue, setIsPlaying } = get();
+          const { isPlaying, countdownEnabled, setCountdownValue, setIsPlaying, countdownDuration } = get();
           if (isPlaying) {
             setIsPlaying(false);
             setCountdownValue(null); // Clear countdown if pausing
           } else {
             if (countdownEnabled) {
-              setCountdownValue(3); // Start countdown
+              setCountdownValue(countdownDuration); // Start countdown with user-defined duration
               // setIsPlaying will be called by TeleprompterView after countdown
             } else {
               setIsPlaying(true); // Play immediately
@@ -300,6 +305,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         layoutPresets: state.layoutPresets, 
         activeLayoutPresetName: state.activeLayoutPresetName,
         countdownEnabled: state.countdownEnabled,
+        countdownDuration: state.countdownDuration,
         horizontalPadding: state.horizontalPadding,
       }),
       onRehydrateStorage: () => (state) => {
@@ -311,6 +317,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
           state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
+          state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
           state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
         }
       }
@@ -327,3 +334,4 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
+

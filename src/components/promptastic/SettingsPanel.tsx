@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask, Gauge, MinusSquare } from 'lucide-react';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask, Gauge, MinusSquare, Timer } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -74,6 +74,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     focusLineStyle, setFocusLineStyle,
     layoutPresets, activeLayoutPresetName, applyLayoutPreset,
     countdownEnabled, setCountdownEnabled,
+    countdownDuration, setCountdownDuration,
     horizontalPadding, setHorizontalPadding,
     resetSettingsToDefaults,
   } = useTeleprompterStore();
@@ -367,10 +368,10 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 Countdown Timer
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    <Timer className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Enable a 3-second countdown before playback starts.</p>
+                    <p>Enable a countdown before playback starts.</p>
                   </TooltipContent>
                 </Tooltip>
               </Label>
@@ -381,6 +382,32 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 aria-label={`Countdown timer: ${countdownEnabled ? 'on' : 'off'}`}
               />
             </div>
+            {countdownEnabled && (
+              <div>
+                <Label htmlFor="countdown-duration" className="flex items-center text-sm">
+                  Countdown Duration: {countdownDuration}s
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Set the countdown duration (1-10 seconds).</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <Slider
+                  id="countdown-duration"
+                  aria-label={`Countdown duration: ${countdownDuration} seconds`}
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={[countdownDuration]}
+                  onValueChange={(value) => setCountdownDuration(value[0])}
+                  className="mt-2"
+                  disabled={!countdownEnabled}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
          <Card>
@@ -416,3 +443,4 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     </TooltipProvider>
   );
 });
+

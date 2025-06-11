@@ -28,6 +28,7 @@ export interface TeleprompterSettings {
   focusLinePercentage: number; // e.g., 0.33 for 33% from the top
   focusLineStyle: FocusLineStyle;
   countdownEnabled: boolean;
+  countdownDuration: number; // in seconds
   horizontalPadding: number; // percentage, e.g., 0 to 25
 }
 
@@ -54,3 +55,4 @@ export interface ParsedSegment {
   isUnderline?: boolean;
   originalMarker?: string; // For cues like //PAUSE//
 }
+
