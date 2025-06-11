@@ -25,6 +25,7 @@ export default function PromptasticPage() {
     togglePlayPause,
     isPresentationMode, setIsPresentationMode,
     enableHighContrast,
+    LONGER_DEFAULT_SCRIPT_TEXT, // Get default text from store
   } = useTeleprompterStore();
 
   const { toast } = useToast();
@@ -35,27 +36,46 @@ export default function PromptasticPage() {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined, enableHighContrast: undefined});
-    let initialDarkMode = persistedStore.darkMode;
-    let initialHighContrast = persistedStore.enableHighContrast;
-
-    if (initialDarkMode === undefined) {
-      if (typeof window !== 'undefined') {
-        initialDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      } else {
-        initialDarkMode = useTeleprompterStore.getState().darkMode;
-      }
+    // Define the expected shape of the data from localStorage
+    interface PersistedStorePreferences {
+      darkMode?: boolean;
+      enableHighContrast?: boolean;
     }
-    setDarkMode(initialDarkMode);
 
-    if (initialHighContrast === undefined) {
-        initialHighContrast = useTeleprompterStore.getState().enableHighContrast;
+    // Provide a default that matches this shape if nothing is found
+    const persistedPrefs = loadFromLocalStorage<PersistedStorePreferences>(
+      'promptastic-store', // This is the key used by useTeleprompterStore persist middleware
+      {} // Default to an empty object if no store found or error
+    );
+
+    let resolvedDarkMode: boolean;
+    if (typeof persistedPrefs.darkMode === 'boolean') {
+      resolvedDarkMode = persistedPrefs.darkMode;
+    } else if (typeof window !== 'undefined') {
+      // Fallback to system preference if not in localStorage
+      resolvedDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } else {
+      // Final fallback to current store state (e.g., for SSR or if window is somehow undefined)
+      resolvedDarkMode = useTeleprompterStore.getState().darkMode;
     }
-    // The actual setting of enableHighContrast is handled by its own useEffect below
-    // to ensure class is applied correctly after hydration.
-    useTeleprompterStore.setState({ enableHighContrast: initialHighContrast });
 
+    // Only update if the resolved value differs from the current store state
+    if (useTeleprompterStore.getState().darkMode !== resolvedDarkMode) {
+      setDarkMode(resolvedDarkMode);
+    }
 
+    let resolvedHighContrast: boolean;
+    if (typeof persistedPrefs.enableHighContrast === 'boolean') {
+      resolvedHighContrast = persistedPrefs.enableHighContrast;
+    } else {
+      // Fallback to current store state
+      resolvedHighContrast = useTeleprompterStore.getState().enableHighContrast;
+    }
+
+    // Only update if the resolved value differs from the current store state
+    if (useTeleprompterStore.getState().enableHighContrast !== resolvedHighContrast) {
+      useTeleprompterStore.setState({ enableHighContrast: resolvedHighContrast });
+    }
   }, [setDarkMode]);
 
 
@@ -78,8 +98,9 @@ export default function PromptasticPage() {
 
   useEffect(() => {
     const storeState = useTeleprompterStore.getState();
-    const { scriptText: currentText, activeScriptName: currentActive, scripts: currentScripts, LONGER_DEFAULT_SCRIPT_TEXT: defaultText } = storeState;
-    const actualDefaultText = typeof defaultText === 'string' ? defaultText : "Welcome to Promptastic!";
+    const { scriptText: currentText, activeScriptName: currentActive, scripts: currentScripts } = storeState;
+    // LONGER_DEFAULT_SCRIPT_TEXT is accessed from the initial destructuring of useTeleprompterStore
+    const actualDefaultText = typeof LONGER_DEFAULT_SCRIPT_TEXT === 'string' ? LONGER_DEFAULT_SCRIPT_TEXT : "Welcome to Promptastic!";
 
     if (currentActive && currentScripts.some(s => s.name === currentActive)) {
       const activeScript = currentScripts.find(s => s.name === currentActive)!;
@@ -94,11 +115,13 @@ export default function PromptasticPage() {
         }
       }
     } else {
+      // This condition handles the case where there are no scripts
+      // and ensures the scriptText is set to default if it's not already.
       if (currentText !== actualDefaultText) {
         useTeleprompterStore.setState({ scriptText: actualDefaultText, activeScriptName: null, currentScrollPosition: 0 });
       }
     }
-  }, [activeScriptName, scripts, loadScriptFromStore]);
+  }, [activeScriptName, scripts, loadScriptFromStore, LONGER_DEFAULT_SCRIPT_TEXT]);
 
 
   const handleToggleFullScreen = () => {
@@ -307,13 +330,13 @@ export default function PromptasticPage() {
                   <li><strong>Saving:</strong> Save new scripts or update existing ones. Changes are saved automatically if you edit an active script and click save.</li>
                   <li><strong>Loading:</strong> Click a script name from the "Saved Scripts" list to load it.</li>
                   <li><strong>Renaming & Deleting:</strong> Use the icons next to each saved script.</li>
-                  <li><strong>Importing:</strong> Click the ".txt", ".pdf", or ".docx" buttons to import scripts from files.</li>
+                  <li><strong>Importing:</strong> Click the ".txt", ".pdf", ".md", or ".docx" buttons to import scripts from files.</li>
                   <li><strong>Exporting:</strong> Export the current script as a .txt file.</li>
                   <li><strong>Script Versions:</strong> Save multiple versions of a script with notes. Load any version back into the editor.</li>
                   <li><strong>AI Summary:</strong> Generate an AI-powered summary of your script (available in Script Manager and footer controls).</li>
                 </ul>
                  <div className="p-3 bg-muted/50 rounded-md border border-border">
-                    <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage.</p>
+                    <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage or synced with Firestore if logged in.</p>
                 </div>
               </section>
 
@@ -378,7 +401,7 @@ export default function PromptasticPage() {
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling.</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen or Presentation mode.</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script in Script Manager.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script in Script Manager (if focus is within script manager context).</li>
                 </ul>
               </section>
 
@@ -394,3 +417,5 @@ export default function PromptasticPage() {
     </div>
   );
 }
+
+    
