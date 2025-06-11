@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 const RESET_COOLDOWN_SECONDS = 30;
 
 interface PasswordValidationState {
+  meetsAll: boolean;
   minLength: boolean;
   hasNumber: boolean;
   hasLowercase: boolean;
@@ -24,6 +25,7 @@ interface PasswordValidationState {
 }
 
 const initialPasswordValidation: PasswordValidationState = {
+  meetsAll: false,
   minLength: false,
   hasNumber: false,
   hasLowercase: false,
@@ -38,7 +40,7 @@ export default function LoginPage() {
     signInWithEmail,
     sendPasswordReset,
     loading,
-    error,
+    error, // Global error from AuthContext (Firebase errors)
     successMessage,
     clearAuthMessages,
   } = useAuth();
@@ -52,7 +54,7 @@ export default function LoginPage() {
 
   const [resetEmail, setResetEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [authAttemptError, setAuthAttemptError] = useState<string | null>(null);
+  const [authAttemptError, setAuthAttemptError] = useState<string | null>(null); // Local form error
 
   const [isResetCooldown, setIsResetCooldown] = useState(false);
   const [currentCooldownSeconds, setCurrentCooldownSeconds] = useState(RESET_COOLDOWN_SECONDS);
@@ -62,28 +64,43 @@ export default function LoginPage() {
   const [showPasswordCriteria, setShowPasswordCriteria] = useState(false);
 
   const validatePassword = useCallback((currentPassword: string): boolean => {
-    const newValidation = {
+    const rules = {
       minLength: currentPassword.length >= 8,
       hasNumber: /[0-9]/.test(currentPassword),
       hasLowercase: /[a-z]/.test(currentPassword),
       hasUppercase: /[A-Z]/.test(currentPassword),
       hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(currentPassword),
     };
-    setPasswordValidation(newValidation);
-    return Object.values(newValidation).every(Boolean);
+    const meetsAll = Object.values(rules).every(Boolean);
+    setPasswordValidation({ ...rules, meetsAll });
+    return meetsAll;
   }, []);
 
-  const allPasswordRulesMet = Object.values(passwordValidation).every(Boolean);
-
   useEffect(() => {
+    // This effect runs when activeTab or showForgotPassword changes, or when the component mounts.
+    // On mount, or when these view-controlling states change, we want to clear prior messages.
     clearAuthMessages();
+    setAuthAttemptError(null); // Clear local form error as well
+
+    if (activeTab !== 'signUp') {
+      setPasswordValidation(initialPasswordValidation);
+      setShowPasswordCriteria(false);
+    }
+    if (!showForgotPassword) {
+        if (isResetCooldown) {
+            if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+            setIsResetCooldown(false);
+            setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
+        }
+    }
+
     return () => {
-      clearAuthMessages();
       if (cooldownIntervalRef.current) {
         clearInterval(cooldownIntervalRef.current);
       }
     };
-  }, [clearAuthMessages, activeTab, showForgotPassword]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, showForgotPassword, clearAuthMessages]); // clearAuthMessages is stable
 
   useEffect(() => {
     if (isResetCooldown) {
@@ -106,7 +123,8 @@ export default function LoginPage() {
   }, [isResetCooldown]);
 
   const handleTabChange = (value: string) => {
-    setAuthAttemptError(null);
+    clearAuthMessages(); // Clear global messages
+    setAuthAttemptError(null); // Clear local message
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -124,26 +142,44 @@ export default function LoginPage() {
       validatePassword(newPassword);
       setShowPasswordCriteria(true);
     }
-    if (authAttemptError) setAuthAttemptError(null);
+    if (authAttemptError) setAuthAttemptError(null); // Clear local error on password change
+    if (error) clearAuthMessages(); // Clear global Firebase error on password change
   };
+  
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (authAttemptError) setAuthAttemptError(null);
+    if (error) clearAuthMessages();
+  }
+  
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value);
+    if (authAttemptError) setAuthAttemptError(null);
+  }
+
+   const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDisplayName(e.target.value);
+    if (authAttemptError) setAuthAttemptError(null);
+  }
+
 
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthAttemptError(null);
-    clearAuthMessages();
+    clearAuthMessages(); // Clear global error/success from AuthContext
+    setAuthAttemptError(null); // Clear local form error
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
         setAuthAttemptError("Display Name cannot be empty.");
         return;
       }
-      if (password !== confirmPassword) {
-        setAuthAttemptError("Passwords do not match.");
+      const isPasswordValid = validatePassword(password); // Re-validate before submit
+      if (!isPasswordValid) {
+        setAuthAttemptError("Password does not meet all requirements.");
         return;
       }
-      const isPasswordStillValid = validatePassword(password);
-      if (!isPasswordStillValid) {
-        setAuthAttemptError("Password does not meet all requirements.");
+      if (password !== confirmPassword) {
+        setAuthAttemptError("Passwords do not match.");
         return;
       }
       await signUpWithEmail(email, password, displayName);
@@ -154,25 +190,27 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthAttemptError(null); 
-    clearAuthMessages();      
+    clearAuthMessages();
+    setAuthAttemptError(null);
+    
     const emailSentSuccessfully = await sendPasswordReset(resetEmail);
 
-    if (emailSentSuccessfully) {
+    if (emailSentSuccessfully) { // Context will set successMessage
       setIsResetCooldown(true);
       setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
+      // User stays on this view, message from context will be shown.
     }
+    // If not successful, context will set error message, which will be shown.
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
+    clearAuthMessages();
     setAuthAttemptError(null);
-    clearAuthMessages(); // Clear messages when toggling this view
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
       setResetEmail('');
-      // Clear cooldown if returning to sign-in view
       if (isResetCooldown) {
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
@@ -191,7 +229,7 @@ export default function LoginPage() {
     { rule: 'hasSpecialChar', text: 'At least 1 special character (!@#$...etc)', met: passwordValidation.hasSpecialChar },
   ];
   
-  const isSignupButtonDisabled = loading || (activeTab === 'signUp' && (!allPasswordRulesMet || !email || !password || !confirmPassword || !displayName));
+  const isSignupButtonDisabled = loading || (activeTab === 'signUp' && (!passwordValidation.meetsAll || !email || !password || !confirmPassword || !displayName));
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -210,7 +248,14 @@ export default function LoginPage() {
           )}
         </CardHeader>
         <CardContent>
-          {error && (
+          {/* Display local form error first if it exists */}
+          {authAttemptError && (
+            <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
+              <AlertCircle className="mr-2 inline h-4 w-4" /> {authAttemptError}
+            </div>
+          )}
+          {/* Display global error from AuthContext if no local form error */}
+          {error && !authAttemptError && (
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>
@@ -230,7 +275,10 @@ export default function LoginPage() {
                   id="reset-email"
                   type="email"
                   value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
+                  onChange={(e) => {
+                     setResetEmail(e.target.value);
+                     if (error) clearAuthMessages(); // Clear global error if user types
+                  }}
                   placeholder="you@example.com"
                   required
                   className="mt-1"
@@ -261,7 +309,7 @@ export default function LoginPage() {
                           id="displayName"
                           type="text"
                           value={displayName}
-                          onChange={(e) => setDisplayName(e.target.value)}
+                          onChange={handleDisplayNameChange}
                           placeholder="Your Name"
                           required
                           className="mt-1"
@@ -275,7 +323,7 @@ export default function LoginPage() {
                         id="email"
                         type="email"
                         value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        onChange={handleEmailChange}
                         placeholder="you@example.com"
                         required
                         className="mt-1"
@@ -327,10 +375,7 @@ export default function LoginPage() {
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={confirmPassword}
-                              onChange={(e) => {
-                                setConfirmPassword(e.target.value);
-                                if (authAttemptError) setAuthAttemptError(null);
-                              }}
+                              onChange={handleConfirmPasswordChange}
                               required
                               className="mt-1 pr-10"
                               autoComplete="new-password"
@@ -347,9 +392,7 @@ export default function LoginPage() {
                             </Button>
                         </div>
                     )}
-                    {authAttemptError && (
-                        <p className="text-xs text-destructive mt-1 px-1" role="alert">{authAttemptError}</p>
-                    )}
+                    {/* Local form errors are now displayed at the top of CardContent */}
                     <Button type="submit" className="w-full" disabled={activeTab === 'signUp' ? isSignupButtonDisabled : loading}>
                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                        {loading ? 'Processing...' : (activeTab === 'signUp' ? 'Sign Up' : 'Sign In')}
@@ -397,5 +440,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
