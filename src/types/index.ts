@@ -14,7 +14,7 @@ export interface TeleprompterSettings {
   darkMode: boolean;
   isAutoSyncEnabled: boolean;
   textColor: string; // e.g., '#FFFFFF' or 'hsl(0, 0%, 100%)'
-  fontFamily: string; // e.g., 'Inter', 'Arial'
+  fontFamily: string; // e.g., 'Inter, sans-serif', 'Arial'
 }
 
 export interface TeleprompterState extends TeleprompterSettings {

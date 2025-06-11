@@ -18,7 +18,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider, // Import TooltipProvider
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,6 @@ const FONT_OPTIONS: FontOption[] = [
   { label: "Courier New", value: "'Courier New', Courier, monospace" },
 ];
 
-// Wrap the component with React.memo
 export const SettingsPanel = React.memo(function SettingsPanel() {
   const {
     fontSize, setFontSize,
@@ -51,7 +50,6 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   } = useTeleprompterStore();
 
   return (
-    // Single TooltipProvider for the entire panel
     <TooltipProvider>
       <div className="space-y-4">
         <Card>

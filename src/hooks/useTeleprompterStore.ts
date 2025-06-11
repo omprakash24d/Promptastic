@@ -16,7 +16,6 @@ const INITIAL_TEXT_COLOR_DARK_MODE_HSL = 'hsl(0 0% 100%)'; // White HSL
 const BLACK_HEX = '#000000';
 const WHITE_HEX = '#ffffff';
 
-
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
 // Default app theme is dark mode.
@@ -41,7 +40,7 @@ Try out the AI Scroll Sync feature! Click the "AI Sync" button, speak a few line
 This text should be long enough to demonstrate scrolling on most screen sizes and with default font settings.
 If you find the scrolling too fast or too slow, remember to adjust the "Scroll Speed" in the settings.
 You can also reset the scroll position at any time using the "Reset" button.
-Use the spacebar to quickly play or pause the scrolling.
+Use the spacebar or backspace key to quickly play or pause the scrolling.
 Full-screen mode can be toggled for an immersive experience.
 
 We hope you enjoy using Promptastic!
@@ -55,6 +54,7 @@ interface TeleprompterState extends TeleprompterSettings {
   activeScriptName: string | null;
   isPlaying: boolean;
   currentScrollPosition: number;
+  LONGER_DEFAULT_SCRIPT_TEXT: string; // Added to make it accessible to other parts if needed
   
   // Actions
   setScriptText: (text: string) => void;
@@ -82,22 +82,11 @@ interface TeleprompterState extends TeleprompterSettings {
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => {
-      const isEffectivelyBlack = (color: string | undefined | null): boolean => {
-        if (!color) return false;
-        const c = color.toLowerCase().replace(/\s/g, '');
-        return c === INITIAL_TEXT_COLOR_LIGHT_MODE_HSL.toLowerCase() || c === BLACK_HEX.toLowerCase();
-      };
-      
-      const isEffectivelyWhite = (color: string | undefined | null): boolean => {
-        if (!color) return false;
-        const c = color.toLowerCase().replace(/\s/g, '');
-        return c === INITIAL_TEXT_COLOR_DARK_MODE_HSL.toLowerCase() || c === WHITE_HEX.toLowerCase();
-      };
-
       return {
         scriptText: LONGER_DEFAULT_SCRIPT_TEXT,
         scripts: [],
         activeScriptName: null,
+        LONGER_DEFAULT_SCRIPT_TEXT: LONGER_DEFAULT_SCRIPT_TEXT,
         
         fontSize: INITIAL_FONT_SIZE,
         scrollSpeed: INITIAL_SCROLL_SPEED,
@@ -136,8 +125,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         deleteScript: (name) => {
           set(state => ({
             scripts: state.scripts.filter(s => s.name !== name),
-            activeScriptName: state.activeScriptName === name ? null : state.activeScriptName,
-            // scriptText is handled by subscription or page effect if all scripts are gone or active one is deleted
           }));
         },
         renameScript: (oldName, newName) => {
@@ -153,10 +140,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
         
         setDarkMode: (newDarkModeValue) => {
-          // This logic ensures text color defaults correctly based on theme.
-          // If current text color is one of the "defaults" (black or white), it's flipped.
-          // Otherwise (custom color), it's preserved.
-          // This was simplified to always set to default, prioritizing visibility.
           set({
             darkMode: newDarkModeValue,
             textColor: newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
@@ -189,7 +172,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         darkMode: state.darkMode,
         isAutoSyncEnabled: state.isAutoSyncEnabled,
         textColor: state.textColor,
-        fontFamily: state.fontFamily,
+        fontFamily: state.fontFamily, // Persist fontFamily
       }),
     }
   )
@@ -201,9 +184,10 @@ export const useTeleprompterStore = create<TeleprompterState>()(
 // Initial script loading based on activeScriptName is handled by PromptasticPage.tsx useEffect.
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
-    if (state.scripts.length === 0 && state.activeScriptName === null && state.scriptText !== LONGER_DEFAULT_SCRIPT_TEXT) {
-        useTeleprompterStore.setState({ scriptText: LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
+    const currentStore = useTeleprompterStore.getState();
+    if (currentStore.scripts.length === 0 && currentStore.activeScriptName === null && currentStore.scriptText !== currentStore.LONGER_DEFAULT_SCRIPT_TEXT) {
+        useTeleprompterStore.setState({ scriptText: currentStore.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
     }
   },
-  (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText }) 
+  (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );

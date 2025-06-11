@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 // SSR-safe defaults
 const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)'; // White (default for dark mode)
-const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif';
+const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; // SSR Font Family Default
 const VIEW_SSR_DEFAULT_DARK_MODE = true; // Dark mode
 
 // Threshold for detecting user scroll intervention during active playback.
@@ -25,7 +25,7 @@ export function TeleprompterView() {
     isMirrored,
     darkMode,
     textColor,
-    fontFamily,
+    fontFamily, // Get fontFamily from store
     isPlaying,
     currentScrollPosition,
     setCurrentScrollPosition,
@@ -194,19 +194,19 @@ export function TeleprompterView() {
   }, [scriptText, checkHighlightedParagraph, fontFamily, fontSize, lineHeight]);
 
   const currentTextColor = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
-  const currentFontFamily = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
+  const currentFontFamily = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily; // Use SSR default or store value
   const mirrorTransform = isMounted && isMirrored ? 'scaleX(-1)' : 'none';
 
   const currentViewStyles: React.CSSProperties = {
     color: currentTextColor,
-    fontFamily: currentFontFamily,
+    fontFamily: currentFontFamily, // Apply fontFamily
     fontSize: `${fontSize}px`,
     lineHeight: lineHeight,
     transform: mirrorTransform,
   };
 
   const innerContentStyles: React.CSSProperties = {
-    transform: mirrorTransform,
+    transform: mirrorTransform, // Apply to inner content if outer is scaled for mirror
   };
 
   return (
