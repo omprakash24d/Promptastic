@@ -110,13 +110,16 @@ export default function LoginPage() {
     clearAuthMessages();
     const success = await sendPasswordReset(resetEmail);
     if (success) {
-      setShowForgotPassword(false);
-      setResetEmail('');
+      // User remains on the forgot password screen.
+      // Success message is set by AuthContext and will be displayed.
+      // Error message (if any, other than user-not-found) is also set by AuthContext.
       setIsResetCooldown(true);
       setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
-      // Success message is set by AuthContext and will be displayed on the main login view
+      // Do not clear resetEmail here, user might want to see what they submitted or try again if there was a typo
+      // Do not call setShowForgotPassword(false) here.
     }
-    // If !success and it's not a 'user-not-found' error, the error is set by AuthContext and will be displayed on the forgot password form
+    // If !success (e.g., invalid email format, network error), the error is set by AuthContext
+    // and will be displayed on the forgot password form.
   };
 
 
@@ -129,12 +132,17 @@ export default function LoginPage() {
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
-    clearAuthMessages();
+    clearAuthMessages(); // Clear messages when toggling the view
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
-      setResetEmail('');
+      setResetEmail(''); // Clear the email field when going back to login
+      if (isResetCooldown) { // Also clear cooldown if navigating back
+        if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+        setIsResetCooldown(false);
+        setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
+      }
     }
   };
 
@@ -278,8 +286,8 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
-                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" /> }
-                   {loading && activeTab === 'signIn' ? 'Signing in...' : 'Google'}
+                   {loading && !activeTab ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" /> }
+                   {loading && !activeTab ? 'Signing in...' : 'Google'}
                 </Button>
               </div>
             </>
@@ -305,3 +313,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
