@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
+import { summarizeScript } from '@/ai/flows/summarize-script-flow'; // Added import
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,9 +23,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle as DialogTitle, // Renamed to avoid conflict if AlertTitle is also used from AlertDialog
+  AlertDialogTitle as DialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Correct import for Alert components
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
@@ -332,7 +333,7 @@ export function ScriptManager() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <DialogTitle className="flex items-center"> {/* Changed from AlertDialogTitle to DialogTitle */}
+            <DialogTitle className="flex items-center">
               <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
               Unsaved Changes
             </DialogTitle>
@@ -411,7 +412,7 @@ export function ScriptManager() {
           <AlertTitle className="font-semibold">Script Summary</AlertTitle>
           <AlertDescription className="mt-1 text-sm">
             <ScrollArea className="h-[100px] w-full rounded-md p-1 bg-muted/20 border">
-             <p className="p-2">{scriptSummary}</p>
+             <p className="p-2 whitespace-pre-wrap">{scriptSummary}</p>
             </ScrollArea>
           </AlertDescription>
         </Alert>
@@ -482,4 +483,3 @@ export function ScriptManager() {
   );
 }
 
-    
