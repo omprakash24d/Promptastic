@@ -2,13 +2,14 @@
 import type React from 'react';
 import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer'; // Import Footer
+import Footer from '@/components/layout/Footer'; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info } from 'lucide-react';
+import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
+import { ShareButtons } from '@/components/promptastic/ShareButtons'; // Import the new component
 
 export const metadata: Metadata = {
     title: 'How to Use Promptastic!',
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export default function HowToUsePage() {
-  const dummyOpen = () => {}; // Placeholder for Header props
+  const dummyOpen = () => {}; 
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -85,7 +86,6 @@ export default function HowToUsePage() {
 
                  <h4 className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
                  <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls on the main page to make the teleprompter view fill your entire screen. This helps minimize distractions. (Presentation mode is currently combined with Fullscreen).</p>
-                 {/* Removed specific presentation mode button explanation as it was removed */}
                  <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit Fullscreen mode.</p>
               </section>
 
@@ -99,6 +99,13 @@ export default function HowToUsePage() {
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script (when Script Manager is open and focused on the script editor).</li>
                 </ul>
               </section>
+
+            <Separator/>
+
+            {/* Share Buttons Section */}
+            <section aria-labelledby="share-guide-heading">
+              <ShareButtons className="mt-6" />
+            </section>
             
             <div className="mt-8 text-center">
               <Button asChild variant="outline">
