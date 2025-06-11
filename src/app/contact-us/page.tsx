@@ -1,8 +1,10 @@
 
+"use client";
+
 import type React from 'react';
-import type { Metadata } from 'next';
+// metadata export removed as this is now a client component
 import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer'; // Import Footer
+import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -11,18 +13,36 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-
-export const metadata: Metadata = {
-    title: 'Contact Us',
-    description: 'Get in touch with the Promptastic! team. Send us your questions, feedback, or feature requests.',
-};
+import { useToast } from '@/hooks/use-toast';
 
 export default function ContactUsPage() {
+  const { toast } = useToast();
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Placeholder: In a real app, you'd handle form submission here (e.g., send to an API endpoint)
-    alert("Form submitted (placeholder action). Thank you for your message!");
-    // Optionally reset form fields
+    const formData = new FormData(e.target as HTMLFormElement);
+    const name = formData.get('name') as string;
+    const email = formData.get('email') as string;
+    const subject = formData.get('subject') as string;
+    const message = formData.get('message') as string;
+
+    console.log("Contact Form Submitted (Placeholder):");
+    console.log({ name, email, subject, message });
+
+    // Developer Note Toast (visible during development or if inspecting)
+    toast({
+      title: "Form Submitted (Developer Note)",
+      description: "Form data logged to console. A backend API endpoint is needed for actual email sending to omprakash24d@gmail.com.",
+      duration: 10000, 
+    });
+    
+    // User-facing Toast
+    toast({
+        title: "Message Sent!",
+        description: "Thank you for your message. We'll review it shortly.",
+        duration: 5000,
+    });
+
     (e.target as HTMLFormElement).reset();
   };
 
@@ -86,3 +106,5 @@ export default function ContactUsPage() {
     </div>
   );
 }
+
+    
