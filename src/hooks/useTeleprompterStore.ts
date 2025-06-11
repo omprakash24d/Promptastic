@@ -127,7 +127,7 @@ interface TeleprompterState extends TeleprompterSettings {
   setIsPlaying: (playing: boolean) => void;
   setCurrentScrollPosition: (position: number) => void;
   resetScroll: () => void;
-  setCountdownValue: (value: number | null) => void;
+  setCountdownValue: (value: number | null | ((prev: number | null) => number | null)) => void;
 }
 
 export const useTeleprompterStore = create<TeleprompterState>()(
@@ -202,7 +202,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
               timestamp: Date.now(),
               notes: notes,
             };
-            const updatedScript = { ...script, versions: [...script.versions, newVersion] };
+            const updatedScript = { ...script, versions: [...(script.versions || []), newVersion] };
             set(state => ({
               scripts: state.scripts.map(s => s.name === scriptName ? updatedScript : s),
             }));
@@ -232,7 +232,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)), activeLayoutPresetName: null }),
         setFocusLineStyle: (style) => set({ focusLineStyle: style, activeLayoutPresetName: null }),
         setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled }),
-        setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(10, duration)) }),
+        setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(60, duration)) }),
         setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }),
         
         applyLayoutPreset: (presetName) => {
@@ -266,20 +266,25 @@ export const useTeleprompterStore = create<TeleprompterState>()(
           const { isPlaying, countdownEnabled, setCountdownValue, setIsPlaying, countdownDuration } = get();
           if (isPlaying) {
             setIsPlaying(false);
-            setCountdownValue(null); // Clear countdown if pausing
+            setCountdownValue(null); 
           } else {
             if (countdownEnabled) {
-              setCountdownValue(countdownDuration); // Start countdown with user-defined duration
-              // setIsPlaying will be called by TeleprompterView after countdown
+              setCountdownValue(countdownDuration); 
             } else {
-              setIsPlaying(true); // Play immediately
+              setIsPlaying(true); 
             }
           }
         },
         setIsPlaying: (playing) => set({ isPlaying: playing }),
         setCurrentScrollPosition: (position) => set({ currentScrollPosition: position }),
         resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false, countdownValue: null }),
-        setCountdownValue: (value) => set({ countdownValue: value }),
+        setCountdownValue: (value) => {
+          if (typeof value === 'function') {
+            set((prevState) => ({ countdownValue: value(prevState.countdownValue) }));
+          } else {
+            set({ countdownValue: value });
+          }
+        },
       }
     },
     {
@@ -335,3 +340,6 @@ const unsub = useTeleprompterStore.subscribe(
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
 
+// Ensure that `setCountdownValue` in the store can accept a function for updates
+// based on the previous state, which is useful for interval-based decrements.
+// The type for `setCountdownValue` was updated for this.

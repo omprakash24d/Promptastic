@@ -391,7 +391,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                       <Info className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Set the countdown duration (1-10 seconds).</p>
+                      <p>Set the countdown duration (1-60 seconds).</p>
                     </TooltipContent>
                   </Tooltip>
                 </Label>
@@ -399,7 +399,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                   id="countdown-duration"
                   aria-label={`Countdown duration: ${countdownDuration} seconds`}
                   min={1}
-                  max={10}
+                  max={60}
                   step={1}
                   value={[countdownDuration]}
                   onValueChange={(value) => setCountdownDuration(value[0])}
@@ -443,4 +443,3 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     </TooltipProvider>
   );
 });
-
