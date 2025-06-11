@@ -5,7 +5,7 @@ import type React from 'react';
 import { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { AuthUser } from '@/types';
 import { usePathname, useRouter } from 'next/navigation';
-import { auth, storage } from '@/firebase/config'; // Added storage
+import { auth, storage } from '@/firebase/config';
 import {
   onAuthStateChanged,
   GoogleAuthProvider,
@@ -18,7 +18,7 @@ import {
   sendEmailVerification,
   type User as FirebaseUser,
 } from 'firebase/auth';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // Added Firebase Storage imports
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 
 const MESSAGE_CLEAR_TIMEOUT = 7000;
@@ -59,7 +59,7 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<boolean>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<boolean>;
-  updateUserProfile: (updates: { displayName?: string }, photoFile?: File | null) => Promise<void>; // Signature updated
+  updateUserProfile: (updates: { displayName?: string }, photoFile?: File | null) => Promise<void>;
   logout: () => Promise<void>;
   resendEmailVerification: () => Promise<void>;
   clearAuthMessages: () => void;
@@ -81,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profileUpdateLoading, setProfileUpdateLoading] = useState(false);
   const [verificationResendLoading, setVerificationResendLoading] = useState(false);
   const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
-  const [initialAuthLoading, setInitialAuthLoading] = useState(true);
+  // const [initialAuthLoading, setInitialAuthLoading] = useState(true); // Removed, not directly used to block rendering
   const [error, setErrorState] = useState<string | null>(null);
   const [successMessage, setSuccessMessageState] = useState<string | null>(null);
   const router = useRouter();
@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [clearAuthMessages]);
 
-  const setSuccessMessage = useCallback((message: string | null) => {
+  const setSuccessMessageCb = useCallback((message: string | null) => {
     clearAuthMessages();
     setSuccessMessageState(message);
     if (message) {
@@ -125,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         clearUserScripts();
       }
-      setInitialAuthLoading(false);
+      // setInitialAuthLoading(false); // Removed
     });
     return () => {
       unsubscribe();
@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Dependencies are stable: initializeUserScripts, clearUserScripts, setCurrentUserIdInStore from Zustand are stable
 
   const handleAuthSuccess = useCallback((message?: string, options: { fromSignup?: boolean, redirectTo?: string, skipRedirect?: boolean } = {}) => {
     clearAuthMessages();
@@ -144,28 +144,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else if (fromSignup) {
       finalMessage = message || "Account created successfully!";
     }
-    setSuccessMessage(finalMessage || null);
+    setSuccessMessageCb(finalMessage || null);
     if (!skipRedirect && pathname !== redirectTo) {
         router.push(redirectTo);
     }
-  }, [setSuccessMessage, router, pathname, clearAuthMessages]);
+  }, [setSuccessMessageCb, router, pathname, clearAuthMessages]);
 
   const handleAuthError = useCallback((err: any, operation?: 'passwordReset' | 'signup') => {
     clearAuthMessages();
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
     if (err.code && userCancellableErrors.includes(err.code)) {
-      return;
+      return; // Do not show an error for user-cancelled actions
     }
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
-      setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
+      // For password resets to non-existent emails, show a generic success message to prevent email enumeration
+      setSuccessMessageCb("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       return;
     }
     const message = FIREBASE_ERROR_MESSAGES[err.code as string] || `An unexpected error occurred: ${err.message} (Code: ${err.code})`;
     setError(message);
     console.error("Firebase Auth Error:", err.code, err.message);
-  }, [setError, setSuccessMessage, clearAuthMessages]);
+  }, [setError, setSuccessMessageCb, clearAuthMessages]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = useCallback(async () => {
     clearAuthMessages();
     setGoogleSignInLoading(true);
     try {
@@ -177,9 +178,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setGoogleSignInLoading(false);
     }
-  };
+  }, [clearAuthMessages, handleAuthSuccess, handleAuthError]);
 
-  const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<boolean> => {
+  const signUpWithEmail = useCallback(async (email: string, password: string, displayName: string): Promise<boolean> => {
     clearAuthMessages();
     setSignupLoading(true);
     try {
@@ -188,8 +189,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await firebaseUpdateProfile(userCredential.user, { displayName });
         await sendEmailVerification(userCredential.user);
         const parsedUser = parseFirebaseUser(userCredential.user);
-        setUser(parsedUser);
-        setCurrentUserIdInStore(parsedUser?.uid || null);
+        setUser(parsedUser); // Update local user state immediately
+        setCurrentUserIdInStore(parsedUser?.uid || null); // Update store
       }
       handleAuthSuccess(undefined, { fromSignup: true, skipRedirect: true });
       return true;
@@ -199,9 +200,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setSignupLoading(false);
     }
-  };
+  }, [clearAuthMessages, handleAuthSuccess, handleAuthError, setCurrentUserIdInStore]);
 
-  const signInWithEmail = async (email: string, password: string) => {
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
     clearAuthMessages();
     setLoginLoading(true);
     try {
@@ -212,14 +213,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoginLoading(false);
     }
-  };
+  }, [clearAuthMessages, handleAuthSuccess, handleAuthError]);
 
-  const sendPasswordReset = async (email: string): Promise<boolean> => {
+  const sendPasswordReset = useCallback(async (email: string): Promise<boolean> => {
     clearAuthMessages();
     setPasswordResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); //This will show the success message due to special handling in handleAuthError
+      // The success message is handled by handleAuthError's special case for 'auth/user-not-found' during passwordReset
+      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); 
       return true;
     } catch (err: any) {
       handleAuthError(err, 'passwordReset');
@@ -227,30 +229,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setPasswordResetLoading(false);
     }
-  };
+  }, [clearAuthMessages, handleAuthError]);
 
-  const resendEmailVerification = async () => {
+  const resendEmailVerification = useCallback(async () => {
     clearAuthMessages();
     if (!auth.currentUser) {
       setError("No user is currently signed in to resend verification email.");
       return;
     }
     if (auth.currentUser.emailVerified) {
-      setSuccessMessage("Your email is already verified!");
+      setSuccessMessageCb("Your email is already verified!");
       return;
     }
     setVerificationResendLoading(true);
     try {
       await sendEmailVerification(auth.currentUser);
-      setSuccessMessage("Verification email resent! Please check your inbox (and spam folder).");
+      setSuccessMessageCb("Verification email resent! Please check your inbox (and spam folder).");
     } catch (err: any) {
       handleAuthError(err);
     } finally {
       setVerificationResendLoading(false);
     }
-  };
+  }, [clearAuthMessages, setError, setSuccessMessageCb, handleAuthError]);
 
-  const updateUserProfile = async (updates: { displayName?: string }, photoFile?: File | null) => {
+  const updateUserProfile = useCallback(async (updates: { displayName?: string }, photoFile?: File | null) => {
     clearAuthMessages();
     setProfileUpdateLoading(true);
     if (!auth.currentUser) {
@@ -261,7 +263,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       let photoURL = auth.currentUser.photoURL;
       if (photoFile) {
-        const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+        const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
         if (photoFile.size > MAX_FILE_SIZE_BYTES) {
           throw { code: 'storage/object-too-large', message: FIREBASE_ERROR_MESSAGES['storage/object-too-large'] };
         }
@@ -275,35 +277,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         photoURL = await getDownloadURL(snapshot.ref);
       }
 
-      const profileUpdates: { displayName?: string; photoURL?: string | null } = { ...updates };
-       // Check if photoURL actually changed or if it's a new upload (photoURL was null before)
-      if (photoURL !== auth.currentUser.photoURL) {
+      const profileUpdates: { displayName?: string; photoURL?: string | null } = {};
+      if (updates.displayName !== undefined && updates.displayName !== auth.currentUser.displayName) {
+        profileUpdates.displayName = updates.displayName;
+      }
+      if (photoURL !== auth.currentUser.photoURL) { // Check if photoURL actually changed or if it's a new upload
         profileUpdates.photoURL = photoURL;
       }
 
-
-      if (Object.keys(updates).length > 0 || (photoFile && photoURL !== auth.currentUser.photoURL) ) {
+      if (Object.keys(profileUpdates).length > 0) {
          await firebaseUpdateProfile(auth.currentUser, profileUpdates);
       }
 
       const parsedUser = parseFirebaseUser(auth.currentUser);
-      setUser(parsedUser);
-      setSuccessMessage("Profile updated successfully!");
+      setUser(parsedUser); // Update local user state immediately
+      setSuccessMessageCb("Profile updated successfully!");
     } catch (err: any) {
       handleAuthError(err);
     } finally {
       setProfileUpdateLoading(false);
     }
-  };
+  }, [clearAuthMessages, setError, setSuccessMessageCb, handleAuthError]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     clearAuthMessages();
-    setLoginLoading(true); // Reuse loginLoading to indicate a general auth operation
+    setLoginLoading(true);
     try {
       await firebaseSignOut(auth);
-      // User state will be updated by onAuthStateChanged, which also calls clearUserScripts
-      // Redirect if not on login page already
-      if (pathname !== '/login' && pathname !== '/') {
+      // User state will be updated by the main onAuthStateChanged listener,
+      // which will also call clearUserScripts from Zustand.
+      if (pathname !== '/login' && pathname !== '/') { // Avoid redundant navigation
         router.push('/login');
       }
     } catch (err: any) {
@@ -311,7 +314,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } finally {
       setLoginLoading(false);
     }
-  };
+  }, [clearAuthMessages, handleAuthError, router, pathname]);
 
   const value = useMemo(() => ({
     user,
@@ -331,17 +334,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     resendEmailVerification,
     clearAuthMessages,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     user,
     loginLoading, signupLoading, passwordResetLoading, profileUpdateLoading, verificationResendLoading, googleSignInLoading,
     error, successMessage,
-    // Callbacks are memoized with useCallback, so they are stable dependencies
+    signInWithGoogle, signUpWithEmail, signInWithEmail, sendPasswordReset, updateUserProfile, logout, resendEmailVerification, clearAuthMessages
   ]);
 
-  // Removed the initialAuthLoading block here.
-  // The app will render its children immediately.
-  // UI components should handle their loading states based on 'user' being null initially.
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

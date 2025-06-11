@@ -28,7 +28,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface PlaybackControlsProps {
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
-  // isPresentationMode and onTogglePresentationMode are removed as per request
 }
 
 export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackControlsProps) {
@@ -231,7 +230,8 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
           <Button
             onClick={() => togglePlayPause()}
             size="lg"
-            aria-label={isPlaying ? 'Pause' : 'Play'}
+            aria-label={isPlaying ? 'Pause scrolling' : 'Play scrolling'}
+            aria-pressed={isPlaying}
             title={isPlaying ? 'Pause (Spacebar/Backspace)' : 'Play (Spacebar/Backspace)'}
             disabled={isRecording || isProcessingAiSync}
             className="px-4"
@@ -243,7 +243,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             onClick={resetScroll}
             variant="outline"
             size="lg"
-            aria-label="Reset Scroll"
+            aria-label="Reset Scroll to beginning"
             title="Reset Scroll"
             disabled={isRecording || isProcessingAiSync}
             className="px-4"
@@ -263,6 +263,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
                   isProcessingAiSync && "bg-blue-500 hover:bg-blue-600 text-white border-blue-600"
               )}
               aria-label={isRecording ? "Stop AI Sync Recording" : (isProcessingAiSync ? "AI Sync in progress" : "Start AI Sync with Speech")}
+              aria-pressed={isRecording || isProcessingAiSync}
               title={isRecording ? "Stop AI Sync Recording" : (isProcessingAiSync ? "AI Sync in progress" : "Start AI Sync with Speech (requires microphone)")}
               disabled={(permissionError !== null && !isRecording) || isProcessingAiSync || !isAiSyncSupported }
             >
@@ -287,6 +288,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
               variant="outline"
               size="lg"
               aria-label={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
+              aria-pressed={isFullScreen}
               title={isFullScreen ? 'Exit Full Screen (Esc)' : 'Enter Full Screen'}
               className="px-4"
             >
@@ -329,3 +331,4 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     </>
   );
 }
+

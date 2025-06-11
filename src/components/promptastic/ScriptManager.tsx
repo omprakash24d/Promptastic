@@ -8,7 +8,7 @@ import { ScriptEditor } from './ScriptEditor';
 import { ScriptList } from './ScriptList';
 import { ScriptVersionHistory } from './ScriptVersionHistory';
 import { ScriptSummaryDisplay } from './ScriptSummaryDisplay';
-import { fileTypes as allFileTypes, type FileTypeOption } from '@/lib/fileParser'; // Import from new utility
+import { fileTypes as allFileTypes, type FileTypeOption } from '@/lib/fileParser';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { AlertTriangle } from 'lucide-react';
@@ -33,7 +33,7 @@ export function ScriptManager() {
     loadScript, saveScript, deleteScript, renameScript, duplicateScript,
     saveScriptVersion, loadScriptVersion,
     setActiveScriptName,
-    LONGER_DEFAULT_SCRIPT_TEXT // Access directly from store, assuming it's static or selected once
+    LONGER_DEFAULT_SCRIPT_TEXT
   } = useTeleprompterStore();
 
   const [currentEditingScriptText, setCurrentEditingScriptText] = useState(scriptText);
@@ -50,8 +50,6 @@ export function ScriptManager() {
   const [showVersionNotesDialog, setShowVersionNotesDialog] = useState(false);
   const [pendingVersionSaveAction, setPendingVersionSaveAction] = useState<(() => void) | null>(null);
 
-  // Use the LONGER_DEFAULT_SCRIPT_TEXT from the store.
-  // It's part of the store's initial state and doesn't change, so direct access is fine.
   const defaultScriptText = useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT;
 
 
@@ -75,7 +73,7 @@ export function ScriptManager() {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
         if (isDirty && currentEditingScriptText.trim() !== "" && currentEditingScriptText !== defaultScriptText) {
             event.preventDefault();
-            event.returnValue = ''; // Required for Chrome
+            event.returnValue = ''; 
         }
     };
 
@@ -116,7 +114,7 @@ export function ScriptManager() {
       setShowConfirmDialog(true);
     } else {
       action();
-      setIsDirty(false); // Ensure dirty flag is cleared if action proceeds without confirm
+      setIsDirty(false); 
     }
   };
 
@@ -135,7 +133,7 @@ export function ScriptManager() {
       return;
     }
     saveScript(nameToSave, currentEditingScriptText);
-    toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
+    // Toast for save success is handled within saveScript in the store
     if (!activeScriptName) setNewScriptName("");
     setIsDirty(false);
   }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
@@ -147,7 +145,6 @@ export function ScriptManager() {
         handleSave();
       }
     };
-    // Use document for keydown listener for global shortcuts like Ctrl+S
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -164,19 +161,8 @@ export function ScriptManager() {
   const handleDelete = (name: string) => {
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`);
     if (confirmDelete) {
-      const wasActive = activeScriptName === name;
-      const remainingScripts = scripts.filter(s => s.name !== name);
       deleteScript(name);
-      toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
-      if (wasActive) {
-        if (remainingScripts.length > 0) {
-          loadScript(remainingScripts[0].name);
-        } else {
-          setCurrentEditingScriptText(defaultScriptText);
-          setActiveScriptName(null);
-        }
-      }
-      setIsDirty(false);
+      // Toast for delete success is handled within deleteScript in the store
     }
   };
 
@@ -201,7 +187,7 @@ export function ScriptManager() {
       return;
     }
     renameScript(name, trimmedRenameValue);
-    toast({ title: "Script Renamed", description: `Script "${name}" renamed to "${trimmedRenameValue}".` });
+    // Toast for rename success is handled within renameScript in the store
     setRenamingScript(null);
     setRenameValue("");
   };
@@ -222,12 +208,8 @@ export function ScriptManager() {
   };
 
   const handleDuplicate = (name: string) => {
-    const newName = duplicateScript(name);
-    if (newName) {
-      toast({ title: "Script Duplicated", description: `Script "${name}" duplicated as "${newName}". New script is now active.` });
-    } else {
-      toast({ title: "Error", description: `Could not duplicate script "${name}".`, variant: "destructive" });
-    }
+    duplicateScript(name);
+    // Toast for duplicate success is handled within duplicateScript in the store
   };
 
   const handleExportTxt = () => {
@@ -255,12 +237,15 @@ export function ScriptManager() {
   };
 
   const processFileContent = (content: string, fileName: string) => {
-    setActiveScriptName(null);
+    setActiveScriptName(null); // Mark as not an active saved script
     setCurrentEditingScriptText(content);
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-    setNewScriptName(fileNameWithoutExtension);
-    toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
-    setIsDirty(true);
+    setNewScriptName(fileNameWithoutExtension); // Suggest name for saving
+    toast({ 
+      title: "File Imported", 
+      description: `Content of "${fileName}" loaded into editor. Save it as a new script (suggested name: "${fileNameWithoutExtension}") or replace an existing one.` 
+    });
+    setIsDirty(true); // Imported content needs to be saved
   };
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -268,7 +253,6 @@ export function ScriptManager() {
     if (file) {
       const fileName = file.name;
       const fileExtension = "." + fileName.split('.').pop()?.toLowerCase();
-      // Use allFileTypes imported from fileParser.ts
       const selectedType = allFileTypes.find(ft => ft.accept.split(',').map(a => a.trim()).some(a => a === fileExtension || a === file.type));
 
       if (selectedType) {
@@ -290,7 +274,7 @@ export function ScriptManager() {
       } else {
         toast({ title: "Import Error", description: `Unsupported file type: "${fileExtension || file.type}". Please select .txt, .pdf, .docx or .md.`, variant: "destructive" });
       }
-      if (event.target) event.target.value = ""; // Reset file input
+      if (event.target) event.target.value = ""; 
     }
   };
 
@@ -300,10 +284,8 @@ export function ScriptManager() {
       return;
     }
     setIsSummarizing(true);
-    setScriptSummary(null); // Clear previous summary
+    setScriptSummary(null); 
     try {
-      // const summarizeScript = (await import('@/ai/flows/summarize-script-flow')).summarizeScript; // Dynamic import if needed
-      // For this component, direct import is likely fine as it's part of its core functionality
       const { summarizeScript: genkitSummarize } = await import('@/ai/flows/summarize-script-flow');
       const result = await genkitSummarize({ scriptText: currentEditingScriptText });
       setScriptSummary(result.summary);
@@ -326,7 +308,7 @@ export function ScriptManager() {
     setShowVersionNotesDialog(true);
     setPendingVersionSaveAction(() => () => {
       saveScriptVersion(activeScriptName, versionNotes);
-      toast({ title: "Version Saved", description: `New version for "${activeScriptName}" saved.` });
+      // Toast for version save success is handled within saveScriptVersion in the store
       setShowVersionNotesDialog(false);
       setVersionNotes("");
     });
@@ -444,3 +426,4 @@ export function ScriptManager() {
     </div>
   );
 }
+
