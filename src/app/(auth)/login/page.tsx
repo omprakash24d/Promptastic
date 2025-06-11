@@ -129,8 +129,8 @@ export default function LoginPage() {
 
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages();
     setAuthAttemptError(null);
+    clearAuthMessages();
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
@@ -141,7 +141,6 @@ export default function LoginPage() {
         setAuthAttemptError("Passwords do not match.");
         return;
       }
-      // Re-validate password on submit as a safeguard, though button should be disabled
       const isPasswordStillValid = validatePassword(password);
       if (!isPasswordStillValid) {
         setAuthAttemptError("Password does not meet all requirements.");
@@ -155,7 +154,8 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages();
+    setAuthAttemptError(null); 
+    clearAuthMessages();      
     const emailSentSuccessfully = await sendPasswordReset(resetEmail);
 
     if (emailSentSuccessfully) {
@@ -395,4 +395,3 @@ export default function LoginPage() {
     </div>
   );
 }
- 

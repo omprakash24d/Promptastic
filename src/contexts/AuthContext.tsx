@@ -72,14 +72,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (finalMessage) setSuccessMessage(finalMessage);
     else setSuccessMessage(null);
 
-    // Only redirect if not already on the target page or if not staying for a message
     if (router.pathname !== '/') { 
         router.push('/');
     }
   }
 
   const handleAuthError = (err: any, operation?: 'passwordReset') => {
-    setSuccessMessage(null); // Clear success message on new error
+    setSuccessMessage(null); 
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
     if (err.code && userCancellableErrors.includes(err.code)) {
@@ -92,11 +91,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     
-    // This specific check for passwordReset + user-not-found should ideally not be hit if `sendPasswordReset` handles it first.
-    // However, it's a safeguard. If `sendPasswordReset` has already set the generic success message, this return prevents overriding it with an error.
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
       setLoading(false); 
-      // Do not set an error here; the generic success message is handled by `sendPasswordReset`.
       return;
     }
 
@@ -132,11 +128,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setError('Access to this account has been temporarily disabled due to many failed login attempts. You can try again later or reset your password.');
             break;
         default:
-          console.error("Unhandled Firebase Auth Error:", err); // Log unhandled errors
+          console.error("Unhandled Firebase Auth Error:", err); 
           setError(`An unexpected error occurred: ${err.message} (Code: ${err.code})`);
       }
     } else {
-      console.error("Generic Auth Error:", err); // Log generic errors
+      console.error("Generic Auth Error:", err); 
       setError(err.message || 'An unexpected error occurred during authentication.');
     }
   }
@@ -149,8 +145,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, provider);
       handleAuthSuccess("Signed in with Google successfully! Redirecting...");
     } catch (err: any) {
+      console.error("Google Sign-In Raw Error:", err); // Added for direct error visibility
       if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(err.code)) {
-        console.error("Google Sign-In Raw Error:", err);
+        // console.error("Google Sign-In Raw Error:", err); // Moved outside this condition
       }
       handleAuthError(err);
     } finally {
@@ -178,7 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
         });
       }
-      handleAuthSuccess(undefined, true); // Message handled by fromSignup flag
+      handleAuthSuccess(undefined, true); 
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -192,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await signInWithEmailAndPassword(auth, email, password);
       handleAuthSuccess("Signed in successfully! Redirecting...");
-    } catch (err: any) { // Added : any type
+    } catch (err: any) { 
       handleAuthError(err);
     } finally {
       setLoading(false);
@@ -201,21 +198,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const sendPasswordReset = async (email: string): Promise<boolean> => {
     setLoading(true);
-    clearAuthMessages();
+    clearAuthMessages(); 
     try {
       await sendPasswordResetEmail(auth, email);
+      setError(null); 
       setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
-      setError(null);
       setLoading(false);
       return true;
     } catch (err: any) {
       if (err.code === 'auth/user-not-found') {
+        setError(null); 
         setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
-        setError(null);
         setLoading(false);
         return true; 
       }
-      handleAuthError(err, 'passwordReset');
+      handleAuthError(err, 'passwordReset'); 
       setLoading(false);
       return false;
     }
