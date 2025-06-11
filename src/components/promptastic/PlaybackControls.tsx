@@ -32,14 +32,14 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
   const [isProcessingAiSync, setIsProcessingAiSync] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
-  const [isAiSyncSupported, setIsAiSyncSupported] = useState(true);
+  const [isAiSyncSupported, setIsAiSyncSupported] = useState(true); // Assume supported until checked
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder)) {
       setIsAiSyncSupported(false);
       toast({
         title: "AI Sync Not Supported",
-        description: "Your browser does not support the necessary features for AI Scroll Sync (MediaRecorder or getUserMedia).",
+        description: "Your browser does not support the necessary features for AI Scroll Sync.",
         variant: "destructive",
         duration: 10000,
       });
@@ -78,13 +78,12 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
 
     if (isRecording) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        mediaRecorderRef.current.stop(); // This will trigger onstop
+        mediaRecorderRef.current.stop();
       }
       // isRecording will be set to false in onstop
       return;
     }
 
-    // Start recording
     setPermissionError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -99,10 +98,11 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        setIsRecording(false);
+        setIsRecording(false); // Moved here to ensure it's set before async ops
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        audioChunksRef.current = []; 
+        audioChunksRef.current = [];
 
+        // Stop tracks after blob creation
         stream.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
 
@@ -110,7 +110,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             toast({ title: "AI Sync", description: "No audio recorded. Please try speaking for a few seconds.", variant: "destructive" });
             return;
         }
-
+        
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -122,7 +122,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             const input: ScrollSyncWithSpeechInput = {
               scriptText,
               audioDataUri,
-              isAutoSyncEnabled: true, 
+              isAutoSyncEnabled: true,
             };
             const output = await scrollSyncWithSpeech(input);
             const newSpeed = Math.max(10, Math.min(output.adjustedScrollSpeed, 200));
@@ -160,11 +160,12 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
         setPermissionError(message);
       }
       toast({ title: "Recording Error", description: message, variant: "destructive" });
-      setIsRecording(false);
+      setIsRecording(false); // Ensure this is reset on error
+      // Clean up stream if it was obtained but MediaRecorder failed
       audioStreamRef.current?.getTracks().forEach(track => track.stop()); 
       audioStreamRef.current = null;
     }
-  }, [isAutoSyncEnabled, scriptText, toast, setScrollSpeed, isRecording, isAiSyncSupported]);
+  }, [isAutoSyncEnabled, scriptText, toast, setScrollSpeed, isRecording, isAiSyncSupported, isProcessingAiSync]); // Added isProcessingAiSync
 
   const aiSyncButtonText = isRecording ? 'Stop Sync' : (isProcessingAiSync ? 'Syncing...' : 'AI Sync');
   const AiSyncIcon = isRecording ? MicOff : (isProcessingAiSync ? Loader2 : Mic);
@@ -185,26 +186,26 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
           <AlertTitle>AI Sync Not Supported</AlertTitle>
           <AlertDescription>
             Your browser does not support the required features for AI Scroll Sync.
-            Please try a different browser.
+            Please try a different browser or update your current one.
           </AlertDescription>
         </Alert>
       )}
       <div className="flex items-center justify-center gap-3 flex-wrap">
-        <Button 
-          onClick={togglePlayPause} 
-          size="lg" 
-          aria-label={isPlaying ? 'Pause' : 'Play'} 
-          title={isPlaying ? 'Pause (Spacebar)' : 'Play (Spacebar)'}
+        <Button
+          onClick={() => togglePlayPause()}
+          size="lg"
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? 'Pause (Spacebar/Backspace)' : 'Play (Spacebar/Backspace)'}
           disabled={isRecording || isProcessingAiSync}
         >
           {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
           <span className="ml-2">{isPlaying ? 'Pause' : 'Play'}</span>
         </Button>
-        <Button 
-          onClick={resetScroll} 
-          variant="outline" 
-          size="lg" 
-          aria-label="Reset Scroll" 
+        <Button
+          onClick={resetScroll}
+          variant="outline"
+          size="lg"
+          aria-label="Reset Scroll"
           title="Reset Scroll"
           disabled={isRecording || isProcessingAiSync}
         >
@@ -217,23 +218,23 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             variant="outline"
             size="lg"
             className={cn(
-                "text-foreground", // Default text color for better visibility
+                "text-foreground",
                 isRecording && "bg-red-600 hover:bg-red-700 border-red-700 text-white",
-                !isRecording && "bg-accent/20 hover:bg-accent/30 border-accent",
+                !isRecording && !isProcessingAiSync && "bg-accent/20 hover:bg-accent/30 border-accent",
                 isProcessingAiSync && "bg-blue-500 hover:bg-blue-600 text-white border-blue-600"
             )}
             aria-label={isRecording ? "Stop AI Sync Recording" : (isProcessingAiSync ? "AI Sync in progress" : "Start AI Sync with Speech")}
-            title={isRecording ? "Stop AI Sync Recording" : (isProcessingAiSync ? "AI Sync in progress" : "Start AI Sync with Speech")}
-            disabled={(permissionError !== null && !isRecording) || isProcessingAiSync || !isAiSyncSupported}
+            title={isRecording ? "Stop AI Sync Recording" : (isProcessingAiSync ? "AI Sync in progress" : "Start AI Sync with Speech (requires microphone)")}
+            disabled={(permissionError !== null && !isRecording) || isProcessingAiSync || !isAiSyncSupported }
           >
             <AiSyncIcon className={cn("h-6 w-6", isProcessingAiSync && "animate-spin")} />
             <span className="ml-2">{aiSyncButtonText}</span>
           </Button>
         )}
-         <Button 
-            onClick={onToggleFullScreen} 
-            variant="outline" 
-            size="lg" 
+         <Button
+            onClick={onToggleFullScreen}
+            variant="outline"
+            size="lg"
             aria-label={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
             title={isFullScreen ? 'Exit Full Screen (Esc)' : 'Enter Full Screen'}
           >
