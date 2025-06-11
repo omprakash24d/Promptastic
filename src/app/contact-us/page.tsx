@@ -2,7 +2,6 @@
 "use client";
 
 import type React from 'react';
-// metadata export removed as this is now a client component
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,35 +14,81 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 
+// --- YOU NEED TO REPLACE THESE PLACEHOLDERS ---
+// 1. Replace with your Google Form's Action URL
+const GOOGLE_FORM_ACTION_URL = "YOUR_GOOGLE_FORM_ACTION_URL_HERE"; 
+
+// 2. Replace with your Google Form's field entry IDs
+//    Find these by inspecting your Google Form in Preview mode.
+//    Each input field will have a `name` attribute like "entry.123456789".
+const GOOGLE_FORM_FIELD_IDS = {
+  name: "entry.XXXXXXXXXX",    // Replace XXXXXXXXXX with the entry ID for your "Name" field
+  email: "entry.YYYYYYYYYY",   // Replace YYYYYYYYYY with the entry ID for your "Email" field
+  subject: "entry.ZZZZZZZZZZ", // Replace ZZZZZZZZZZ with the entry ID for your "Subject" field
+  message: "entry.AAAAAAAAAA", // Replace AAAAAAAAAA with the entry ID for your "Message" field
+};
+// --- END OF PLACEHOLDERS ---
+
+
 export default function ContactUsPage() {
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.target as HTMLFormElement);
-    const name = formData.get('name') as string;
-    const email = formData.get('email') as string;
-    const subject = formData.get('subject') as string;
-    const message = formData.get('message') as string;
+    const formElement = e.target as HTMLFormElement;
+    const formData = new FormData(formElement);
 
-    console.log("Contact Form Submitted (Placeholder):");
-    console.log({ name, email, subject, message });
+    if (!GOOGLE_FORM_ACTION_URL || GOOGLE_FORM_ACTION_URL === "YOUR_GOOGLE_FORM_ACTION_URL_HERE" || Object.values(GOOGLE_FORM_FIELD_IDS).some(id => id.startsWith("entry.X") || id.startsWith("entry.Y") || id.startsWith("entry.Z") || id.startsWith("entry.A"))) {
+      toast({
+        title: "Developer Note: Google Form Not Configured",
+        description: "The contact form is not yet configured to send emails. Please update GOOGLE_FORM_ACTION_URL and GOOGLE_FORM_FIELD_IDS in src/app/contact-us/page.tsx with your Google Form details.",
+        variant: "destructive",
+        duration: 15000, 
+      });
+      console.warn("Contact form submission attempted, but Google Form details are not configured in the code.");
+      console.log("Form Data (would be sent to Google Form):", {
+        name: formData.get('name'),
+        email: formData.get('email'),
+        subject: formData.get('subject'),
+        message: formData.get('message'),
+      });
+      // formElement.reset(); // Optionally reset even if not configured
+      return;
+    }
 
-    // Developer Note Toast (visible during development or if inspecting)
-    toast({
-      title: "Form Submitted (Developer Note)",
-      description: "Form data logged to console. A backend API endpoint is needed for actual email sending to omprakash24d@gmail.com.",
-      duration: 10000, 
-    });
-    
-    // User-facing Toast
-    toast({
-        title: "Message Sent!",
-        description: "Thank you for your message. We'll review it shortly.",
-        duration: 5000,
-    });
+    const dataToSubmit = new URLSearchParams();
+    dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.name, formData.get('name') as string);
+    dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.email, formData.get('email') as string);
+    dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.subject, formData.get('subject') as string);
+    dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.message, formData.get('message') as string);
 
-    (e.target as HTMLFormElement).reset();
+    try {
+      await fetch(GOOGLE_FORM_ACTION_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Important: Google Forms don't allow CORS for responses from direct fetch.
+                         // This means we can't know if submission was truly successful from the response,
+                         // but the data is usually sent.
+        headers: {
+          // 'Content-Type': 'application/x-www-form-urlencoded', // Not strictly needed with URLSearchParams
+        },
+        body: dataToSubmit,
+      });
+
+      toast({
+          title: "Message Sent!",
+          description: "Thank you for your message. We'll review it shortly via our Google Form.",
+          duration: 7000,
+      });
+      formElement.reset();
+    } catch (error) {
+      console.error("Error submitting to Google Form:", error);
+      toast({
+          title: "Submission Error",
+          description: "There was an issue sending your message. Please try again later or contact us directly.",
+          variant: "destructive",
+          duration: 10000,
+      });
+    }
   };
 
   return (
@@ -59,7 +104,7 @@ export default function ContactUsPage() {
           <CardContent className="space-y-6">
             <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                 <p>
-                If you have any questions, feedback, bug reports, or feature requests regarding Promptastic!, please don't hesitate to reach out.
+                If you have any questions, feedback, bug reports, or feature requests regarding Promptastic!, please don't hesitate to reach out using the form below. Your input will be submitted to our Google Form.
                 </p>
             </div>
 
@@ -106,5 +151,4 @@ export default function ContactUsPage() {
     </div>
   );
 }
-
     
