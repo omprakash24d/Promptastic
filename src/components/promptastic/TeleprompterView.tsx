@@ -8,9 +8,9 @@ import { cn } from '@/lib/utils';
 import type { ParsedSegment, FocusLineStyle } from '@/types';
 import { PauseCircle, ChevronsDown } from 'lucide-react';
 
-const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)';
+const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)'; // White for SSR default (dark mode)
 const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif';
-const VIEW_SSR_DEFAULT_DARK_MODE = true;
+const VIEW_SSR_DEFAULT_DARK_MODE = true; // Assume SSR defaults to dark mode context
 const VIEW_SSR_DEFAULT_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 
 
@@ -96,10 +96,11 @@ export function TeleprompterView() {
     lineHeight,
     isMirrored,
     darkMode,
-    textColor,
+    textColor, // User-configurable text color from store
     fontFamily,
     focusLineStyle,
     horizontalPadding,
+    enableHighContrast, // Get high contrast state
   } = useTeleprompterStore(
     (state) => ({
       scriptText: state.scriptText,
@@ -111,6 +112,7 @@ export function TeleprompterView() {
       fontFamily: state.fontFamily,
       focusLineStyle: state.focusLineStyle,
       horizontalPadding: state.horizontalPadding,
+      enableHighContrast: state.enableHighContrast,
     })
   );
   
@@ -465,14 +467,28 @@ export function TeleprompterView() {
     });
   }, [scriptParagraphs, highlightedParagraphIndex, handleParagraphClick, focusLineStyle, parseLineToSegments]);
 
-  const currentTextColorToUse = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
+
+  const finalTeleprompterTextColor = useMemo(() => {
+    if (!isMounted) {
+      // For SSR, use a default based on assumed server-side dark mode preference
+      return VIEW_SSR_DEFAULT_DARK_MODE ? VIEW_SSR_DEFAULT_TEXT_COLOR : 'hsl(0 0% 0%)';
+    }
+    if (enableHighContrast) {
+      // In high contrast mode, let CSS theme variables take precedence.
+      // Returning undefined means no inline style for color will be applied.
+      return undefined;
+    }
+    if (!darkMode) { // Light mode, and not high contrast
+      return 'hsl(0 0% 0%)'; // Force black for light mode
+    }
+    // Dark mode, and not high contrast
+    return textColor; // Use the user-selected or default dark mode text color from store
+  }, [isMounted, darkMode, textColor, enableHighContrast]);
+  
   const currentFontFamilyToUse = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
-  const currentDarkMode = !isMounted ? VIEW_SSR_DEFAULT_DARK_MODE : darkMode;
-  const currentFocusLineStyle = !isMounted ? VIEW_SSR_DEFAULT_FOCUS_LINE_STYLE : focusLineStyle;
   const mirrorTransform = isMounted && isMirrored ? 'scaleX(-1)' : 'none';
 
   const teleprompterContainerStyles: React.CSSProperties = {
-    color: currentTextColorToUse,
     fontFamily: currentFontFamilyToUse,
     fontSize: `${fontSize}px`,
     lineHeight: lineHeight,
@@ -480,17 +496,16 @@ export function TeleprompterView() {
     position: 'relative', 
   };
 
-  const focusLineElementStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: `calc(${focusLinePercentage * 100}%)`,
-    left: `${horizontalPadding}%`, // Adjust for horizontal padding
-    right: `${horizontalPadding}%`,// Adjust for horizontal padding
-    height: '2px',
-    backgroundColor: 'hsla(var(--primary), 0.5)',
-    pointerEvents: 'none',
-    zIndex: 10,
-    transition: 'top 0.3s ease-out', 
-  };
+  if (finalTeleprompterTextColor !== undefined) {
+    teleprompterContainerStyles.color = finalTeleprompterTextColor;
+  }
+
+  const currentBgClass = useMemo(() => {
+    if (!isMounted) return VIEW_SSR_DEFAULT_DARK_MODE ? "bg-gray-900" : "bg-gray-50";
+    if (enableHighContrast) return "bg-background"; // High contrast theme handles this
+    return darkMode ? "bg-gray-900" : "bg-gray-50";
+  }, [isMounted, darkMode, enableHighContrast]);
+
 
   const estimatedReadingTimeDisplay = useMemo(() => {
     if (!isMounted || !scriptText.trim()) return null;
@@ -507,9 +522,9 @@ export function TeleprompterView() {
     <div
       ref={scrollContainerRef}
       className={cn(
-        "w-full h-full overflow-y-auto focus:outline-none relative", // Added relative for countdown
+        "w-full h-full overflow-y-auto focus:outline-none relative",
         "transition-colors duration-300 ease-in-out",
-        currentDarkMode ? "bg-gray-900" : "bg-gray-50",
+        currentBgClass, // Use dynamic background class
       )}
       style={teleprompterContainerStyles}
       tabIndex={0} 
@@ -532,8 +547,9 @@ export function TeleprompterView() {
         <div 
           className="absolute top-2 right-4 text-xs px-2 py-1 rounded-md pointer-events-none z-20"
           style={{
-            color: darkMode ? 'hsla(var(--foreground), 0.7)' : 'hsla(var(--foreground), 0.7)',
-            backgroundColor: darkMode ? 'hsla(var(--background), 0.5)' : 'hsla(var(--background), 0.5)',
+            // Respect current theme for this little info box
+            color: 'hsla(var(--foreground), 0.7)', 
+            backgroundColor: 'hsla(var(--background), 0.5)',
             backdropFilter: 'blur(2px)'
           }}
           aria-hidden="true"
@@ -541,11 +557,21 @@ export function TeleprompterView() {
           {estimatedReadingTimeDisplay}
         </div>
       )}
-      {currentFocusLineStyle === 'line' && (
-        <div style={focusLineElementStyle} data-testid="focus-line-overlay" />
+      {focusLineStyle === 'line' && !enableHighContrast && ( // Only show default focus line if not high contrast
+        <div style={{
+            position: 'absolute',
+            top: `calc(${focusLinePercentage * 100}%)`,
+            left: `${horizontalPadding}%`,
+            right: `${horizontalPadding}%`,
+            height: '2px',
+            backgroundColor: 'hsla(var(--primary), 0.5)', // Use primary theme color
+            pointerEvents: 'none',
+            zIndex: 10,
+            transition: 'top 0.3s ease-out',
+        }} data-testid="focus-line-overlay" />
       )}
       <div
-        className="select-none px-8 md:px-16 py-8 md:py-16" // Base padding, actual text area padding applied by inner div
+        className="select-none px-8 md:px-16 py-8 md:py-16" 
         style={{
            paddingLeft: `${horizontalPadding}%`,
            paddingRight: `${horizontalPadding}%`,
@@ -562,3 +588,4 @@ export function TeleprompterView() {
     </div>
   );
 }
+
