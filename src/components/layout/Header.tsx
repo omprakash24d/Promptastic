@@ -195,7 +195,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
             </nav>
           ) : (
             <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
-              {user && onOpenScripts && (
+              {onOpenScripts && (
                 <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager" title="Open script manager">
                   <FileText className="mr-1 h-5 w-5" /> Scripts
                 </Button>
