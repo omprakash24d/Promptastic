@@ -94,21 +94,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const setError = useCallback((message: string | null) => {
+  const clearAuthMessages = useCallback(() => {
     if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    setErrorState(null);
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    setSuccessMessageState(null);
+  }, []);
+
+  const setError = useCallback((message: string | null) => {
+    clearAuthMessages(); // Clear previous messages before setting a new one
     setErrorState(message);
     if (message) {
       errorTimeoutRef.current = setTimeout(() => setErrorState(null), MESSAGE_CLEAR_TIMEOUT);
     }
-  }, []);
+  }, [clearAuthMessages]);
 
   const setSuccessMessage = useCallback((message: string | null) => {
-    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    clearAuthMessages(); // Clear previous messages before setting a new one
     setSuccessMessageState(message);
     if (message) {
       successTimeoutRef.current = setTimeout(() => setSuccessMessageState(null), MESSAGE_CLEAR_TIMEOUT);
     }
-  }, []);
+  }, [clearAuthMessages]);
 
 
   useEffect(() => {
@@ -125,14 +132,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const clearAuthMessages = useCallback(() => {
-    setError(null);
-    setSuccessMessage(null);
-  }, [setError, setSuccessMessage]);
 
   const handleAuthSuccess = useCallback((message?: string, options: { fromSignup?: boolean, redirectTo?: string, skipRedirect?: boolean } = {}) => {
     const { fromSignup = false, redirectTo = '/', skipRedirect = false } = options;
-    setError(null);
+    // setError(null); // setError calls clearAuthMessages which clears success too. Call setSuccessMessage directly.
     let finalMessage = message;
 
     if (fromSignup && auth.currentUser && !auth.currentUser.emailVerified) {
@@ -141,42 +144,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       finalMessage = message || "Account created successfully!";
     }
     
-    if (finalMessage) setSuccessMessage(finalMessage);
-    else setSuccessMessage(null);
+    setSuccessMessage(finalMessage || null); // This will clear error via its internal clearAuthMessages
 
     if (!skipRedirect && pathname !== redirectTo) { 
         router.push(redirectTo);
     }
-  }, [setError, setSuccessMessage, router, pathname]);
+  }, [setSuccessMessage, router, pathname]);
 
   const handleAuthError = useCallback((err: any, operation?: 'passwordReset' | 'signup') => {
-    setSuccessMessage(null); 
+    // setSuccessMessage(null); // setSuccessMessage(null) calls clearAuthMessages which clears error too. Call setError directly.
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
     if (err.code && userCancellableErrors.includes(err.code)) {
-      // setError('The sign-in process was cancelled.'); // Simplified message
-      // Do not set an error for user-cancelled popups, just let them try again.
-      clearAuthMessages();
+      clearAuthMessages(); // User cancelled, so clear everything silently
       return;
     }
     
-    // For password reset, always show generic success if it's just user-not-found
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
-      setError(null); // Clear any potential error
+      // setError(null); // setError(null) clears success message. Call setSuccessMessage directly.
       setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       return;
     }
 
     const message = FIREBASE_ERROR_MESSAGES[err.code as string] || `An unexpected error occurred: ${err.message} (Code: ${err.code})`;
-    setError(message);
+    setError(message); // This will clear success via its internal clearAuthMessages
     console.error("Firebase Auth Error:", err.code, err.message);
 
   }, [setError, setSuccessMessage, clearAuthMessages]);
 
 
   const signInWithGoogle = async () => {
-    setGoogleSignInLoading(true);
     clearAuthMessages();
+    setGoogleSignInLoading(true);
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
@@ -189,8 +188,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<boolean> => {
-    setSignupLoading(true);
     clearAuthMessages();
+    setSignupLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
@@ -201,7 +200,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(parsedUser);
         setIsEmailVerified(userCredential.user.emailVerified);
       }
-      // For signup, skip redirect and let the login page handle UI.
       handleAuthSuccess(undefined, { fromSignup: true, skipRedirect: true }); 
       return true;
     } catch (err: any) {
@@ -213,8 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    setLoginLoading(true);
     clearAuthMessages();
+    setLoginLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
       handleAuthSuccess("Signed in successfully! Redirecting...");
@@ -226,11 +224,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const sendPasswordReset = async (email: string): Promise<boolean> => {
-    setPasswordResetLoading(true);
     clearAuthMessages(); 
+    setPasswordResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      setError(null); // Explicitly clear error before setting success
+      // setError(null); // Explicitly clear error before setting success - Handled by handleAuthError's specific path for this
       handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); // Triggers generic success
       return true;
     } catch (err: any) {
@@ -242,6 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const resendEmailVerification = async () => {
+    clearAuthMessages();
     if (!auth.currentUser) {
       setError("No user is currently signed in to resend verification email.");
       return;
@@ -252,7 +251,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setVerificationResendLoading(true);
-    clearAuthMessages();
     try {
       await sendEmailVerification(auth.currentUser);
       setSuccessMessage("Verification email resent! Please check your inbox (and spam folder).");
@@ -265,8 +263,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   const updateUserProfile = async (updates: { displayName?: string; photoURL?: string }) => {
-    setProfileUpdateLoading(true);
     clearAuthMessages();
+    setProfileUpdateLoading(true);
     if (!auth.currentUser) {
       setError("No user logged in to update profile.");
       setProfileUpdateLoading(false);
@@ -274,9 +272,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       await firebaseUpdateProfile(auth.currentUser, updates);
-      const parsedUser = parseFirebaseUser(auth.currentUser); // Re-parse after update
+      const parsedUser = parseFirebaseUser(auth.currentUser); 
       setUser(parsedUser);
-      if (auth.currentUser) setIsEmailVerified(auth.currentUser.emailVerified); // Update email verified status
+      if (auth.currentUser) setIsEmailVerified(auth.currentUser.emailVerified); 
       setSuccessMessage("Profile updated successfully!");
     } catch (err: any) {
       handleAuthError(err);
@@ -286,14 +284,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    // Use a general loading state or a specific one if preferred for logout
-    setGoogleSignInLoading(true); // Re-using google sign-in for simplicity, can be specific
     clearAuthMessages();
+    setGoogleSignInLoading(true); 
     try {
       await firebaseSignOut(auth);
       setUser(null);
       setIsEmailVerified(undefined);
-      router.push('/login'); // Redirect to login after logout
+      router.push('/login'); 
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -325,13 +322,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user, isEmailVerified,
     loginLoading, signupLoading, passwordResetLoading, profileUpdateLoading, verificationResendLoading, googleSignInLoading,
     error, successMessage,
-    // router, pathname, // router and pathname are stable from Next.js hooks
-    // Memoizing functions if they don't depend on frequently changing state from outside
-    // For simplicity here, assuming they are stable or their dependencies are listed
+    // router, pathname, are stable
+    // Callbacks (setError, setSuccessMessage, etc.) are memoized with useCallback
   ]);
 
   if (initialAuthLoading) {
-    // You could return a full-page loader here if desired
     return <div className="flex min-h-screen items-center justify-center bg-background"><p>Authenticating...</p></div>;
   }
 
@@ -345,4 +340,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
