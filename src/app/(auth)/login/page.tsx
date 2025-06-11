@@ -2,6 +2,7 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, XCircle, LogIn } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+
+// For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
+// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
+// If specific, dynamic metadata for THIS page is needed, consider converting to Server Component
+// or using a more advanced pattern for client-side metadata updates if absolutely necessary (less common for SEO).
+
+// export const metadata: Metadata = {
+//   title: 'Login / Sign Up',
+//   description: 'Log in or create an account to access Promptastic! and save your scripts and settings to the cloud.',
+// };
+
 
 const RESET_COOLDOWN_SECONDS = 30;
 
@@ -46,9 +58,9 @@ export default function LoginPage() {
     error, 
     successMessage,
     clearAuthMessages,
-    user, // To check if user is already logged in (though AuthProvider handles redirect)
-    resendEmailVerification, // Added for resend button
-    verificationResendLoading, // Added
+    user, 
+    resendEmailVerification, 
+    verificationResendLoading, 
   } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -85,7 +97,6 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    // If AuthProvider sets a success message for signup, mark it locally
     if (successMessage && successMessage.startsWith("Account created!")) {
       setSignupSuccessful(true);
     } else {
@@ -96,7 +107,6 @@ export default function LoginPage() {
   useEffect(() => {
     clearAuthMessages();
     setAuthAttemptError(null); 
-    // setSignupSuccessful(false); // Do not reset signupSuccessful on general effect if we want to show the message
 
     if (activeTab !== 'signUp') {
       setPasswordValidation(initialPasswordValidation);
@@ -141,7 +151,7 @@ export default function LoginPage() {
   const handleTabChange = (value: string) => {
     clearAuthMessages(); 
     setAuthAttemptError(null);
-    setSignupSuccessful(false); // Reset this when user manually changes tab
+    setSignupSuccessful(false); 
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -167,7 +177,7 @@ export default function LoginPage() {
     setEmail(e.target.value);
     if (authAttemptError) setAuthAttemptError(null);
     if (error) clearAuthMessages();
-    if (successMessage) clearAuthMessages(); // Clear success if user types again
+    if (successMessage) clearAuthMessages(); 
   }
   
   const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,7 +195,6 @@ export default function LoginPage() {
     e.preventDefault();
     clearAuthMessages(); 
     setAuthAttemptError(null); 
-    // setSignupSuccessful(false); // Do not reset this here, success path will set it
 
     if (!email.trim()) {
         setAuthAttemptError("Email cannot be empty.");
@@ -205,7 +214,7 @@ export default function LoginPage() {
       const isPasswordValid = validatePassword(password); 
       if (!isPasswordValid) {
         setAuthAttemptError("Password does not meet all requirements.");
-        setShowPasswordCriteria(true); // Make sure criteria are visible
+        setShowPasswordCriteria(true); 
         return;
       }
       if (password !== confirmPassword) {
@@ -214,12 +223,10 @@ export default function LoginPage() {
       }
       const success = await signUpWithEmail(email, password, displayName);
       if (success) {
-        // AuthContext's handleAuthSuccess (with skipRedirect) will set successMessage.
-        // useEffect will set signupSuccessful=true. The UI will then show the message and "Proceed to Sign In" button.
+        // UI will show success message and "Proceed to Sign In" button
       }
     } else {
       await signInWithEmail(email, password);
-      // Redirect on successful sign-in is handled by AuthContext
     }
   };
 
@@ -236,15 +243,12 @@ export default function LoginPage() {
 
     if (emailSentSuccessfully) { 
       setIsResetCooldown(true);
-      // User stays on this view, message from context will be shown.
     }
-    // If not successful with a "real" error, context will set error message.
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
     clearAuthMessages();
     setAuthAttemptError(null);
-    // setSignupSuccessful(false); // Should not be relevant if on forgot password
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
@@ -271,7 +275,6 @@ export default function LoginPage() {
   const generalLoading = loginLoading || signupLoading || passwordResetLoading || googleSignInLoading || verificationResendLoading;
   const currentActionLoading = activeTab === 'signIn' ? loginLoading : signupLoading;
 
-  // Disable sign-up button if not all criteria met or loading or fields empty
   const isSignupButtonDisabled = 
     signupLoading || 
     !email || 
@@ -280,12 +283,10 @@ export default function LoginPage() {
     !displayName || 
     (activeTab === 'signUp' && !passwordValidation.meetsAll);
 
-  // Disable sign-in button if loading or fields empty
   const isSignInButtonDisabled = loginLoading || !email || !password;
 
 
-  if (user && !signupSuccessful && !showForgotPassword) { // If user is logged in and not in a post-signup state
-      // AuthProvider should handle redirection, but this is a fallback UI
+  if (user && !signupSuccessful && !showForgotPassword) { 
       return (
           <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
             <div>
@@ -317,13 +318,11 @@ export default function LoginPage() {
           )}
         </CardHeader>
         <CardContent>
-          {/* Display local form error first if it exists */}
           {authAttemptError && (
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {authAttemptError}
             </div>
           )}
-          {/* Display global error from AuthContext if no local form error */}
           {error && !authAttemptError && (
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
@@ -332,7 +331,7 @@ export default function LoginPage() {
           {successMessage && (
             <div className={cn("mb-4 rounded-md border p-3 text-center text-sm",
                 signupSuccessful ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400" 
-                                 : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400" // This blue is for non-signup success, like password reset success.
+                                 : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400" 
             )} role="status">
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
               {signupSuccessful && (

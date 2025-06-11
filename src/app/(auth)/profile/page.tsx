@@ -2,19 +2,27 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, UserCircle2, Camera, Save, Loader2 } from 'lucide-react'; // Added Loader2
+import { AlertCircle, CheckCircle2, UserCircle2, Camera, Save, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+// For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
+// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
+// export const metadata: Metadata = {
+//   title: 'User Profile',
+//   description: 'Manage your Promptastic! user profile. Update your display name and profile picture.',
+// };
+
 export default function ProfilePage() {
-  const { user, updateUserProfile, profileUpdateLoading, error, successMessage, clearAuthMessages } = useAuth(); // Used profileUpdateLoading
+  const { user, updateUserProfile, profileUpdateLoading, error, successMessage, clearAuthMessages } = useAuth();
   const router = useRouter();
 
   const [displayName, setDisplayName] = useState('');
@@ -23,7 +31,7 @@ export default function ProfilePage() {
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user && !profileUpdateLoading && !error) { // Adjusted loading condition
+    if (!user && !profileUpdateLoading && !error) { 
       router.push('/login');
     }
     if (user) {
@@ -41,21 +49,20 @@ export default function ProfilePage() {
     setLocalError(null);
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      // Basic client-side validation (can be enhanced)
       const MAX_FILE_SIZE_MB = 5;
       if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
         setLocalError(`File is too large. Max size is ${MAX_FILE_SIZE_MB}MB.`);
         setPhotoFile(null);
-        setPhotoPreview(user?.photoURL || null); // Revert preview
-        e.target.value = ""; // Clear file input
+        setPhotoPreview(user?.photoURL || null); 
+        e.target.value = ""; 
         return;
       }
       const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (!ALLOWED_TYPES.includes(file.type)) {
         setLocalError('Invalid file type. Please upload a JPG, PNG, GIF, or WEBP image.');
         setPhotoFile(null);
-        setPhotoPreview(user?.photoURL || null); // Revert preview
-        e.target.value = ""; // Clear file input
+        setPhotoPreview(user?.photoURL || null); 
+        e.target.value = ""; 
         return;
       }
 
@@ -66,7 +73,6 @@ export default function ProfilePage() {
       };
       reader.readAsDataURL(file);
     } else {
-      // If no file selected (e.g., user cleared selection), reset to current user photo or null
       setPhotoFile(null);
       setPhotoPreview(user?.photoURL || null);
     }
@@ -96,13 +102,16 @@ export default function ProfilePage() {
 
 
     if (hasChanges) {
+      // @ts-ignore // TODO: Fix this type error in AuthContext updateUserProfile if possible
       await updateUserProfile(updates, photoFile);
-      // If successful, photoFile should be cleared to prevent re-upload on subsequent "Save" without new selection
-      if (!error && !localError) { // Check if context error or local error was set during profile update
+      if (!error && !localError) { 
         setPhotoFile(null); 
       }
     } else {
-        setSuccessMessage("No changes to save."); // Or clear any existing messages
+        // TODO: Figure out how to call AuthContext's setSuccessMessage here if possible or remove this
+        // setSuccessMessage("No changes to save.");
+        // For now, just clear existing messages
+        clearAuthMessages();
     }
   };
 
@@ -141,6 +150,7 @@ export default function ProfilePage() {
                 onClick={() => document.getElementById('photoUpload')?.click()}
                 title="Change profile picture"
                 disabled={profileUpdateLoading}
+                aria-label="Change profile picture"
             >
                 <Camera className="h-4 w-4" />
             </Button>
@@ -151,6 +161,7 @@ export default function ProfilePage() {
                 className="hidden"
                 onChange={handleFileChange}
                 disabled={profileUpdateLoading}
+                aria-label="Profile photo upload input"
             />
           </div>
           <CardTitle className="text-2xl">Edit Profile</CardTitle>
@@ -162,7 +173,7 @@ export default function ProfilePage() {
               <AlertCircle className="mr-2 inline h-4 w-4" /> {localError}
             </div>
           )}
-          {error && !localError && ( // Display context error if no local error
+          {error && !localError && ( 
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>

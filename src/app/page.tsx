@@ -3,6 +3,7 @@
 
 import type React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import type { Metadata } from 'next'; // Import Metadata type for page-specific metadata
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
 import { PlaybackControls } from '@/components/promptastic/PlaybackControls';
@@ -17,6 +18,21 @@ import { HelpCircle, Settings, FileText, Play, Mic, Maximize, ListChecks, Palett
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+// Page-specific metadata
+// Note: For dynamic metadata based on content, you'd use the generateMetadata function.
+// export const metadata: Metadata = {
+//   title: 'Promptastic! Teleprompter - Home', // More specific title for the homepage
+//   description: 'The main interface for Promptastic! teleprompter. View scripts, control playback, customize settings, and use AI-powered features for smooth presentations.',
+  // You can add specific Open Graph or Twitter tags here if they need to differ from the defaults in layout.tsx
+  // openGraph: {
+  //   title: 'Promptastic! Teleprompter - Your Script, Perfectly Delivered',
+  //   description: 'Experience seamless script delivery with Promptastic! - a powerful Next.js teleprompter application.',
+  // },
+// };
+// For Client Components, metadata should be handled differently or set via RootLayout's defaults.
+// If dynamic metadata is needed here, you might need to lift state or use a different approach.
+// For now, we rely on the default metadata from RootLayout.tsx for this client component page.
+
 
 export default function PromptasticPage() {
   const {
@@ -25,7 +41,7 @@ export default function PromptasticPage() {
     togglePlayPause,
     isPresentationMode, setIsPresentationMode,
     enableHighContrast,
-    LONGER_DEFAULT_SCRIPT_TEXT, // Get default text from store
+    LONGER_DEFAULT_SCRIPT_TEXT,
   } = useTeleprompterStore();
 
   const { toast } = useToast();
@@ -36,30 +52,25 @@ export default function PromptasticPage() {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    // Define the expected shape of the data from localStorage
     interface PersistedStorePreferences {
       darkMode?: boolean;
       enableHighContrast?: boolean;
     }
 
-    // Provide a default that matches this shape if nothing is found
     const persistedPrefs = loadFromLocalStorage<PersistedStorePreferences>(
-      'promptastic-store', // This is the key used by useTeleprompterStore persist middleware
-      {} // Default to an empty object if no store found or error
+      'promptastic-store',
+      {}
     );
 
     let resolvedDarkMode: boolean;
     if (typeof persistedPrefs.darkMode === 'boolean') {
       resolvedDarkMode = persistedPrefs.darkMode;
     } else if (typeof window !== 'undefined') {
-      // Fallback to system preference if not in localStorage
       resolvedDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     } else {
-      // Final fallback to current store state (e.g., for SSR or if window is somehow undefined)
       resolvedDarkMode = useTeleprompterStore.getState().darkMode;
     }
 
-    // Only update if the resolved value differs from the current store state
     if (useTeleprompterStore.getState().darkMode !== resolvedDarkMode) {
       setDarkMode(resolvedDarkMode);
     }
@@ -68,11 +79,9 @@ export default function PromptasticPage() {
     if (typeof persistedPrefs.enableHighContrast === 'boolean') {
       resolvedHighContrast = persistedPrefs.enableHighContrast;
     } else {
-      // Fallback to current store state
       resolvedHighContrast = useTeleprompterStore.getState().enableHighContrast;
     }
 
-    // Only update if the resolved value differs from the current store state
     if (useTeleprompterStore.getState().enableHighContrast !== resolvedHighContrast) {
       useTeleprompterStore.setState({ enableHighContrast: resolvedHighContrast });
     }
@@ -99,7 +108,6 @@ export default function PromptasticPage() {
   useEffect(() => {
     const storeState = useTeleprompterStore.getState();
     const { scriptText: currentText, activeScriptName: currentActive, scripts: currentScripts } = storeState;
-    // LONGER_DEFAULT_SCRIPT_TEXT is accessed from the initial destructuring of useTeleprompterStore
     const actualDefaultText = typeof LONGER_DEFAULT_SCRIPT_TEXT === 'string' ? LONGER_DEFAULT_SCRIPT_TEXT : "Welcome to Promptastic!";
 
     if (currentActive && currentScripts.some(s => s.name === currentActive)) {
@@ -115,8 +123,6 @@ export default function PromptasticPage() {
         }
       }
     } else {
-      // This condition handles the case where there are no scripts
-      // and ensures the scriptText is set to default if it's not already.
       if (currentText !== actualDefaultText) {
         useTeleprompterStore.setState({ scriptText: actualDefaultText, activeScriptName: null, currentScrollPosition: 0 });
       }
@@ -171,7 +177,6 @@ export default function PromptasticPage() {
       const isCurrentlyFullscreen = !!document.fullscreenElement;
       setIsFullScreen(isCurrentlyFullscreen);
       if (!isCurrentlyFullscreen && isPresentationMode) {
-        // If exiting fullscreen externally while in presentation mode, also exit presentation mode
         setIsPresentationMode(false);
       }
     };
@@ -191,9 +196,9 @@ export default function PromptasticPage() {
       }
       if (event.key === 'Escape') {
         if (isPresentationMode) {
-            setIsPresentationMode(false); // Exit presentation mode first
+            setIsPresentationMode(false);
         }
-        if (document.fullscreenElement) { // Then exit fullscreen if still active
+        if (document.fullscreenElement) {
             document.exitFullscreen().catch(err => {
             console.error(`Error attempting to exit full-screen mode via Escape: ${err.message} (${err.name})`);
             toast({
@@ -264,8 +269,9 @@ export default function PromptasticPage() {
                 size="icon"
                 title="Exit Presentation Mode (Esc)"
                 className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
+                aria-label="Exit Presentation Mode"
             >
-                <Maximize className="h-5 w-5" /> {/* Using Maximize as "exit" icon here */}
+                <Maximize className="h-5 w-5" />
             </Button>
         </div>
       )}
@@ -417,5 +423,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
-    

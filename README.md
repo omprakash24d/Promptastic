@@ -230,5 +230,3 @@ Copyright (c) 2024 [Your Name or Organization Name Here]. All Rights Reserved.
 *   Community contributions and feedback.
 
 ---
-
-This README provides a good overview of Promptastic! Feel free to modify and expand it as your project evolves.
