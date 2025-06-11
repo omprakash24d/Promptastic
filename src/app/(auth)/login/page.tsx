@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
 const RESET_COOLDOWN_SECONDS = 30;
@@ -31,10 +31,11 @@ export default function LoginPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [activeTab, setActiveTab] = useState<'signIn' | 'signUp'>('signIn');
+  const [showPassword, setShowPassword] = useState(false);
 
   const [resetEmail, setResetEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [passwordMismatchError, setPasswordMismatchError] = useState<string | null>(null);
+  const [authAttemptError, setAuthAttemptError] = useState<string | null>(null); // Renamed from passwordMismatchError
 
   const [isResetCooldown, setIsResetCooldown] = useState(false);
   const [currentCooldownSeconds, setCurrentCooldownSeconds] = useState(RESET_COOLDOWN_SECONDS);
@@ -56,7 +57,7 @@ export default function LoginPage() {
           if (prev <= 1) {
             if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
             setIsResetCooldown(false);
-            return RESET_COOLDOWN_SECONDS; // Reset for next time
+            return RESET_COOLDOWN_SECONDS;
           }
           return prev - 1;
         });
@@ -72,31 +73,31 @@ export default function LoginPage() {
 
   const handleTabChange = (value: string) => {
     clearAuthMessages();
-    setPasswordMismatchError(null);
+    setAuthAttemptError(null);
     setEmail('');
     setPassword('');
     setConfirmPassword('');
     setDisplayName('');
-    setShowForgotPassword(false); // Ensure forgot password form is hidden when switching tabs
+    setShowForgotPassword(false);
     setActiveTab(value as 'signIn' | 'signUp');
   };
 
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAuthMessages();
-    setPasswordMismatchError(null);
+    setAuthAttemptError(null);
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
-        setPasswordMismatchError("Display Name cannot be empty.");
+        setAuthAttemptError("Display Name cannot be empty.");
         return;
       }
       if (password !== confirmPassword) {
-        setPasswordMismatchError("Passwords do not match.");
+        setAuthAttemptError("Passwords do not match.");
         return;
       }
-      if (password.length < 6) {
-        setPasswordMismatchError("Password must be at least 6 characters long.");
+      if (password.length < 8) { // Updated to 8 characters
+        setAuthAttemptError("Password must be at least 8 characters long.");
         return;
       }
       await signUpWithEmail(email, password, displayName);
@@ -110,35 +111,32 @@ export default function LoginPage() {
     clearAuthMessages();
     const success = await sendPasswordReset(resetEmail);
     if (success) {
-      // User remains on the forgot password screen.
-      // Success message is set by AuthContext and will be displayed.
-      // Error message (if any, other than user-not-found) is also set by AuthContext.
       setIsResetCooldown(true);
       setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
-      // Do not clear resetEmail here, user might want to see what they submitted or try again if there was a typo
-      // Do not call setShowForgotPassword(false) here.
+      // User remains on the forgot password screen.
+      // Success/error message is set by AuthContext and displayed.
     }
-    // If !success (e.g., invalid email format, network error), the error is set by AuthContext
-    // and will be displayed on the forgot password form.
+    // If !success (e.g., invalid email format, network error other than user-not-found),
+    // the error is set by AuthContext and will be displayed on this form.
   };
 
 
   const getPasswordStrengthFeedback = () => {
     if (!password && activeTab === 'signUp') return null;
-    if (password.length > 0 && password.length < 6 && activeTab === 'signUp') {
-      return <p className="text-xs text-destructive mt-1">Password must be at least 6 characters.</p>;
+    if (password.length > 0 && password.length < 8 && activeTab === 'signUp') {
+      return <p className="text-xs text-destructive mt-1">Password must be at least 8 characters.</p>;
     }
     return null;
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
-    clearAuthMessages(); // Clear messages when toggling the view
+    clearAuthMessages();
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
-      setResetEmail(''); // Clear the email field when going back to login
-      if (isResetCooldown) { // Also clear cooldown if navigating back
+      setResetEmail('');
+      if (isResetCooldown) {
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
         setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
@@ -146,6 +144,7 @@ export default function LoginPage() {
     }
   };
 
+  const toggleShowPassword = () => setShowPassword(prev => !prev);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -164,12 +163,12 @@ export default function LoginPage() {
           )}
         </CardHeader>
         <CardContent>
-          {error && (
+          {error && ( // Global error from AuthContext
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>
           )}
-          {successMessage && (
+          {successMessage && ( // Global success from AuthContext
             <div className="mb-4 rounded-md border border-green-500/50 bg-green-500/10 p-3 text-center text-sm text-green-700 dark:text-green-400" role="status">
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
             </div>
@@ -236,34 +235,54 @@ export default function LoginPage() {
                         autoComplete="email"
                       />
                     </div>
-                    <div>
+                    <div className="relative">
                       <Label htmlFor="password">Password</Label>
                       <Input
                         id="password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="mt-1"
+                        className="mt-1 pr-10" 
                         autoComplete={activeTab === 'signUp' ? "new-password" : "current-password"}
                       />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-7 h-7 px-2"
+                        onClick={toggleShowPassword}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                       {getPasswordStrengthFeedback()}
                     </div>
                      {activeTab === 'signUp' && (
-                        <div>
+                        <div className="relative">
                             <Label htmlFor="confirm-password">Confirm Password</Label>
                             <Input
                               id="confirm-password"
-                              type="password"
+                              type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={confirmPassword}
                               onChange={(e) => setConfirmPassword(e.target.value)}
                               required
-                              className="mt-1"
+                              className="mt-1 pr-10"
                               autoComplete="new-password"
                             />
-                            {passwordMismatchError && <p className="text-xs text-destructive mt-1" role="alert">{passwordMismatchError}</p>}
+                             <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-1 top-7 h-7 px-2"
+                                onClick={toggleShowPassword}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                             >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                            {authAttemptError && <p className="text-xs text-destructive mt-1" role="alert">{authAttemptError}</p>}
                         </div>
                     )}
                     <Button type="submit" className="w-full" disabled={loading}>
@@ -286,8 +305,8 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
-                   {loading && !activeTab ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" /> }
-                   {loading && !activeTab ? 'Signing in...' : 'Google'}
+                   {loading && !email && !password ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" /> }
+                   {loading && !email && !password ? 'Signing in...' : 'Google'}
                 </Button>
               </div>
             </>
@@ -313,4 +332,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

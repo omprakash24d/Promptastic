@@ -15,6 +15,7 @@ import {
   sendPasswordResetEmail,
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
+  sendEmailVerification, // Added for email verification
 } from 'firebase/auth';
 
 
@@ -59,11 +60,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSuccessMessage(null);
   };
 
-  const handleAuthSuccess = (message?: string) => {
-    router.push('/');
+  const handleAuthSuccess = (message?: string, fromSignup: boolean = false) => {
     setError(null);
-    if (message) setSuccessMessage(message);
+    let finalMessage = message;
+    if (fromSignup && auth.currentUser && !auth.currentUser.emailVerified) {
+      finalMessage = "Account created! Please check your email to verify your account. Redirecting...";
+    } else if (fromSignup) {
+      finalMessage = message || "Account created successfully! Redirecting...";
+    }
+    
+    if (finalMessage) setSuccessMessage(finalMessage);
     else setSuccessMessage(null);
+
+    // Only redirect if not already on the target page or if not staying for a message
+    if (router.pathname !== '/') { // Assuming '/' is the main app page/dashboard
+        router.push('/');
+    }
   }
 
   const handleAuthError = (err: any, operation?: 'passwordReset') => {
@@ -76,13 +88,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (err.code === 'auth/cancelled-popup-request') {
         setError('The sign-in attempt was cancelled. If you\'d like to sign in, please try again.');
       }
-      setLoading(false); // Ensure loading is false for these specific errors
-      return; // Don't log to console
+      setLoading(false);
+      return;
     }
 
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
-      // This case is handled directly in sendPasswordReset to show a generic message
-      // and prevent email enumeration. So we don't set an error here.
+      setLoading(false); // Ensure loading is false
       return;
     }
 
@@ -92,13 +103,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         case 'auth/user-not-found':
         case 'auth/wrong-password':
         case 'auth/invalid-credential':
-          setError('Invalid email or password.');
+          setError('Invalid email or password. Please try again.');
           break;
         case 'auth/email-already-in-use':
           setError('This email address is already in use by another account.');
           break;
         case 'auth/weak-password':
-          setError('Password is too weak. It should be at least 6 characters long.');
+          setError('Password is too weak. It should be at least 8 characters long and ideally include a mix of letters, numbers, and symbols.');
           break;
         case 'auth/requires-recent-login':
           setError('This action requires a recent login. Please sign out and sign in again.');
@@ -107,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setError('An account already exists with this email, but with a different sign-in method (e.g., Google). Try signing in with that method.');
           break;
         case 'auth/invalid-email':
-          setError('The email address is not valid.');
+          setError('The email address format is not valid. Please check and try again.');
           break;
         case 'auth/unauthorized-domain':
              setError('This domain is not authorized for Firebase operations. Please check your Firebase project configuration (Authentication > Sign-in method > Authorized domains) or contact support.');
@@ -115,12 +126,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         case 'auth/network-request-failed':
             setError('A network error occurred. Please check your internet connection and try again.');
             break;
+        case 'auth/too-many-requests':
+            setError('Access to this account has been temporarily disabled due to many failed login attempts. You can try again later or reset your password.');
+            break;
         default:
-          // console.error("Unhandled Auth Error:", err); // Suppressed for now
           setError(`An unexpected error occurred: ${err.message} (Code: ${err.code})`);
       }
     } else {
-      // console.error("Generic Auth Error:", err); // Suppressed for now
       setError(err.message || 'An unexpected error occurred during authentication.');
     }
   }
@@ -133,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, provider);
       handleAuthSuccess();
     } catch (err: any) {
-      // console.log("Google Sign-In Raw Error:", err); // For debugging specific Google sign-in issues
       handleAuthError(err);
     } finally {
       setLoading(false);
@@ -147,7 +158,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await firebaseUpdateProfile(userCredential.user, { displayName });
-        setUser(prev => {
+        // Send email verification
+        await sendEmailVerification(userCredential.user);
+
+        setUser(prev => { // Optimistically update local user state
             if (!userCredential.user) return null;
             return {
                 uid: userCredential.user.uid,
@@ -158,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
         });
       }
-      handleAuthSuccess('Account created successfully! Redirecting...');
+      handleAuthSuccess('Account created successfully!', true);
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -171,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      handleAuthSuccess();
+      handleAuthSuccess("Signed in successfully! Redirecting...");
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -186,20 +200,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await sendPasswordResetEmail(auth, email);
       setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       setError(null);
+      setLoading(false); // Set loading false on success before returning
       return true;
     } catch (err: any) {
+      // For user-not-found, we show a generic success message to prevent email enumeration
       if (err.code === 'auth/user-not-found') {
-        // Prevent email enumeration: show generic success message even if user not found.
         setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
         setError(null);
-        // Return true so the UI (e.g., login page) behaves as if successful (starts cooldown, navigates back)
-        return true;
+        setLoading(false);
+        return true; // Still return true for UI flow (e.g., cooldown)
       }
       handleAuthError(err, 'passwordReset');
+      setLoading(false); // Set loading false on error
       return false;
-    } finally {
-      setLoading(false);
     }
+    // Ensure loading is false in all paths for sendPasswordReset
+    // The finally block might be redundant if all paths set it, but good for safety.
+    // However, since we return early in try/catch, finally won't always execute before return.
+    // So, explicitly set setLoading(false) in each path.
   };
 
   const updateUserProfile = async (updates: { displayName?: string; photoURL?: string }) => {
@@ -268,3 +286,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
