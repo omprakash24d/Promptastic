@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from 'firebase/auth';
@@ -10,7 +11,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDNej4-TbHgUybORv9MTsHwaMbY6NCiSR4",
   authDomain: "promptastic-5087f.firebaseapp.com",
   projectId: "promptastic-5087f",
-  storageBucket: "promptastic-5087f.appspot.com", // Corrected: .appspot.com for storageBucket
+  storageBucket: "promptastic-5087f.firebasestorage.app", // Updated as per user's Firebase console
   messagingSenderId: "331038695715",
   appId: "1:331038695715:web:62f980ed5cad6a6f512c96"
 };
