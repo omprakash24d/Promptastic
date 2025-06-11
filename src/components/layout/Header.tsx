@@ -1,9 +1,9 @@
 
 "use client";
 
-import React from 'react'; 
+import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun } from 'lucide-react';
+import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle } from 'lucide-react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 interface HeaderProps {
   onOpenScripts: () => void;
   onOpenSettings: () => void;
+  onOpenHelp: () => void;
 }
 
 interface NavButtonConfig {
@@ -21,7 +22,7 @@ interface NavButtonConfig {
   showTextOnDesktop?: boolean;
 }
 
-const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
+const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpenHelp }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
 
   const toggleTheme = useCallback(() => {
@@ -44,16 +45,23 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
       showTextOnDesktop: true,
     },
     {
+      label: 'Help',
+      icon: HelpCircle,
+      onClick: onOpenHelp,
+      ariaLabel: 'Open help documentation',
+      showTextOnDesktop: true,
+    },
+    {
       label: darkMode ? 'Light Mode' : 'Dark Mode',
       icon: darkMode ? Sun : Moon,
       onClick: toggleTheme,
-      ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`, 
+      ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`,
       showTextOnDesktop: false,
     },
   ];
 
   return (
-    <header className="border-b bg-card py-3 shadow-sm" role="banner">
+    <header className="border-b bg-card py-3 shadow-sm shrink-0" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -63,7 +71,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
                 viewBox="0 0 24 24"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true" 
+                aria-hidden="true"
               >
                 <path
                   d="M12 2L20 7V17L12 22L4 17V7L12 2Z"
@@ -79,7 +87,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
             </span>
           </div>
 
-          
+
           <nav className="hidden items-center space-x-2 md:flex" aria-label="Main navigation">
             {navButtons.map((button) => (
               <Button
@@ -88,15 +96,15 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
                 size={button.showTextOnDesktop ? "sm" : "icon"}
                 onClick={button.onClick}
                 aria-label={button.ariaLabel}
-                title={button.ariaLabel} 
+                title={button.ariaLabel}
               >
-                <button.icon className={button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5"} aria-hidden="true" />
+                <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5", button.label === 'Help' && button.showTextOnDesktop && "mr-1.5")} aria-hidden="true" />
                 {button.showTextOnDesktop && button.label}
               </Button>
             ))}
           </nav>
 
-          
+
           <nav className="flex items-center md:hidden" aria-label="Mobile navigation">
             {navButtons.map((button, index) => (
               <Button
@@ -106,7 +114,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
                 className={index < navButtons.length -1 ? "mr-1" : ""}
                 onClick={button.onClick}
                 aria-label={button.ariaLabel}
-                title={button.ariaLabel} 
+                title={button.ariaLabel}
               >
                 <button.icon className="h-5 w-5" aria-hidden="true"/>
               </Button>
