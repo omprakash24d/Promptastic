@@ -3,8 +3,7 @@
 
 import type React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import type { Metadata } from 'next'; // Import Metadata type for page-specific metadata
-import Link from 'next/link'; // Added Link import
+import Link from 'next/link';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
 import { PlaybackControls } from '@/components/promptastic/PlaybackControls';
@@ -44,20 +43,20 @@ export default function PromptasticPage() {
       enableHighContrast?: boolean;
     }
 
-    const persistedPrefs = loadFromLocalStorage<PersistedStorePreferences>(
+    const persistedPrefs: PersistedStorePreferences = loadFromLocalStorage<PersistedStorePreferences>(
       'promptastic-store',
-      {}
+      {} 
     );
-
+    
     let resolvedDarkMode: boolean;
     if (typeof persistedPrefs.darkMode === 'boolean') {
       resolvedDarkMode = persistedPrefs.darkMode;
     } else if (typeof window !== 'undefined') {
       resolvedDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     } else {
-      resolvedDarkMode = useTeleprompterStore.getState().darkMode;
+      resolvedDarkMode = useTeleprompterStore.getState().darkMode; 
     }
-
+    
     if (useTeleprompterStore.getState().darkMode !== resolvedDarkMode) {
       setDarkMode(resolvedDarkMode);
     }
@@ -70,8 +69,9 @@ export default function PromptasticPage() {
     }
 
     if (useTeleprompterStore.getState().enableHighContrast !== resolvedHighContrast) {
-      useTeleprompterStore.setState({ enableHighContrast: resolvedHighContrast });
+       useTeleprompterStore.setState({ enableHighContrast: resolvedHighContrast });
     }
+
   }, [setDarkMode]);
 
 
@@ -143,6 +143,7 @@ export default function PromptasticPage() {
     }
   };
 
+  // togglePresentationMode is kept in case another way to trigger it is added later.
   const togglePresentationMode = () => {
     setIsPresentationMode(!isPresentationMode);
     if (!isPresentationMode && !document.fullscreenElement && mainRef.current) {
@@ -231,8 +232,6 @@ export default function PromptasticPage() {
           <PlaybackControls
             isFullScreen={isFullScreen}
             onToggleFullScreen={handleToggleFullScreen}
-            isPresentationMode={isPresentationMode}
-            onTogglePresentationMode={togglePresentationMode}
           />
           <footer className="mt-6 text-center text-muted-foreground text-sm leading-relaxed">
   Designed and developed by{" "}
@@ -258,7 +257,7 @@ export default function PromptasticPage() {
                 className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
                 aria-label="Exit Presentation Mode"
             >
-                <Maximize className="h-5 w-5" /> {/* Or use TvMinimalPlay if you prefer consistency with the playbar button */}
+                <Maximize className="h-5 w-5" />
             </Button>
         </div>
       )}
@@ -351,7 +350,7 @@ export default function PromptasticPage() {
 
                  <h4 className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
                  <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls to make the teleprompter view fill your entire screen. This helps minimize distractions.</p>
-                 <p><strong>Presentation Mode:</strong> Click the <MonitorPlay className="inline h-4 w-4"/> "Present" button for an even more immersive, UI-less experience. This mode also goes fullscreen and hides all UI elements except for the scrolling script and a subtle exit button. Ideal for actual delivery.</p>
+                 <p><strong>Presentation Mode:</strong> While the dedicated "Present" button has been removed from the main controls, the functionality for an immersive, UI-less experience still exists. If re-enabled, it also goes fullscreen and hides all UI elements except for the scrolling script and a subtle exit button. Ideal for actual delivery.</p>
                  <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit either Fullscreen or Presentation mode.</p>
               </section>
 
@@ -405,4 +404,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-

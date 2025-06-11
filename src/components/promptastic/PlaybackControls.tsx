@@ -5,7 +5,7 @@ import type React from 'react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize, Loader2, BookOpenText, MonitorPlay, TvMinimalPlay } from 'lucide-react';
+import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize, Loader2, BookOpenText } from 'lucide-react';
 import { scrollSyncWithSpeech, type ScrollSyncWithSpeechInput } from '@/ai/flows/scroll-sync-with-speech';
 import { summarizeScript, type SummarizeScriptInput, type SummarizeScriptOutput } from '@/ai/flows/summarize-script-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -28,11 +28,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface PlaybackControlsProps {
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
-  isPresentationMode: boolean;
-  onTogglePresentationMode: () => void;
+  // isPresentationMode and onTogglePresentationMode are removed as per request
 }
 
-export function PlaybackControls({ isFullScreen, onToggleFullScreen, isPresentationMode, onTogglePresentationMode }: PlaybackControlsProps) {
+export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackControlsProps) {
   const { toast } = useToast();
   const {
     isPlaying, togglePlayPause,
@@ -293,17 +292,6 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen, isPresentat
             >
             {isFullScreen ? <Minimize className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize className="h-5 w-5 sm:h-6 sm:w-6" />}
             <span className="ml-2 hidden sm:inline">{isFullScreen ? 'Exit Full' : 'Full Screen'}</span>
-          </Button>
-           <Button
-              onClick={onTogglePresentationMode}
-              variant="outline"
-              size="lg"
-              aria-label={isPresentationMode ? 'Exit Presentation Mode' : 'Enter Presentation Mode'}
-              title={isPresentationMode ? 'Exit Presentation Mode (Esc)' : 'Enter Presentation Mode'}
-              className="px-4"
-            >
-            {isPresentationMode ? <TvMinimalPlay className="h-5 w-5 sm:h-6 sm:w-6" /> : <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6" />}
-            <span className="ml-2 hidden sm:inline">{isPresentationMode ? 'Exit Present' : 'Present'}</span>
           </Button>
         </div>
       </div>
