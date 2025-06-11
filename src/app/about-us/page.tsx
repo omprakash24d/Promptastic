@@ -3,6 +3,7 @@
 
 import type React from 'react';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -13,7 +14,7 @@ export default function AboutUsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} onOpenHelp={dummyOpen} />
+      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
           <CardHeader className="items-center">
@@ -64,6 +65,7 @@ export default function AboutUsPage() {
           </CardContent>
         </Card>
       </main>
+      <Footer />
     </div>
   );
 }

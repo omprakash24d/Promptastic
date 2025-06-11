@@ -3,19 +3,20 @@
 
 import type React from 'react';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer } from 'lucide-react';
+import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; // Added MonitorPlay
+import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
 
 export default function HowToUsePage() {
   const dummyOpen = () => {}; // Placeholder for Header props
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} onOpenHelp={dummyOpen} />
+      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
           <CardHeader className="items-center">
@@ -48,7 +49,7 @@ export default function HowToUsePage() {
                 </ul>
 
                 <h4 className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
-                <p>Access the Script Manager by clicking the "Scripts" (<FileText className="inline h-4 w-4"/> icon) button in the header.</p>
+                <p>Access the Script Manager by clicking the "Scripts" (<FileText className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>Create & Edit:</strong> Type or paste your script directly into the editor. The estimated reading time is shown.</li>
                   <li><strong>Save Scripts:</strong> Save your work with a unique name. If you are logged in, scripts sync to the cloud (Firebase Firestore); otherwise, they are saved in your browser's local storage.</li>
@@ -64,7 +65,7 @@ export default function HowToUsePage() {
                 </div>
 
                 <h4 className="font-medium flex items-center pt-2"><Settings className="mr-2 h-5 w-5"/>Settings Panel</h4>
-                <p>Access Teleprompter Settings by clicking the "Settings" (<Settings className="inline h-4 w-4"/> icon) button in the header.</p>
+                <p>Access Teleprompter Settings by clicking the "Settings" (<Settings className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
                  <ul className="list-disc list-outside pl-5 space-y-1">
                     <li><strong>Appearance:</strong> Customize font size, line spacing, font family (including Atkinson Hyperlegible for readability), text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, and themes (Light/Dark/High-Contrast).</li>
                     <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (duration 1-60s).</li>
@@ -79,9 +80,9 @@ export default function HowToUsePage() {
                 </div>
 
                  <h4 className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
-                 <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls on the main page to make the teleprompter view fill your entire screen. This helps minimize distractions.</p>
-                 <p><strong>Presentation Mode:</strong> Activate Presentation Mode by clicking the <MonitorPlay className="inline h-4 w-4"/> icon in the playback controls. This offers an even more immersive, UI-less fullscreen experience for delivery. A subtle exit button appears on hover in Presentation Mode.</p>
-                 <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit either Fullscreen or Presentation mode.</p>
+                 <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls on the main page to make the teleprompter view fill your entire screen. This helps minimize distractions. (Presentation mode is currently combined with Fullscreen).</p>
+                 {/* Removed specific presentation mode button explanation as it was removed */}
+                 <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit Fullscreen mode.</p>
               </section>
 
               <Separator/>
@@ -90,7 +91,7 @@ export default function HowToUsePage() {
                 <h3 id="keyboard-shortcuts-heading" className="text-lg font-semibold mb-2 flex items-center"><Palette className="mr-2 h-5 w-5 text-primary"/>Keyboard Shortcuts</h3>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling (when not focused on an input field).</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen or Presentation mode.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen mode.</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script (when Script Manager is open and focused on the script editor).</li>
                 </ul>
               </section>
@@ -106,6 +107,7 @@ export default function HowToUsePage() {
           </CardContent>
         </Card>
       </main>
+      <Footer />
     </div>
   );
 }

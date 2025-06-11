@@ -3,6 +3,7 @@
 
 import type React from 'react';
 import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -10,6 +11,8 @@ import { ChevronLeft, Mail } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+
 
 export default function ContactUsPage() {
   const dummyOpen = () => {}; // Placeholder for Header props
@@ -24,7 +27,7 @@ export default function ContactUsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} onOpenHelp={dummyOpen} />
+      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
           <CardHeader className="items-center">
@@ -78,9 +81,7 @@ export default function ContactUsPage() {
           </CardContent>
         </Card>
       </main>
+      <Footer />
     </div>
   );
 }
-
-// Minimal Separator for this page
-const Separator: React.FC = () => <hr className="my-6 border-border" />;

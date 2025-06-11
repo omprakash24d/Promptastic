@@ -18,96 +18,34 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
+import { useIsMobile } from '@/hooks/use-mobile'; // Import useIsMobile
 
 interface HeaderProps {
   onOpenScripts: () => void;
   onOpenSettings: () => void;
-  onOpenHelp?: () => void; // Made optional as it might be replaced by dropdown
+  // onOpenHelp is removed as help is now a dropdown linking to pages
 }
 
-interface NavButtonConfig {
-  label: string;
-  icon: React.ElementType;
-  onClick?: () => void;
-  href?: string;
-  isDropdown?: boolean;
-  dropdownItems?: DropdownItemConfig[];
-  ariaLabel: string;
-  showTextOnDesktop?: boolean;
-  requiresAuth?: boolean;
-  hideIfAuth?: boolean;
-}
-
-interface DropdownItemConfig {
-    label: string;
-    href: string;
-    icon: React.ElementType;
-}
-
-const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
-  const { darkMode, setDarkMode } = useTeleprompterStore();
-  const { user, logout, loading } = useAuth();
-
-  const toggleTheme = useCallback(() => {
-    setDarkMode(!darkMode);
-  }, [darkMode, setDarkMode]);
-
-  const helpDropdownItems: DropdownItemConfig[] = [
+// This definition can be outside if it's static and doesn't depend on component state/props
+const staticHelpPageItems = [
     { label: "About Promptastic!", href: "/about-us", icon: Info },
     { label: "How to Use", href: "/how-to-use", icon: FileQuestion },
     { label: "Contact Us", href: "/contact-us", icon: Mail },
     { label: "Privacy Policy", href: "/privacy-policy", icon: ShieldCheck },
     { label: "Terms & Conditions", href: "/terms-conditions", icon: Gavel },
-  ];
+];
 
-  const getNavButtons = (): NavButtonConfig[] => {
-    const dynamicButtons: NavButtonConfig[] = [
-      {
-        label: 'Scripts',
-        icon: FileText,
-        onClick: onOpenScripts,
-        ariaLabel: 'Open script manager',
-        showTextOnDesktop: true,
-        requiresAuth: true,
-      },
-      {
-        label: 'Settings',
-        icon: SlidersHorizontal,
-        onClick: onOpenSettings,
-        ariaLabel: 'Open settings',
-        showTextOnDesktop: true,
-      },
-      {
-        label: 'Help',
-        icon: Hammer, 
-        isDropdown: true,
-        dropdownItems: helpDropdownItems,
-        ariaLabel: 'Open help menu',
-        showTextOnDesktop: true,
-      },
-      {
-        label: darkMode ? 'Light Mode' : 'Dark Mode',
-        icon: darkMode ? Sun : Moon,
-        onClick: toggleTheme,
-        ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`,
-        showTextOnDesktop: false, 
-      },
-    ];
 
-    if (loading) {
-      return dynamicButtons.filter(b => !b.requiresAuth && b.label !== 'Scripts');
-    }
+const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
+  const { darkMode, setDarkMode } = useTeleprompterStore();
+  const { user, logout, loading } = useAuth();
+  const isMobile = useIsMobile();
 
-    return dynamicButtons.filter(b => {
-      if (b.requiresAuth && !user) return false;
-      return true;
-    });
-  };
+  const toggleTheme = useCallback(() => {
+    setDarkMode(!darkMode);
+  }, [darkMode, setDarkMode]);
 
-  const navButtons = getNavButtons();
-
-  const UserNav = () => {
+  const UserNavDesktop = () => {
     if (loading) {
       return <Button variant="ghost" size="sm" className="h-8 w-20 animate-pulse bg-muted/50 rounded-md" disabled>&nbsp;</Button>;
     }
@@ -157,69 +95,63 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
     );
   };
 
-  const renderNavButton = (button: NavButtonConfig, isMobile: boolean) => {
-    const buttonContent = (
-      <>
-        <button.icon className={cn((button.showTextOnDesktop && !isMobile) ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
-        {(button.showTextOnDesktop && !isMobile) && button.label}
-      </>
-    );
-
-    if (button.isDropdown && button.dropdownItems) {
-      return (
-        <DropdownMenu key={button.label + (isMobile ? "-mobile" : "-desktop")}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
-              aria-label={button.ariaLabel}
-              title={button.ariaLabel}
-            >
-              {buttonContent}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {button.dropdownItems.map(item => (
-              <Link key={item.href} href={item.href} passHref legacyBehavior>
-                <DropdownMenuItem asChild>
-                  <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
-                </DropdownMenuItem>
-              </Link>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-
-    if (button.href) {
-      return (
-        <Link key={button.label + (isMobile ? "-mobile" : "-desktop")} href={button.href} passHref legacyBehavior>
-          <Button
-            variant="ghost"
-            size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
-            aria-label={button.ariaLabel}
-            title={button.ariaLabel}
-            asChild
-          >
-            <a>{buttonContent}</a>
-          </Button>
-        </Link>
-      );
-    }
-
-    return (
-      <Button
-        key={button.label + (isMobile ? "-mobile" : "-desktop")}
-        variant="ghost"
-        size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
-        onClick={button.onClick}
-        aria-label={button.ariaLabel}
-        title={button.ariaLabel}
-      >
-        {buttonContent}
-      </Button>
-    );
-  };
+  const renderMobileMenu = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Open main menu">
+          <Hammer className="h-5 w-5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end">
+        {loading ? (
+            <DropdownMenuItem disabled>Loading user...</DropdownMenuItem>
+        ) : !user ? (
+          <Link href="/login" passHref legacyBehavior>
+            <DropdownMenuItem asChild>
+              <a><LogIn className="mr-2 h-4 w-4" />Login</a>
+            </DropdownMenuItem>
+          </Link>
+        ) : (
+          <>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {user.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onOpenScripts}>
+              <FileText className="mr-2 h-4 w-4" /> Scripts
+            </DropdownMenuItem>
+             <Link href="/profile" passHref legacyBehavior>
+              <DropdownMenuItem asChild>
+                <a><UserCircle2 className="mr-2 h-4 w-4" />Profile</a>
+              </DropdownMenuItem>
+            </Link>
+          </>
+        )}
+        <DropdownMenuItem onClick={onOpenSettings}>
+          <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings
+        </DropdownMenuItem>
+        {user && !loading && (
+             <DropdownMenuItem onClick={logout}>
+                <LogOut className="mr-2 h-4 w-4" /> Logout
+            </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Help & Information</DropdownMenuLabel>
+        {staticHelpPageItems.map(item => (
+          <Link key={item.href} href={item.href} passHref legacyBehavior>
+            <DropdownMenuItem asChild>
+              <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
+            </DropdownMenuItem>
+          </Link>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
 
   return (
@@ -249,17 +181,45 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
-            {navButtons.map(button => renderNavButton(button, false))}
-            <UserNav />
-          </nav>
-
-          {/* Mobile Navigation: Render all available buttons as icons */}
-          <nav className="flex items-center md:hidden space-x-0.5" aria-label="Mobile navigation">
-            {navButtons.map(button => renderNavButton(button, true))}
-            <UserNav /> {/* UserNav is separate and already responsive */}
-          </nav>
+          {isMobile ? (
+            <nav className="flex items-center space-x-1" aria-label="Mobile navigation">
+              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`}>
+                {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
+              {renderMobileMenu()}
+            </nav>
+          ) : (
+            <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
+              {!loading && user && (
+                <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager" title="Open script manager">
+                  <FileText className="mr-1 h-5 w-5" /> Scripts
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings" title="Open settings">
+                <SlidersHorizontal className="mr-1 h-5 w-5" /> Settings
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" aria-label="Open help menu" title="Open help menu">
+                    <Hammer className="mr-1 h-5 w-5" /> Help
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {staticHelpPageItems.map(item => (
+                    <Link key={item.href} href={item.href} passHref legacyBehavior>
+                      <DropdownMenuItem asChild>
+                        <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
+                      </DropdownMenuItem>
+                    </Link>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`}>
+                {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+              </Button>
+              <UserNavDesktop />
+            </nav>
+          )}
         </div>
       </div>
     </header>
