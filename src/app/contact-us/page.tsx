@@ -2,17 +2,19 @@
 "use client";
 
 import type React from 'react';
+import { useState } from 'react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft, Mail } from 'lucide-react';
+import { ChevronLeft, Mail, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 // --- THESE VALUES ARE NOW UPDATED BASED ON YOUR PREFILLED LINK ---
 // 1. Google Form's Action URL
@@ -30,9 +32,13 @@ const GOOGLE_FORM_FIELD_IDS = {
 
 export default function ContactUsPage() {
   const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsLoading(true);
+    setSubmissionStatus(null);
     const formElement = e.target as HTMLFormElement;
     const formData = new FormData(formElement);
 
@@ -50,6 +56,7 @@ export default function ContactUsPage() {
         subject: formData.get('subject'),
         message: formData.get('message'),
       });
+      setIsLoading(false);
       // formElement.reset(); // Optionally reset even if not configured
       return;
     }
@@ -63,29 +70,17 @@ export default function ContactUsPage() {
     try {
       await fetch(GOOGLE_FORM_ACTION_URL, {
         method: 'POST',
-        mode: 'no-cors', // Important: Google Forms don't allow CORS for responses from direct fetch.
-                         // This means we can't know if submission was truly successful from the response,
-                         // but the data is usually sent.
-        headers: {
-          // 'Content-Type': 'application/x-www-form-urlencoded', // Not strictly needed with URLSearchParams
-        },
+        mode: 'no-cors', 
         body: dataToSubmit,
       });
 
-      toast({
-          title: "Message Sent!",
-          description: "Thank you for your message. We'll review it shortly via our Google Form.",
-          duration: 7000,
-      });
+      setSubmissionStatus({ type: 'success', message: "Thank you for your message. We'll review it shortly." });
       formElement.reset();
     } catch (error) {
       console.error("Error submitting to Google Form:", error);
-      toast({
-          title: "Submission Error",
-          description: "There was an issue sending your message. Please try again later or contact us directly.",
-          variant: "destructive",
-          duration: 10000,
-      });
+      setSubmissionStatus({ type: 'error', message: "There was an issue sending your message. Please try again later." });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -109,21 +104,81 @@ export default function ContactUsPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="name">Full Name</Label>
-                <Input id="name" name="name" type="text" placeholder="Your Name" required className="mt-1" />
+                <Input 
+                  id="name" 
+                  name="name" 
+                  type="text" 
+                  placeholder="Your Name" 
+                  required 
+                  className="mt-1" 
+                  disabled={isLoading}
+                  onChange={() => submissionStatus && setSubmissionStatus(null)} 
+                />
               </div>
               <div>
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" name="email" type="email" placeholder="you@example.com" required className="mt-1" />
+                <Input 
+                  id="email" 
+                  name="email" 
+                  type="email" 
+                  placeholder="you@example.com" 
+                  required 
+                  className="mt-1" 
+                  disabled={isLoading}
+                  onChange={() => submissionStatus && setSubmissionStatus(null)} 
+                />
               </div>
               <div>
                 <Label htmlFor="subject">Subject</Label>
-                <Input id="subject" name="subject" type="text" placeholder="Regarding..." required className="mt-1" />
+                <Input 
+                  id="subject" 
+                  name="subject" 
+                  type="text" 
+                  placeholder="Regarding..." 
+                  required 
+                  className="mt-1" 
+                  disabled={isLoading}
+                  onChange={() => submissionStatus && setSubmissionStatus(null)} 
+                />
               </div>
               <div>
                 <Label htmlFor="message">Message</Label>
-                <Textarea id="message" name="message" placeholder="Your message here..." required rows={5} className="mt-1" />
+                <Textarea 
+                  id="message" 
+                  name="message" 
+                  placeholder="Your message here..." 
+                  required 
+                  rows={5} 
+                  className="mt-1" 
+                  disabled={isLoading}
+                  onChange={() => submissionStatus && setSubmissionStatus(null)} 
+                />
               </div>
-              <Button type="submit" className="w-full">Send Message</Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Message'
+                )}
+              </Button>
+              {submissionStatus && (
+                <div
+                  className={cn(
+                    "mt-2 text-center text-sm p-2 rounded-md",
+                    submissionStatus.type === 'success' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                  )}
+                  role={submissionStatus.type === 'error' ? "alert" : "status"}
+                >
+                  {submissionStatus.type === 'success' ? 
+                    <CheckCircle2 className="inline mr-1.5 h-4 w-4" /> :
+                    <AlertCircle className="inline mr-1.5 h-4 w-4" />
+                  }
+                  {submissionStatus.message}
+                </div>
+              )}
             </form>
             
             <Separator />
@@ -135,7 +190,7 @@ export default function ContactUsPage() {
             </div>
 
             <div className="mt-8 text-center">
-              <Button asChild variant="outline">
+              <Button asChild variant="outline" disabled={isLoading}>
                 <Link href="/">
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   Back to Promptastic!
