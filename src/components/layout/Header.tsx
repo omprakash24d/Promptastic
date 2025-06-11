@@ -11,7 +11,6 @@ import { cn } from '@/lib/utils';
 interface HeaderProps {
   onOpenScripts: () => void;
   onOpenSettings: () => void;
-  className?: string; 
 }
 
 interface NavButtonConfig {
@@ -22,7 +21,7 @@ interface NavButtonConfig {
   showTextOnDesktop?: boolean;
 }
 
-const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, className }: HeaderProps) {
+const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
 
   const toggleTheme = useCallback(() => {
@@ -54,7 +53,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, class
   ];
 
   return (
-    <header className={cn("border-b bg-card py-3 shadow-sm", className)} role="banner">
+    <header className="border-b bg-card py-3 shadow-sm" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center">

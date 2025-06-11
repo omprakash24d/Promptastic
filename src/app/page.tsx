@@ -146,9 +146,8 @@ export default function PromptasticPage() {
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
+    <div className="flex flex-col h-screen bg-background text-foreground">
       <Header
-        className="shrink-0"
         onOpenScripts={openScriptsSheet}
         onOpenSettings={openSettingsSheet}
       />
@@ -158,7 +157,7 @@ export default function PromptasticPage() {
       </main>
 
       <div
-        className="shrink-0 p-4 border-t print:hidden bg-card shadow-md sticky bottom-0 z-20"
+        className="p-4 border-t print:hidden bg-card shadow-md"
         role="toolbar"
         aria-label="Playback Controls and Information"
       >
