@@ -90,23 +90,6 @@ export default function PromptasticPage() {
 
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [darkMode]);
-
-  useEffect(() => {
-    if (enableHighContrast) {
-      document.documentElement.classList.add('high-contrast');
-    } else {
-      document.documentElement.classList.remove('high-contrast');
-    }
-  }, [enableHighContrast]);
-
-
-  useEffect(() => {
     const storeState = useTeleprompterStore.getState();
     const { scriptText: currentText, activeScriptName: currentActive, scripts: currentScripts } = storeState;
     const actualDefaultText = typeof LONGER_DEFAULT_SCRIPT_TEXT === 'string' ? LONGER_DEFAULT_SCRIPT_TEXT : "Welcome to Promptastic!";
@@ -381,4 +364,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
