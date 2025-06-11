@@ -52,6 +52,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
       fontFamily: INITIAL_FONT_FAMILY,
       scrollSpeed: INITIAL_SCROLL_SPEED,
+      focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
+      horizontalPadding: INITIAL_HORIZONTAL_PADDING,
     }
   },
   {
@@ -62,6 +64,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       focusLinePercentage: 0.4,
       fontFamily: "Verdana, sans-serif",
       scrollSpeed: 25,
+      focusLineStyle: 'line',
+      horizontalPadding: 5,
     }
   },
   {
@@ -72,6 +76,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       focusLinePercentage: 0.3,
       fontFamily: "Inter, sans-serif",
       scrollSpeed: 35,
+      focusLineStyle: 'shadedParagraph',
+      horizontalPadding: 10,
     }
   },
   {
@@ -82,6 +88,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       focusLinePercentage: 0.5,
       fontFamily: "'Courier New', monospace",
       scrollSpeed: 40,
+      focusLineStyle: 'line',
+      horizontalPadding: 0,
     }
   }
 ];
@@ -107,6 +115,7 @@ interface TeleprompterStateStore extends TeleprompterSettings {
   saveScript: (name: string, content?: string) => void;
   deleteScript: (name: string) => void;
   renameScript: (oldName: string, newName: string) => void;
+  duplicateScript: (name: string) => string | null; // Returns new name or null
   saveScriptVersion: (scriptName: string, notes?: string) => void;
   loadScriptVersion: (scriptName: string, versionId: string) => void;
 
@@ -224,6 +233,34 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
           }));
         },
+        duplicateScript: (name) => {
+          const originalScript = get().scripts.find(s => s.name === name);
+          if (!originalScript) return null;
+
+          const existingNames = get().scripts.map(s => s.name);
+          let newName = `${originalScript.name} (Copy)`;
+          let copyIndex = 2;
+          while (existingNames.includes(newName)) {
+            newName = `${originalScript.name} (Copy ${copyIndex})`;
+            copyIndex++;
+          }
+          
+          const now = Date.now();
+          const duplicatedScript: Script = {
+            ...originalScript, // copies content and versions
+            name: newName,
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          set(state => ({
+            scripts: [...state.scripts, duplicatedScript],
+            activeScriptName: newName, // Make the new script active
+            scriptText: duplicatedScript.content, // Load its content into editor
+            currentScrollPosition: 0,
+          }));
+          return newName;
+        },
         saveScriptVersion: (scriptName, notes) => {
           const script = get().scripts.find(s => s.name === scriptName);
           if (script) {
@@ -271,28 +308,39 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
-          if (preset) {
-            set(state => ({ ...state, ...preset.settings, activeLayoutPresetName: presetName }));
+          if (preset?.settings) { // Check if preset.settings is defined
+            const { fontSize, lineHeight, focusLinePercentage, fontFamily, scrollSpeed, focusLineStyle, horizontalPadding } = preset.settings;
+            set(state => ({ 
+              ...state, 
+              fontSize: fontSize ?? state.fontSize,
+              lineHeight: lineHeight ?? state.lineHeight,
+              focusLinePercentage: focusLinePercentage ?? state.focusLinePercentage,
+              fontFamily: fontFamily ?? state.fontFamily,
+              scrollSpeed: scrollSpeed ?? state.scrollSpeed,
+              focusLineStyle: focusLineStyle ?? state.focusLineStyle,
+              horizontalPadding: horizontalPadding ?? state.horizontalPadding,
+              activeLayoutPresetName: presetName 
+            }));
           }
         },
 
         resetSettingsToDefaults: () => {
           const currentDarkMode = get().darkMode;
-          // High contrast is not reset here, it's a separate global toggle
-          const defaultPreset = get().layoutPresets.find(p => p.name === "Default") || { settings: {} };
+          const defaultPreset = get().layoutPresets.find(p => p.name === "Default");
+          const defaultSettings = defaultPreset?.settings ?? {};
           set({
-            fontSize: defaultPreset.settings.fontSize ?? INITIAL_FONT_SIZE,
-            scrollSpeed: defaultPreset.settings.scrollSpeed ?? INITIAL_SCROLL_SPEED,
-            lineHeight: defaultPreset.settings.lineHeight ?? INITIAL_LINE_HEIGHT,
+            fontSize: defaultSettings.fontSize ?? INITIAL_FONT_SIZE,
+            scrollSpeed: defaultSettings.scrollSpeed ?? INITIAL_SCROLL_SPEED,
+            lineHeight: defaultSettings.lineHeight ?? INITIAL_LINE_HEIGHT,
             isMirrored: INITIAL_IS_MIRRORED,
             isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
             textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
-            fontFamily: defaultPreset.settings.fontFamily ?? INITIAL_FONT_FAMILY,
-            focusLinePercentage: defaultPreset.settings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
-            focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
+            fontFamily: defaultSettings.fontFamily ?? INITIAL_FONT_FAMILY,
+            focusLinePercentage: defaultSettings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
+            focusLineStyle: defaultSettings.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE,
             countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
             countdownDuration: INITIAL_COUNTDOWN_DURATION,
-            horizontalPadding: INITIAL_HORIZONTAL_PADDING,
+            horizontalPadding: defaultSettings.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
         },
@@ -380,13 +428,14 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         horizontalPadding: state.horizontalPadding,
         enableHighContrast: state.enableHighContrast,
         userSettingsProfiles: state.userSettingsProfiles,
+        // scriptText is intentionally not persisted here to avoid large local storage entries if not careful.
+        // It's reloaded from activeScriptName or default on app load.
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          if (!state.layoutPresets || state.layoutPresets.length === 0) {
-            state.layoutPresets = DEFAULT_LAYOUT_PRESETS;
-            state.activeLayoutPresetName = "Default";
-          }
+          // Ensure default values for potentially new settings if loading older persisted state
+          state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
+          state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
           state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
@@ -400,6 +449,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
   )
 );
 
+// Initialize with default script if no scripts are loaded
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
     const currentStore = useTeleprompterStore.getState();

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2, CopyPlus, History, Eye } from 'lucide-react';
+import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2, CopyPlus, History, Eye, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
@@ -48,7 +48,7 @@ export function ScriptManager() {
   const {
     scriptText, setScriptText,
     scripts, activeScriptName,
-    loadScript, saveScript, deleteScript, renameScript,
+    loadScript, saveScript, deleteScript, renameScript, duplicateScript,
     saveScriptVersion, loadScriptVersion,
     setActiveScriptName
   } = useTeleprompterStore();
@@ -71,12 +71,12 @@ export function ScriptManager() {
     setCurrentEditingScriptText(scriptText);
     setScriptSummary(null); 
     setIsDirty(false);
-  }, [scriptText, activeScriptName]); // Added activeScriptName to reset dirty on script load
+  }, [scriptText, activeScriptName]);
 
   useEffect(() => {
     if (activeScriptName && scripts.find(s => s.name === activeScriptName)?.content !== currentEditingScriptText) {
       setIsDirty(true);
-    } else if (!activeScriptName && currentEditingScriptText !== "") { // For new scripts
+    } else if (!activeScriptName && currentEditingScriptText !== "" && currentEditingScriptText !== useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT) { 
       setIsDirty(true);
     }
      else {
@@ -109,12 +109,12 @@ export function ScriptManager() {
   };
 
   const executeOrConfirm = (action: () => void) => {
-    if (isDirty && currentEditingScriptText.trim() !== "") { // Only show confirm if there's actual content and it's dirty
+    if (isDirty && currentEditingScriptText.trim() !== "" && currentEditingScriptText !== useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT) {
       setPendingAction(() => action);
       setShowConfirmDialog(true);
     } else {
       action();
-      setIsDirty(false); // Ensure dirty is reset if action proceeded without confirm
+      setIsDirty(false);
     }
   };
 
@@ -136,7 +136,7 @@ export function ScriptManager() {
 
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName(""); // Clear new script name input only if it was a new script
+    if (!activeScriptName) setNewScriptName(""); 
     setIsDirty(false);
   }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
 
@@ -176,12 +176,11 @@ export function ScriptManager() {
                 loadScript(newActiveScript.name);
             }
         } else {
-             setScriptText(""); // This should be handled by the store's default script logic
-             setCurrentEditingScriptText("");
+             setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT);
              setActiveScriptName(null);
         }
       }
-       setIsDirty(false); // Should be reset by loadScript or setActiveScriptName if wasActive
+       setIsDirty(false);
     }
   };
 
@@ -209,12 +208,20 @@ export function ScriptManager() {
   const handleNewScript = () => {
     executeOrConfirm(() => {
         setActiveScriptName(null);
-        // setScriptText(""); // Let store handle default script
-        setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT); // Set editor to default
+        setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT);
         setNewScriptName("");
         setScriptSummary(null);
         toast({ title: "New Script", description: "Ready for your new script."});
     });
+  };
+
+  const handleDuplicate = (name: string) => {
+    const newName = duplicateScript(name);
+    if (newName) {
+      toast({ title: "Script Duplicated", description: `Script "${name}" duplicated as "${newName}". New script is now active.` });
+    } else {
+      toast({ title: "Error", description: `Could not duplicate script "${name}".`, variant: "destructive" });
+    }
   };
 
   const handleExportTxt = () => {
@@ -242,10 +249,10 @@ export function ScriptManager() {
   };
 
   const processFileContent = (content: string, fileName: string) => {
-    setActiveScriptName(null); // Indicate it's a new/imported script, not an existing active one
-    setCurrentEditingScriptText(content); // Update editor content
+    setActiveScriptName(null); 
+    setCurrentEditingScriptText(content);
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-    setNewScriptName(fileNameWithoutExtension); // Suggest name for saving
+    setNewScriptName(fileNameWithoutExtension); 
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
     setIsDirty(true); 
   };
@@ -341,9 +348,9 @@ export function ScriptManager() {
         toast({ title: "Cannot Save Version", description: "You must save the script first before saving versions.", variant: "destructive" });
         return;
     }
-    setVersionNotes(""); // Clear previous notes
+    setVersionNotes(""); 
     setShowVersionNotesDialog(true);
-    setPendingVersionSaveAction(() => () => { // Store the action
+    setPendingVersionSaveAction(() => () => { 
         saveScriptVersion(activeScriptName, versionNotes);
         toast({ title: "Version Saved", description: `New version for "${activeScriptName}" saved.` });
         setShowVersionNotesDialog(false);
@@ -529,10 +536,10 @@ export function ScriptManager() {
           <CardContent>
             <ScrollArea className="h-[200px] w-full rounded-md border bg-muted/20">
               <ul className="space-y-1 p-1">
-                {scripts.map((script) => (
-                  <li key={script.name} className="flex items-center p-2 rounded-md hover:bg-muted text-sm">
+                {scripts.sort((a, b) => b.updatedAt - a.updatedAt).map((script) => (
+                  <li key={script.name} className="p-2 rounded-md hover:bg-muted text-sm">
                     {renamingScript === script.name ? (
-                      <div className="flex-grow flex items-center gap-2 min-w-0">
+                      <div className="flex flex-grow items-center gap-2 min-w-0">
                         <Input
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
@@ -547,7 +554,7 @@ export function ScriptManager() {
                         <Button size="sm" variant="ghost" onClick={() => { setRenamingScript(null); setRenameValue(""); }} className="flex-shrink-0">Cancel</Button>
                       </div>
                     ) : (
-                      <>
+                      <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0 mr-2">
                           <span
                             className={`block truncate cursor-pointer hover:underline ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
@@ -556,16 +563,22 @@ export function ScriptManager() {
                           >
                             {script.name}
                           </span>
+                           <span className="text-xs text-muted-foreground flex items-center mt-0.5">
+                             <Clock className="h-3 w-3 mr-1" /> Last updated: {format(new Date(script.updatedAt), "MMM d, yyyy HH:mm")}
+                           </span>
                         </div>
                         <div className="flex-shrink-0 flex items-center gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label={`Rename script ${script.name}`}>
+                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(script.name)} aria-label={`Duplicate script ${script.name}`} title="Duplicate script">
+                            <CopyPlus className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label={`Rename script ${script.name}`} title="Rename script">
                             <Edit3 className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label={`Delete script ${script.name}`}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label={`Delete script ${script.name}`} title="Delete script">
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
-                      </>
+                      </div>
                     )}
                   </li>
                 ))}
