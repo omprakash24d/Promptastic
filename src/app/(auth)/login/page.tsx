@@ -11,13 +11,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+// import { useRouter } from 'next/navigation'; // No longer explicitly needed here for navigation
 
 export default function LoginPage() {
   const {
     signInWithGoogle,
-    // signInWithGithub, // Removed
-    // signInWithPhoneNumber, // Removed
     signUpWithEmail,
     signInWithEmail,
     sendPasswordReset,
@@ -26,7 +24,7 @@ export default function LoginPage() {
     successMessage,
     clearAuthMessages,
   } = useAuth();
-  const router = useRouter();
+  // const router = useRouter(); // No longer explicitly needed here
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -80,13 +78,16 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages();
-    await sendPasswordReset(resetEmail);
+    // clearAuthMessages(); // sendPasswordReset in AuthContext now handles this
+    const success = await sendPasswordReset(resetEmail);
+    if (success) {
+      setShowForgotPassword(false); // Go back to Sign In view
+      setResetEmail(''); // Clear the input field
+      // Success message is set by AuthContext and will be displayed
+    }
+    // If !success, error is set by AuthContext and will be displayed on the forgot password form
   };
 
-  // const handlePhoneSignIn = () => { // Removed
-  //   alert("Phone Sign-In: Advanced setup required (RecaptchaVerifier). Not implemented in this placeholder.");
-  // };
 
   const getPasswordStrengthFeedback = () => {
     if (!password && activeTab === 'signUp') return null;
@@ -95,6 +96,17 @@ export default function LoginPage() {
     }
     return null;
   };
+
+  const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
+    clearAuthMessages();
+    setShowForgotPassword(show);
+    if (show && prefillEmail) {
+      setResetEmail(prefillEmail);
+    } else if (!show) {
+      setResetEmail(''); 
+    }
+  };
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -137,6 +149,7 @@ export default function LoginPage() {
                   placeholder="you@example.com"
                   required
                   className="mt-1"
+                  autoComplete="email"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
@@ -230,21 +243,21 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
+                  <Mail className="mr-2 h-5 w-5 hidden" /> {/* Hidden as requested for cleaner look, icon can be re-added if desired */}
                   <Chrome className="mr-2 h-5 w-5" /> Google
                 </Button>
-                {/* GitHub and Phone Buttons Removed */}
               </div>
             </>
           )}
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2 pt-4">
           {showForgotPassword ? (
-            <Button variant="link" size="sm" onClick={() => { setShowForgotPassword(false); clearAuthMessages(); }} className="text-sm">
+            <Button variant="link" size="sm" onClick={() => toggleForgotPasswordView(false)} className="text-sm">
               Back to Sign In
             </Button>
           ) : (
             <>
-              <Button variant="link" size="sm" onClick={() => { setShowForgotPassword(true); setResetEmail(email); clearAuthMessages();}} className="text-sm text-muted-foreground hover:text-primary">
+              <Button variant="link" size="sm" onClick={() => toggleForgotPasswordView(true, email)} className="text-sm text-muted-foreground hover:text-primary">
                 Forgot Password?
               </Button>
             </>

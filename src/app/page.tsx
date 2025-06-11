@@ -222,7 +222,7 @@ export default function PromptasticPage() {
           <p className="text-xs text-muted-foreground text-center mt-3">
             Designed and developed by{" "}
             <a
-              href="https://www.linkedin.com/in/om-prakash-yadav-0731b7256/"
+              href="https://www.instagram.com/omprakash24d/"
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:text-primary"
