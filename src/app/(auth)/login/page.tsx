@@ -35,20 +35,22 @@ export default function LoginPage() {
 
   const [resetEmail, setResetEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [authAttemptError, setAuthAttemptError] = useState<string | null>(null); // Renamed from passwordMismatchError
+  const [authAttemptError, setAuthAttemptError] = useState<string | null>(null);
 
   const [isResetCooldown, setIsResetCooldown] = useState(false);
   const [currentCooldownSeconds, setCurrentCooldownSeconds] = useState(RESET_COOLDOWN_SECONDS);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Clear auth messages from context when component mounts or when switching tabs/views
+    clearAuthMessages();
     return () => {
-      clearAuthMessages();
+      clearAuthMessages(); // Also clear on unmount
       if (cooldownIntervalRef.current) {
         clearInterval(cooldownIntervalRef.current);
       }
     };
-  }, [clearAuthMessages]);
+  }, [clearAuthMessages, activeTab, showForgotPassword]); // Added dependencies
 
   useEffect(() => {
     if (isResetCooldown) {
@@ -72,20 +74,20 @@ export default function LoginPage() {
 
 
   const handleTabChange = (value: string) => {
-    clearAuthMessages();
+    // clearAuthMessages(); // Already handled by useEffect above
     setAuthAttemptError(null);
     setEmail('');
     setPassword('');
     setConfirmPassword('');
     setDisplayName('');
-    setShowForgotPassword(false);
+    setShowForgotPassword(false); // Ensure forgot password form is hidden when switching tabs
     setActiveTab(value as 'signIn' | 'signUp');
   };
 
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages();
-    setAuthAttemptError(null);
+    clearAuthMessages(); // Clear context messages before new attempt
+    setAuthAttemptError(null); // Clear local component error
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
@@ -96,7 +98,7 @@ export default function LoginPage() {
         setAuthAttemptError("Passwords do not match.");
         return;
       }
-      if (password.length < 8) { // Updated to 8 characters
+      if (password.length < 8) {
         setAuthAttemptError("Password must be at least 8 characters long.");
         return;
       }
@@ -108,16 +110,17 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages();
-    const success = await sendPasswordReset(resetEmail);
-    if (success) {
+    clearAuthMessages(); // Clear context messages before new attempt
+    const emailSentSuccessfully = await sendPasswordReset(resetEmail); // sendPasswordReset now sets success/error in context
+
+    if (emailSentSuccessfully) { // This means the process initiated (actual send OR user-not-found masked)
       setIsResetCooldown(true);
       setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
       // User remains on the forgot password screen.
       // Success/error message is set by AuthContext and displayed.
     }
-    // If !success (e.g., invalid email format, network error other than user-not-found),
-    // the error is set by AuthContext and will be displayed on this form.
+    // If !emailSentSuccessfully (i.e., a real error like invalid-email or network),
+    // the error message is set by AuthContext and will be displayed.
   };
 
 
@@ -130,13 +133,14 @@ export default function LoginPage() {
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
-    clearAuthMessages();
+    // clearAuthMessages(); // Already handled by useEffect
+    setAuthAttemptError(null); // Clear local error
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
       setResetEmail('');
-      if (isResetCooldown) {
+      if (isResetCooldown) { // Clear cooldown if navigating away from forgot password view
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
         setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
@@ -163,12 +167,12 @@ export default function LoginPage() {
           )}
         </CardHeader>
         <CardContent>
-          {error && ( // Global error from AuthContext
+          {error && (
             <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>
           )}
-          {successMessage && ( // Global success from AuthContext
+          {successMessage && (
             <div className="mb-4 rounded-md border border-green-500/50 bg-green-500/10 p-3 text-center text-sm text-green-700 dark:text-green-400" role="status">
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
             </div>
