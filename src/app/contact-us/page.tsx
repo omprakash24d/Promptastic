@@ -14,20 +14,18 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 
-// --- YOU NEED TO REPLACE THESE PLACEHOLDERS ---
-// 1. Replace with your Google Form's Action URL
-const GOOGLE_FORM_ACTION_URL = "YOUR_GOOGLE_FORM_ACTION_URL_HERE"; 
+// --- THESE VALUES ARE NOW UPDATED BASED ON YOUR PREFILLED LINK ---
+// 1. Google Form's Action URL
+const GOOGLE_FORM_ACTION_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdz4Y6N6QO8PYBETvSkBBF6lLoq1rkRoj4TU9lZGuZim_3nzQ/formResponse"; 
 
-// 2. Replace with your Google Form's field entry IDs
-//    Find these by inspecting your Google Form in Preview mode.
-//    Each input field will have a `name` attribute like "entry.123456789".
+// 2. Google Form's field entry IDs
 const GOOGLE_FORM_FIELD_IDS = {
-  name: "entry.XXXXXXXXXX",    // Replace XXXXXXXXXX with the entry ID for your "Name" field
-  email: "entry.YYYYYYYYYY",   // Replace YYYYYYYYYY with the entry ID for your "Email" field
-  subject: "entry.ZZZZZZZZZZ", // Replace ZZZZZZZZZZ with the entry ID for your "Subject" field
-  message: "entry.AAAAAAAAAA", // Replace AAAAAAAAAA with the entry ID for your "Message" field
+  name: "entry.998546520",
+  email: "entry.1538728133",
+  subject: "entry.1370750446",
+  message: "entry.1209899467",
 };
-// --- END OF PLACEHOLDERS ---
+// --- END OF UPDATED VALUES ---
 
 
 export default function ContactUsPage() {
