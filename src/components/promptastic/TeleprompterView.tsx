@@ -13,6 +13,7 @@ const VIEW_SSR_DEFAULT_DARK_MODE = true;
 
 // Threshold for detecting user scroll intervention during active playback.
 const USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR = 0.5;
+const MIN_SCROLL_INTERVENTION_THRESHOLD_PX = 5; // Minimum pixels for intervention
 
 
 export function TeleprompterView() {
@@ -38,7 +39,7 @@ export function TeleprompterView() {
   const paragraphRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  const justStartedPlayingRef = useRef(false); // Ref to ignore initial scroll events after play
+  const justStartedPlayingRef = useRef(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -54,19 +55,18 @@ export function TeleprompterView() {
       return;
     }
     const container = scrollContainerRef.current;
-    const focusLine = container.scrollTop + container.clientHeight / 3; // Consider top 1/3 of the screen as focus
+    const focusLine = container.scrollTop + container.clientHeight / 3;
 
     let newHighlightedIndex: number | null = null;
 
-    // Special case: if at the very top, and first paragraph is in view
-    if (container.scrollTop < 5 && paragraphRefs.current[0]) { // Use a small tolerance for scrollTop check
+    if (container.scrollTop < 5 && paragraphRefs.current[0]) {
       const firstPRef = paragraphRefs.current[0];
       if (firstPRef.offsetTop + firstPRef.offsetHeight > container.clientHeight / 4 && firstPRef.offsetTop < container.clientHeight / 2) {
          newHighlightedIndex = 0;
       }
     }
 
-    if (newHighlightedIndex === null) { // If not already set by the top-of-scroll check
+    if (newHighlightedIndex === null) {
       for (let i = 0; i < paragraphRefs.current.length; i++) {
         const pRef = paragraphRefs.current[i];
         if (pRef) {
@@ -83,11 +83,11 @@ export function TeleprompterView() {
     if (highlightedParagraphIndex !== newHighlightedIndex) {
       setHighlightedParagraphIndex(newHighlightedIndex);
     }
-  }, [highlightedParagraphIndex, setHighlightedParagraphIndex]); // Added highlightedParagraphIndex to dependency
+  }, [highlightedParagraphIndex]);
 
 
   const scrollLoop = useCallback((timestamp: number) => {
-    const currentIsPlaying = useTeleprompterStore.getState().isPlaying; // Get fresh state
+    const currentIsPlaying = useTeleprompterStore.getState().isPlaying;
     if (!currentIsPlaying || !scrollContainerRef.current) {
       lastTimestampRef.current = 0;
       if (animationFrameIdRef.current) {
@@ -107,7 +107,7 @@ export function TeleprompterView() {
     lastTimestampRef.current = timestamp;
 
     const container = scrollContainerRef.current;
-    const currentScrollSpeed = useTeleprompterStore.getState().scrollSpeed; // Get fresh state
+    const currentScrollSpeed = useTeleprompterStore.getState().scrollSpeed;
     const newScrollTop = container.scrollTop + currentScrollSpeed * deltaTime;
 
     if (newScrollTop >= container.scrollHeight - container.clientHeight) {
@@ -130,7 +130,6 @@ export function TeleprompterView() {
   useEffect(() => {
     let timerId: NodeJS.Timeout | null = null;
     if (isPlaying) {
-      // Explicitly set scrollTop to currentScrollPosition from store when play begins
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = currentScrollPosition;
       }
@@ -165,26 +164,28 @@ export function TeleprompterView() {
       }
       justStartedPlayingRef.current = false; 
     };
-  }, [isPlaying, scrollLoop, currentScrollPosition]); // Added currentScrollPosition to dependencies
+  }, [isPlaying, scrollLoop, currentScrollPosition]);
 
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    const currentPhysicalScroll = container.scrollTop;
+
     if (justStartedPlayingRef.current) {
-      setCurrentScrollPosition(container.scrollTop);
+      setCurrentScrollPosition(currentPhysicalScroll);
       checkHighlightedParagraph();
       return;
     }
 
-    const currentPhysicalScroll = container.scrollTop;
     const storeState = useTeleprompterStore.getState(); 
 
     if (!storeState.isPlaying) {
        setCurrentScrollPosition(currentPhysicalScroll);
     } else {
-      const scrollThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
+      const calculatedThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
+      const scrollThreshold = Math.max(MIN_SCROLL_INTERVENTION_THRESHOLD_PX, calculatedThreshold);
       
       if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollThreshold) {
         userInteractedRef.current = true; 
@@ -236,7 +237,7 @@ export function TeleprompterView() {
       >
         {paragraphBlock.split('\n').map((line, lineIndex) => (
           <p key={lineIndex} className="mb-1 last:mb-0">
-            {line || <>&nbsp;</>}
+            {line.trim() === "" && paragraphBlock.split('\n').length > 1 ? <>&nbsp;</> : (line || <>&nbsp;</>)}
           </p>
         ))}
       </div>
@@ -285,4 +286,3 @@ export function TeleprompterView() {
     </div>
   );
 }
-
