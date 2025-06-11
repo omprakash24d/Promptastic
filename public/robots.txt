@@ -1,18 +1,11 @@
 
-# robots.txt for Promptastic!
-# See https://www.robotstxt.org/robotstxt.html for documentation
-
+# https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
 
-# Disallow access to authentication and profile pages for most bots
-# as they are not typically useful for SEO indexing.
+# Disallow access to auth-related pages if they shouldn't be indexed
 Disallow: /login
 Disallow: /profile
+# Add any other paths you want to disallow
 
-# Disallow access to API routes if you have any and they shouldn't be crawled
-# Disallow: /api/
-
-# TODO: Replace [YOUR_FULL_APP_URL] with your actual deployed application URL
-# e.g., Sitemap: https://www.promptastic-app.com/sitemap.xml
-Sitemap: [YOUR_FULL_APP_URL]/sitemap.xml
+Sitemap: https://prompt.indhinditech.com/sitemap.xml
