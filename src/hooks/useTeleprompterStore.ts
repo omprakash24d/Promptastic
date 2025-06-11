@@ -20,10 +20,10 @@ const WHITE_HEX = '#ffffff';
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
 // SSR-safe defaults for initial store state before hydration from localStorage
-const SERVER_DEFAULT_DARK_MODE = false; // App defaults to light mode on first load / SSR
+const SERVER_DEFAULT_DARK_MODE = true; // App defaults to dark mode on first load / SSR
 // SERVER_DEFAULT_TEXT_COLOR is the text color that the app's initial state (pre-hydration) will have.
-// Since SERVER_DEFAULT_DARK_MODE is false (light mode), the corresponding text color is black.
-const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_LIGHT_MODE;
+// Since SERVER_DEFAULT_DARK_MODE is true (dark mode), the corresponding text color is white.
+const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE;
 
 
 interface TeleprompterState extends TeleprompterSettings {
@@ -59,12 +59,14 @@ interface TeleprompterState extends TeleprompterSettings {
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => {
+      // Helper to check if a color is effectively black (HSL or Hex)
       const isEffectivelyBlack = (color: string | undefined | null): boolean => {
         if (!color) return false;
         const c = color.toLowerCase();
         return c === INITIAL_TEXT_COLOR_LIGHT_MODE || c === BLACK_HEX;
       };
       
+      // Helper to check if a color is effectively white (HSL or Hex)
       const isEffectivelyWhite = (color: string | undefined | null): boolean => {
         if (!color) return false;
         const c = color.toLowerCase();
@@ -129,25 +131,26 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
         setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
         
+        // This function is called when the theme is changed or initialized.
+        // It adjusts the text color to a sensible default (black for light, white for dark)
+        // ONLY IF the current text color is one of the default "opposite" colors.
+        // Custom user-selected text colors are preserved.
         setDarkMode: (newDarkModeValue) => {
           const currentTextColor = get().textColor;
           let newFinalTextColor = currentTextColor;
 
-          // If the app is initializing or the text color hasn't been set by user (is still the server default)
-          const isInitialServerDefaultColor = currentTextColor === SERVER_DEFAULT_TEXT_COLOR || !currentTextColor;
-
-          if (newDarkModeValue) { // Target is Dark Mode
-            // If current text is effectively black (common for light mode default) or it's the initial uncustomized server default,
-            // change to white.
-            if (isEffectivelyBlack(currentTextColor) || isInitialServerDefaultColor) {
-              newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE; // white HSL
-            }
-          } else { // Target is Light Mode
-            // If current text is effectively white (common for dark mode default), change to black.
-            // We don't need to check for isInitialServerDefaultColor here because SERVER_DEFAULT_TEXT_COLOR is already black.
-            if (isEffectivelyWhite(currentTextColor)) {
-              newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE; // black HSL
-            }
+          // Determine if the current text color is one of the "default" ones that should be flipped.
+          // This helps avoid changing a user's custom color choice (e.g., blue text).
+          const shouldChangeToWhite = newDarkModeValue && isEffectivelyBlack(currentTextColor);
+          const shouldChangeToBlack = !newDarkModeValue && isEffectivelyWhite(currentTextColor);
+          
+          // This also handles the case where the app initializes and textColor might be the
+          // initial SERVER_DEFAULT_TEXT_COLOR (which will now be white). If newDarkModeValue is false (light mode),
+          // and currentTextColor is white (from initial dark default), it will flip to black.
+          if (shouldChangeToWhite) {
+            newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE; // white HSL
+          } else if (shouldChangeToBlack) {
+            newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE; // black HSL
           }
           
           set({ 
@@ -191,3 +194,4 @@ export const useTeleprompterStore = create<TeleprompterState>()(
     }
   )
 );
+

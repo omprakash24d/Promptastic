@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 
 // SSR-safe defaults. These are used to prevent hydration mismatches
 // if the client-side store initializes with different values than what SSR might imply.
-const SERVER_DEFAULT_TEXT_COLOR = 'hsl(0 0% 0%)'; // Black (matches INITIAL_TEXT_COLOR_LIGHT_MODE from store)
-const SERVER_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; // Matches INITIAL_FONT_FAMILY from store
-const SERVER_DEFAULT_DARK_MODE = false; // Light mode
+// These constants are specific to this component for its pre-hydration rendering.
+const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)'; // White (default for dark mode)
+const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; // Matches INITIAL_FONT_FAMILY from store
+const VIEW_SSR_DEFAULT_DARK_MODE = true; // Dark mode
 
 // Threshold for detecting user scroll intervention during active playback.
 // (Scroll speed is pixels per second, this is approx 5 frames worth of scroll)
@@ -42,7 +43,10 @@ export function TeleprompterView() {
 
   // isMounted is used to ensure that browser-specific logic or
   // store-dependent styles are only applied after client-side hydration,
-  // preventing mismatches with server-rendered HTML.
+  // preventing mismatches with server-rendered HTML. This helps avoid
+  // hydration errors if the client-side store (potentially loaded from localStorage)
+  // has different initial values (e.g., for darkMode or textColor) than
+  // what the server might have assumed for its initial render.
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     setIsMounted(true);
@@ -219,9 +223,9 @@ export function TeleprompterView() {
   }, [scriptText, checkHighlightedParagraph, fontFamily, fontSize, lineHeight]); 
 
   // Determine text color: Use SSR-safe default before hydration, then store value.
-  const currentTextColor = !isMounted ? SERVER_DEFAULT_TEXT_COLOR : textColor;
+  const currentTextColor = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
   // Determine font family: Use SSR-safe default before hydration.
-  const currentFontFamily = !isMounted ? SERVER_DEFAULT_FONT_FAMILY : fontFamily;
+  const currentFontFamily = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
   // Determine transform for mirroring: Only apply after mount.
   const mirrorTransform = isMounted && isMirrored ? 'scaleX(-1)' : 'none';
 
@@ -246,12 +250,13 @@ export function TeleprompterView() {
         "w-full h-full overflow-y-auto p-8 md:p-16 focus:outline-none",
         "transition-colors duration-300 ease-in-out",
         // Determine background color: Use SSR-safe default before hydration.
-        (!isMounted ? SERVER_DEFAULT_DARK_MODE : darkMode) ? "bg-gray-900" : "bg-gray-50",
+        // If not mounted, use VIEW_SSR_DEFAULT_DARK_MODE (true). If mounted, use actual darkMode from store.
+        (!isMounted ? VIEW_SSR_DEFAULT_DARK_MODE : darkMode) ? "bg-gray-900" : "bg-gray-50",
       )}
       style={currentViewStyles}
       tabIndex={0} // Make it focusable for keyboard interactions (e.g., arrow key scrolling by browser)
       role="region" // Identifies this as a significant, navigable section
-      aria-label="Teleprompter Script View" // Provides an accessible name
+      aria-label="Teleprompter Script Viewport" // Provides an accessible name
     >
       <div 
         className="select-none" // Prevent text selection during scrolling
