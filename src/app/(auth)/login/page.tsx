@@ -2,17 +2,34 @@
 "use client";
 
 import type React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2, Eye, EyeOff, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 const RESET_COOLDOWN_SECONDS = 30;
+
+interface PasswordValidationState {
+  minLength: boolean;
+  hasNumber: boolean;
+  hasLowercase: boolean;
+  hasUppercase: boolean;
+  hasSpecialChar: boolean;
+}
+
+const initialPasswordValidation: PasswordValidationState = {
+  minLength: false,
+  hasNumber: false,
+  hasLowercase: false,
+  hasUppercase: false,
+  hasSpecialChar: false,
+};
 
 export default function LoginPage() {
   const {
@@ -41,16 +58,32 @@ export default function LoginPage() {
   const [currentCooldownSeconds, setCurrentCooldownSeconds] = useState(RESET_COOLDOWN_SECONDS);
   const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [passwordValidation, setPasswordValidation] = useState<PasswordValidationState>(initialPasswordValidation);
+  const [showPasswordCriteria, setShowPasswordCriteria] = useState(false);
+
+  const validatePassword = useCallback((currentPassword: string): boolean => {
+    const newValidation = {
+      minLength: currentPassword.length >= 8,
+      hasNumber: /[0-9]/.test(currentPassword),
+      hasLowercase: /[a-z]/.test(currentPassword),
+      hasUppercase: /[A-Z]/.test(currentPassword),
+      hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(currentPassword),
+    };
+    setPasswordValidation(newValidation);
+    return Object.values(newValidation).every(Boolean);
+  }, []);
+
+  const allPasswordRulesMet = Object.values(passwordValidation).every(Boolean);
+
   useEffect(() => {
-    // Clear auth messages from context when component mounts or when switching tabs/views
     clearAuthMessages();
     return () => {
-      clearAuthMessages(); // Also clear on unmount
+      clearAuthMessages();
       if (cooldownIntervalRef.current) {
         clearInterval(cooldownIntervalRef.current);
       }
     };
-  }, [clearAuthMessages, activeTab, showForgotPassword]); // Added dependencies
+  }, [clearAuthMessages, activeTab, showForgotPassword]);
 
   useEffect(() => {
     if (isResetCooldown) {
@@ -72,22 +105,32 @@ export default function LoginPage() {
     };
   }, [isResetCooldown]);
 
-
   const handleTabChange = (value: string) => {
-    // clearAuthMessages(); // Already handled by useEffect above
     setAuthAttemptError(null);
     setEmail('');
     setPassword('');
     setConfirmPassword('');
     setDisplayName('');
-    setShowForgotPassword(false); // Ensure forgot password form is hidden when switching tabs
+    setShowForgotPassword(false);
+    setPasswordValidation(initialPasswordValidation);
+    setShowPasswordCriteria(false);
     setActiveTab(value as 'signIn' | 'signUp');
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    setPassword(newPassword);
+    if (activeTab === 'signUp') {
+      validatePassword(newPassword);
+      setShowPasswordCriteria(true);
+    }
+    if (authAttemptError) setAuthAttemptError(null);
   };
 
   const handleEmailPasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages(); // Clear context messages before new attempt
-    setAuthAttemptError(null); // Clear local component error
+    clearAuthMessages();
+    setAuthAttemptError(null);
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
@@ -98,8 +141,10 @@ export default function LoginPage() {
         setAuthAttemptError("Passwords do not match.");
         return;
       }
-      if (password.length < 8) {
-        setAuthAttemptError("Password must be at least 8 characters long.");
+      // Re-validate password on submit as a safeguard, though button should be disabled
+      const isPasswordStillValid = validatePassword(password);
+      if (!isPasswordStillValid) {
+        setAuthAttemptError("Password does not meet all requirements.");
         return;
       }
       await signUpWithEmail(email, password, displayName);
@@ -110,37 +155,23 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    clearAuthMessages(); // Clear context messages before new attempt
-    const emailSentSuccessfully = await sendPasswordReset(resetEmail); // sendPasswordReset now sets success/error in context
+    clearAuthMessages();
+    const emailSentSuccessfully = await sendPasswordReset(resetEmail);
 
-    if (emailSentSuccessfully) { // This means the process initiated (actual send OR user-not-found masked)
+    if (emailSentSuccessfully) {
       setIsResetCooldown(true);
       setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
-      // User remains on the forgot password screen.
-      // Success/error message is set by AuthContext and displayed.
     }
-    // If !emailSentSuccessfully (i.e., a real error like invalid-email or network),
-    // the error message is set by AuthContext and will be displayed.
-  };
-
-
-  const getPasswordStrengthFeedback = () => {
-    if (!password && activeTab === 'signUp') return null;
-    if (password.length > 0 && password.length < 8 && activeTab === 'signUp') {
-      return <p className="text-xs text-destructive mt-1">Password must be at least 8 characters.</p>;
-    }
-    return null;
   };
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
-    // clearAuthMessages(); // Already handled by useEffect
-    setAuthAttemptError(null); // Clear local error
+    setAuthAttemptError(null);
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
       setResetEmail('');
-      if (isResetCooldown) { // Clear cooldown if navigating away from forgot password view
+      if (isResetCooldown) {
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
         setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
@@ -149,6 +180,16 @@ export default function LoginPage() {
   };
 
   const toggleShowPassword = () => setShowPassword(prev => !prev);
+
+  const passwordCriteriaDisplay = [
+    { rule: 'minLength', text: 'At least 8 characters', met: passwordValidation.minLength },
+    { rule: 'hasUppercase', text: 'At least 1 uppercase letter (A-Z)', met: passwordValidation.hasUppercase },
+    { rule: 'hasLowercase', text: 'At least 1 lowercase letter (a-z)', met: passwordValidation.hasLowercase },
+    { rule: 'hasNumber', text: 'At least 1 number (0-9)', met: passwordValidation.hasNumber },
+    { rule: 'hasSpecialChar', text: 'At least 1 special character (!@#$...etc)', met: passwordValidation.hasSpecialChar },
+  ];
+  
+  const isSignupButtonDisabled = loading || (activeTab === 'signUp' && (!allPasswordRulesMet || !email || !password || !confirmPassword || !displayName));
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -245,11 +286,13 @@ export default function LoginPage() {
                         id="password"
                         type={showPassword ? "text" : "password"}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={handlePasswordChange}
+                        onFocus={() => { if (activeTab === 'signUp') setShowPasswordCriteria(true);}}
                         placeholder="••••••••"
                         required
                         className="mt-1 pr-10" 
                         autoComplete={activeTab === 'signUp' ? "new-password" : "current-password"}
+                        aria-describedby={activeTab === 'signUp' ? "password-criteria" : undefined}
                       />
                       <Button
                         type="button"
@@ -261,8 +304,19 @@ export default function LoginPage() {
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
-                      {getPasswordStrengthFeedback()}
                     </div>
+
+                    {activeTab === 'signUp' && showPasswordCriteria && (
+                      <div id="password-criteria" className="mt-2 space-y-1 text-xs" aria-live="polite">
+                        {passwordCriteriaDisplay.map((item) => (
+                          <div key={item.rule} className={cn("flex items-center", item.met ? 'text-green-600 dark:text-green-400' : 'text-destructive')}>
+                            {item.met ? <CheckCircle2 className="mr-2 h-3.5 w-3.5 flex-shrink-0" /> : <XCircle className="mr-2 h-3.5 w-3.5 flex-shrink-0" />}
+                            {item.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                      {activeTab === 'signUp' && (
                         <div className="relative">
                             <Label htmlFor="confirm-password">Confirm Password</Label>
@@ -271,7 +325,10 @@ export default function LoginPage() {
                               type={showPassword ? "text" : "password"}
                               placeholder="••••••••"
                               value={confirmPassword}
-                              onChange={(e) => setConfirmPassword(e.target.value)}
+                              onChange={(e) => {
+                                setConfirmPassword(e.target.value);
+                                if (authAttemptError) setAuthAttemptError(null);
+                              }}
                               required
                               className="mt-1 pr-10"
                               autoComplete="new-password"
@@ -286,10 +343,12 @@ export default function LoginPage() {
                              >
                                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                             </Button>
-                            {authAttemptError && <p className="text-xs text-destructive mt-1" role="alert">{authAttemptError}</p>}
                         </div>
                     )}
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    {authAttemptError && (
+                        <p className="text-xs text-destructive mt-1 px-1" role="alert">{authAttemptError}</p>
+                    )}
+                    <Button type="submit" className="w-full" disabled={activeTab === 'signUp' ? isSignupButtonDisabled : loading}>
                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                        {loading ? 'Processing...' : (activeTab === 'signUp' ? 'Sign Up' : 'Sign In')}
                     </Button>
@@ -336,3 +395,4 @@ export default function LoginPage() {
     </div>
   );
 }
+ 
