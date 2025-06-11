@@ -13,7 +13,7 @@ import {
   saveUserScriptVersion as saveUserScriptVersionToFirestore,
 } from '@/firebase/firestoreService';
 import { auth } from '@/firebase/config';
-
+import { toast } from "@/hooks/use-toast"; // Import toast
 
 const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
@@ -219,19 +219,18 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         setCurrentUserId: (userId) => set({ currentUserId: userId }),
 
         initializeUserScripts: async (userId) => {
-          set({ currentUserId: userId, scripts: [], activeScriptName: null, scriptText: LONGER_DEFAULT_SCRIPT_TEXT }); // Clear local scripts first
+          set({ currentUserId: userId, scripts: [], activeScriptName: null, scriptText: LONGER_DEFAULT_SCRIPT_TEXT }); 
           try {
             const firestoreScripts = await fetchUserScripts(userId);
             set({ scripts: firestoreScripts });
             if (firestoreScripts.length > 0) {
-              // Optionally, load the first script or most recently updated
               get().loadScript(firestoreScripts[0].name);
             } else {
                set({ scriptText: LONGER_DEFAULT_SCRIPT_TEXT, activeScriptName: null });
             }
           } catch (error) {
             console.error("Error initializing user scripts from Firestore:", error);
-            // Keep local store empty or with default script if fetch fails
+            toast({ title: "Cloud Sync Error", description: "Could not load your scripts from the cloud.", variant: "destructive"});
             set({ scripts: [], scriptText: LONGER_DEFAULT_SCRIPT_TEXT, activeScriptName: null });
           }
         },
@@ -280,12 +279,24 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
                if (!existingScript && !scripts.some(s => s.id === savedFirestoreScript.id)) {
                  set(state => ({ scripts: [...state.scripts, { ...savedFirestoreScript, userId: currentUserId }]}));
                }
-
+              toast({ title: "Cloud Sync", description: `Script "${savedFirestoreScript.name}" saved to cloud.`, variant: "default" });
             } catch (error) {
               console.error("Error saving script to Firestore:", error);
-              // Potentially fall back to local save or notify user
+              toast({ title: "Cloud Sync Error", description: `Could not save script "${name}" to the cloud. Changes saved locally.`, variant: "destructive" });
+              // Save locally as fallback if cloud save fails
+              if (existingScript) {
+                set(state => ({
+                  scripts: state.scripts.map(s => s.name === name ? scriptToSave : s),
+                  activeScriptName: name, scriptText: scriptContentToSave,
+                }));
+              } else {
+                set(state => ({
+                  scripts: [...state.scripts, { ...scriptToSave, id: uuidv4() }],
+                  activeScriptName: name, scriptText: scriptContentToSave,
+                }));
+              }
             }
-          } else { // Local save
+          } else { // Local save for anonymous user
             if (existingScript) {
               set(state => ({
                 scripts: state.scripts.map(s => s.name === name ? scriptToSave : s),
@@ -294,11 +305,12 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
               }));
             } else {
               set(state => ({
-                scripts: [...state.scripts, { ...scriptToSave, id: uuidv4() }], // Assign local UUID for new local scripts
+                scripts: [...state.scripts, { ...scriptToSave, id: uuidv4() }], 
                 activeScriptName: name,
                 scriptText: scriptContentToSave,
               }));
             }
+            toast({ title: "Script Saved", description: `Script "${name}" saved locally.`, variant: "default" });
           }
         },
 
@@ -311,15 +323,18 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           if (currentUserId && scriptToDelete.id) {
             try {
               await deleteUserScriptFromFirestore(currentUserId, scriptToDelete.id);
+              toast({ title: "Cloud Sync", description: `Script "${scriptName}" deleted from cloud.`, variant: "default" });
             } catch (error) {
               console.error("Error deleting script from Firestore:", error);
-              // Optionally notify user and don't proceed with local deletion
-              return; 
+              toast({ title: "Cloud Sync Error", description: `Could not delete script "${scriptName}" from cloud. Please try again.`, variant: "destructive" });
+              return; // Don't delete locally if cloud delete failed
             }
           }
           
           const updatedScripts = scripts.filter(s => s.name !== scriptName);
           set({ scripts: updatedScripts });
+          if (!currentUserId) toast({ title: "Script Deleted", description: `Script "${scriptName}" deleted locally.`, variant: "default" });
+
 
           if (activeScriptName === scriptName) {
             if (updatedScripts.length > 0) {
@@ -335,7 +350,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           const scriptToRename = scripts.find(s => s.name === oldName);
 
           if (!scriptToRename || !newName.trim() || scripts.some(s => s.name === newName.trim() && s.name !== oldName)) {
-            console.error("Invalid rename operation: script not found, new name empty, or new name already exists.");
+            toast({ title: "Error", description: "Invalid rename: Name empty or already exists.", variant: "destructive" });
             return;
           }
 
@@ -343,11 +358,12 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
 
           if (currentUserId && scriptToRename.id) {
             try {
-              // Firestore saveUserScript will update if ID exists
-              await saveUserScriptToFirestore(currentUserId, updatedScript); 
+              await saveUserScriptToFirestore(currentUserId, updatedScript);
+              toast({ title: "Cloud Sync", description: `Script renamed to "${newName.trim()}" in cloud.`, variant: "default" });
             } catch (error) {
               console.error("Error renaming script in Firestore:", error);
-              return;
+              toast({ title: "Cloud Sync Error", description: "Could not rename script in cloud. Please try again.", variant: "destructive" });
+              return; 
             }
           }
           
@@ -356,6 +372,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             activeScriptName: state.activeScriptName === oldName ? newName.trim() : state.activeScriptName,
             scriptText: state.activeScriptName === oldName ? updatedScript.content : state.scriptText,
           }));
+          if (!currentUserId) toast({ title: "Script Renamed", description: `Script renamed to "${newName.trim()}" locally.`, variant: "default" });
         },
 
         duplicateScript: async (scriptName) => {
@@ -376,7 +393,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             content: originalScript.content,
             createdAt: now,
             updatedAt: now,
-            versions: originalScript.versions.map(v => ({...v, versionId: uuidv4()})), // Duplicate versions with new IDs
+            versions: originalScript.versions.map(v => ({...v, versionId: uuidv4()})),
           };
 
           if (currentUserId) {
@@ -389,9 +406,11 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
                 scriptText: newCompleteScript.content,
                 currentScrollPosition: 0,
               }));
+              toast({ title: "Cloud Sync", description: `Script duplicated as "${newCompleteScript.name}" in cloud.`, variant: "default" });
               return newCompleteScript.name;
             } catch (error) {
               console.error("Error duplicating script in Firestore:", error);
+              toast({ title: "Cloud Sync Error", description: "Could not duplicate script in cloud.", variant: "destructive" });
               return null;
             }
           } else {
@@ -402,6 +421,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
               scriptText: localDuplicate.content,
               currentScrollPosition: 0,
             }));
+            toast({ title: "Script Duplicated", description: `Script duplicated as "${localDuplicate.name}" locally.`, variant: "default" });
             return localDuplicate.name;
           }
         },
@@ -410,10 +430,12 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           const { currentUserId, scripts, scriptText, activeScriptName: currentActiveScriptName } = get();
           const script = scripts.find(s => s.name === scriptName);
 
-          if (!script) return;
-          if (!script.id && currentUserId) { // Script exists locally but not in Firestore for this user
-            console.warn("Cannot save version: Script not yet saved to Firestore.");
-            // TODO: Optionally prompt user to save script first.
+          if (!script) {
+             toast({ title: "Error", description: "Script not found to save version.", variant: "destructive" });
+             return;
+          }
+          if (!script.id && currentUserId) {
+            toast({ title: "Save Script First", description: "Please save the main script to the cloud before saving versions.", variant: "destructive" });
             return;
           }
 
@@ -430,15 +452,18 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           if (currentUserId && script.id) {
             try {
               savedVersion = await saveUserScriptVersionToFirestore(currentUserId, script.id, newVersionData);
+              toast({ title: "Cloud Sync", description: `New version for "${scriptName}" saved to cloud.`, variant: "default" });
             } catch (error) {
               console.error("Error saving script version to Firestore:", error);
+              toast({ title: "Cloud Sync Error", description: "Could not save script version to cloud.", variant: "destructive" });
               return;
             }
           } else {
             savedVersion = { ...newVersionData, versionId: uuidv4() };
+            toast({ title: "Version Saved", description: `New version for "${scriptName}" saved locally.`, variant: "default" });
           }
           
-          const updatedScript = { ...script, versions: [...(script.versions || []), savedVersion] };
+          const updatedScript = { ...script, versions: [...(script.versions || []), savedVersion].sort((a,b) => b.timestamp - a.timestamp) };
           set(state => ({
             scripts: state.scripts.map(s => s.name === scriptName ? updatedScript : s),
           }));
@@ -449,6 +474,9 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           const version = script?.versions.find(v => v.versionId === versionId);
           if (script && version) {
             set({ scriptText: version.content, activeScriptName: script.name, currentScrollPosition: 0 });
+            toast({ title: "Version Loaded", description: `Loaded version for "${scriptName}".`, variant: "default" });
+          } else {
+            toast({ title: "Error", description: "Could not load script version.", variant: "destructive" });
           }
         },
 
@@ -487,6 +515,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
               horizontalPadding: horizontalPadding ?? state.horizontalPadding,
               activeLayoutPresetName: presetName 
             }));
+            toast({title: "Layout Preset Applied", description: `"${presetName}" preset has been applied.`, variant: "default"});
           }
         },
 
@@ -507,10 +536,14 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             horizontalPadding: defaultSettings.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
+          toast({title: "Settings Reset", description: "Core appearance and playback settings have been reset to default.", variant: "default"});
         },
 
         saveUserSettingsProfile: (name) => {
-          if (!name.trim()) return;
+          if (!name.trim()) {
+            toast({ title: "Error", description: "Profile name cannot be empty.", variant: "destructive" });
+            return;
+          }
           const newProfile: UserSettingsProfile = {
             id: uuidv4(),
             name: name.trim(),
@@ -519,25 +552,36 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           set(state => ({
             userSettingsProfiles: [...state.userSettingsProfiles, newProfile]
           }));
+          toast({title: "Settings Profile Saved", description: `Profile "${name.trim()}" saved.`, variant: "default"});
         },
         loadUserSettingsProfile: (profileId) => {
           const profile = get().userSettingsProfiles.find(p => p.id === profileId);
           if (profile) {
             set(state => ({ ...state, ...profile.settings, activeLayoutPresetName: null }));
+            toast({title: "Settings Profile Loaded", description: `Profile "${profile.name}" loaded.`, variant: "default"});
+          } else {
+            toast({ title: "Error", description: "Could not load settings profile.", variant: "destructive" });
           }
         },
         deleteUserSettingsProfile: (profileId) => {
+          const profileName = get().userSettingsProfiles.find(p => p.id === profileId)?.name;
           set(state => ({
             userSettingsProfiles: state.userSettingsProfiles.filter(p => p.id !== profileId)
           }));
+          toast({title: "Settings Profile Deleted", description: `Profile "${profileName || 'ID: '+profileId}" deleted.`, variant: "default"});
         },
         renameUserSettingsProfile: (profileId, newName) => {
-          if (!newName.trim()) return;
+          if (!newName.trim()) {
+             toast({ title: "Error", description: "New profile name cannot be empty.", variant: "destructive" });
+            return;
+          }
+          const oldProfileName = get().userSettingsProfiles.find(p => p.id === profileId)?.name;
           set(state => ({
             userSettingsProfiles: state.userSettingsProfiles.map(p =>
               p.id === profileId ? { ...p, name: newName.trim() } : p
             )
           }));
+          toast({title: "Settings Profile Renamed", description: `Profile "${oldProfileName}" renamed to "${newName.trim()}".`, variant: "default"});
         },
 
         togglePlayPause: () => {
@@ -573,8 +617,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
-        // Only persist settings and non-user-specific script data for anonymous users
-        // Scripts for logged-in users will be fetched from Firestore
         ...(state.currentUserId === null && { scripts: state.scripts, activeScriptName: state.activeScriptName }),
         fontSize: state.fontSize,
         scrollSpeed: state.scrollSpeed,
@@ -602,7 +644,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
           state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
-          // Scripts for logged-out users are rehydrated, logged-in users will fetch from Firestore
           state.scripts = state.currentUserId ? [] : (state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? []);
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
           state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
@@ -610,28 +651,30 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
           state.userSettingsProfiles = state.userSettingsProfiles ?? [];
           state.textColor = state.textColor ?? (state.darkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL);
-          state.currentUserId = auth.currentUser?.uid || null; // Initialize based on current auth state
+          state.currentUserId = auth.currentUser?.uid || null;
         }
       }
     }
   )
 );
 
-// Initialize currentUserId on load and subscribe to auth changes
 if (typeof window !== 'undefined') {
   useTeleprompterStore.getState().setCurrentUserId(auth.currentUser?.uid || null);
   auth.onAuthStateChanged(user => {
-    useTeleprompterStore.getState().setCurrentUserId(user?.uid || null);
+    const store = useTeleprompterStore.getState();
     if (user) {
-        // This is now handled by AuthContext calling initializeUserScripts
+      if(store.currentUserId !== user.uid) { // Only re-initialize if user actually changed
+        store.setCurrentUserId(user.uid);
+        store.initializeUserScripts(user.uid);
+      }
     } else {
-      useTeleprompterStore.getState().clearUserScripts();
+      if (store.currentUserId !== null) { // Only clear if there was a logged-in user
+        store.clearUserScripts();
+      }
     }
   });
 }
 
-
-// Default script logic if store is empty after rehydration (for non-logged-in users)
 const unsub = useTeleprompterStore.subscribe(
   (currentState) => {
     if (!currentState.currentUserId && currentState.scripts.length === 0 && currentState.activeScriptName === null && currentState.scriptText !== currentState.LONGER_DEFAULT_SCRIPT_TEXT) {
