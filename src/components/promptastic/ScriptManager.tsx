@@ -237,15 +237,16 @@ export function ScriptManager() {
   };
 
   const processFileContent = (content: string, fileName: string) => {
-    setActiveScriptName(null); // Mark as not an active saved script
+    setActiveScriptName(null); 
     setCurrentEditingScriptText(content);
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-    setNewScriptName(fileNameWithoutExtension); // Suggest name for saving
+    setNewScriptName(fileNameWithoutExtension); 
     toast({ 
-      title: "File Imported", 
-      description: `Content of "${fileName}" loaded into editor. Save it as a new script (suggested name: "${fileNameWithoutExtension}") or replace an existing one.` 
+      title: "File Imported Successfully", 
+      description: `Content of "${fileName}" has been loaded into the editor. You can now save it as a new script (suggested name: "${fileNameWithoutExtension}") or replace an existing one by saving with its name.`,
+      duration: 7000,
     });
-    setIsDirty(true); // Imported content needs to be saved
+    setIsDirty(true);
   };
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,4 +427,3 @@ export function ScriptManager() {
     </div>
   );
 }
-

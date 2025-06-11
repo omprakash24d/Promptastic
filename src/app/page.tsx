@@ -28,6 +28,7 @@ export default function PromptasticPage() {
     darkMode, setDarkMode,
     scripts, activeScriptName, loadScript: loadScriptFromStore,
     togglePlayPause,
+    resetScroll,
     isPresentationMode, setIsPresentationMode,
     enableHighContrast,
     LONGER_DEFAULT_SCRIPT_TEXT,
@@ -171,15 +172,17 @@ export default function PromptasticPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space' || event.code === 'Backspace') {
-        const activeElement = document.activeElement;
-        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'button')) {
-          return;
-        }
+      const activeElement = document.activeElement;
+      const isTyping = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'textbox');
+
+      if ((event.code === 'Space' || event.code === 'Backspace') && !isTyping) {
         event.preventDefault();
         togglePlayPause();
-      }
-      if (event.key === 'Escape') {
+      } else if (event.key.toUpperCase() === 'R' && !isTyping) {
+        event.preventDefault();
+        resetScroll();
+        toast({ title: "Scroll Reset", description: "Teleprompter scroll position has been reset to the beginning." });
+      } else if (event.key === 'Escape') {
         if (isPresentationMode) {
             setIsPresentationMode(false);
         }
@@ -200,11 +203,10 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause, toast, isPresentationMode, setIsPresentationMode]);
+  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode]);
 
   const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
-  // openHelpSheet is no longer needed
 
   return (
     <div className={cn("flex flex-col h-screen bg-background text-foreground overflow-hidden", isPresentationMode && "presentation-mode-active")}>
@@ -212,7 +214,6 @@ export default function PromptasticPage() {
         <Header
           onOpenScripts={openScriptsSheet}
           onOpenSettings={openSettingsSheet}
-          // onOpenHelp is removed
         />
       )}
 
@@ -280,8 +281,6 @@ export default function PromptasticPage() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
-
-      {/* The Help Sheet component is removed from here */}
 
     </div>
   );

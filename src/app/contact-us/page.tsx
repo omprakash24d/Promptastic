@@ -67,7 +67,7 @@ export default function ContactUsPage() {
 
             <div className="text-center space-y-2">
                 <p className="text-muted-foreground">You can also reach out directly via:</p>
-                <p><strong>Email:</strong> <a href="mailto:support@prompt.indhinditech.com" className="text-primary hover:underline">support@prompt.indhinditech.com</a> (Placeholder)</p>
+                <p><strong>Email:</strong> <a href="mailto:help@indhinditech.com" className="text-primary hover:underline">help@indhinditech.com</a> </p>
                 <p><strong>Instagram:</strong> <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@omprakash24d</a></p>
             </div>
 

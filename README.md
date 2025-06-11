@@ -14,6 +14,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Script versioning with notes.
     *   AI-powered script summarization.
     *   Export scripts as `.txt`.
+    *   Estimated reading time display.
 *   **🖥️ Teleprompter View**:
     *   Distraction-free, full-screen display.
     *   Smooth, adjustable auto-scrolling.
@@ -24,12 +25,12 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Choose font family (includes Atkinson Hyperlegible for readability).
     *   Customize text color (respects high-contrast mode).
     *   Adjustable focus line/area (style: line or shaded paragraph, vertical position).
-    *   Layout presets and save/load custom settings profiles.
+    *   Layout presets (e.g., "Default", "Studio Recording") and save/load custom settings profiles.
 *   **⏯️ Playback Controls**:
     *   Play, pause, resume, and reset scroll.
     *   Manual scroll override when paused.
     *   Click paragraph to set as new start point when paused.
-    *   Optional countdown timer before playback starts.
+    *   Optional countdown timer (1-60s) before playback starts.
 *   **🎨 UI & UX**:
     *   Clean, minimal, and responsive interface.
     *   Collapsible side panels for Scripts and Settings.
@@ -46,8 +47,8 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Password reset functionality.
     *   User profile management (display name, profile picture upload).
 *   **☁️ Cloud Sync**:
-    *   User scripts and versions are saved to Firestore when logged in.
-    *   Anonymous users' scripts are saved locally in the browser.
+    *   User scripts, versions, and custom settings profiles are saved to Firestore when logged in.
+    *   Anonymous users' scripts and profiles are saved locally in the browser.
 
 ## 🛠️ Tech Stack
 
@@ -149,6 +150,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
 ### Script Management
 Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   Create new scripts or edit existing ones in a text area.
+*   View an estimated reading time for the current script.
 *   Save scripts with a name. Logged-in users' scripts sync to Firestore; anonymous users' scripts save to browser local storage.
 *   Load saved scripts into the teleprompter.
 *   Rename, duplicate, or delete scripts.
@@ -161,9 +163,9 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   **Playback Bar**: Located at the bottom (hidden in Presentation Mode). Controls play/pause, reset, AI Sync toggle, script summary, fullscreen, and presentation mode.
 *   **Settings Panel**: Access via the gear icon in the header. Customize:
     *   **Appearance**: Font size, line spacing, font family, text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, dark/light/high-contrast themes.
-    *   **Playback**: Scroll speed, AI scroll sync (enable/disable), countdown timer (enable/disable, duration).
-    *   **Layouts & Profiles**: Apply predefined layout presets or save/load your custom combinations of settings as named profiles.
-    *   **General**: Reset core settings to defaults.
+    *   **Playback**: Scroll speed, AI scroll sync (enable/disable), countdown timer (enable/disable, duration 1-60s).
+    *   **Layouts & Profiles**: Apply predefined layout presets (e.g., "Default", "Studio Recording") or save/load your custom combinations of settings as named profiles.
+    *   **General**: Reset core settings to their "Default" preset values.
 
 ### Authentication
 *   Users can sign up with an email and password, or sign in using Google.
@@ -184,6 +186,7 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 ## ⌨️ Keyboard Shortcuts
 
 *   **Spacebar / Backspace**: Toggle Play/Pause scrolling (when not focused on an input field).
+*   **R**: Reset scroll to the beginning (when not focused on an input field).
 *   **Esc**: Exit Fullscreen or Presentation mode.
 *   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and focused).
 

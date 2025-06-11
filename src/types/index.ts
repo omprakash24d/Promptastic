@@ -32,18 +32,19 @@ export interface TeleprompterSettings {
   countdownEnabled: boolean;
   countdownDuration: number; // in seconds
   horizontalPadding: number; // percentage, e.g., 0 to 25
-  enableHighContrast: boolean; // New for accessibility
+  enableHighContrast: boolean;
 }
 
 export interface LayoutPreset {
   name: string;
-  settings: Partial<Pick<TeleprompterSettings, 'fontSize' | 'lineHeight' | 'focusLinePercentage' | 'fontFamily' | 'scrollSpeed' | 'focusLineStyle' | 'horizontalPadding' >>;
+  settings: Partial<Pick<TeleprompterSettings, 'fontSize' | 'lineHeight' | 'focusLinePercentage' | 'fontFamily' | 'scrollSpeed' | 'focusLineStyle' | 'horizontalPadding' | 'countdownEnabled' | 'countdownDuration'>>;
 }
 
 export interface UserSettingsProfile {
   id: string;
   name: string;
-  settings: Omit<TeleprompterSettings, 'darkMode' | 'enableHighContrast'>; // darkMode and highContrast are global toggles, not per-profile
+  // Exclude global toggles like darkMode and enableHighContrast from per-profile settings
+  settings: Omit<TeleprompterSettings, 'darkMode' | 'enableHighContrast'>;
 }
 
 export interface TeleprompterState extends TeleprompterSettings {
@@ -52,8 +53,8 @@ export interface TeleprompterState extends TeleprompterSettings {
   isPlaying: boolean;
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
-  isPresentationMode: boolean; // New for Presentation Mode
-  userSettingsProfiles: UserSettingsProfile[]; // New for settings profiles
+  isPresentationMode: boolean;
+  userSettingsProfiles: UserSettingsProfile[]; // For saving/loading custom combinations of settings
 }
 
 // Updated script segment parsing type
@@ -75,4 +76,3 @@ export interface AuthUser {
   photoURL?: string | null;
   isEmailVerified: boolean; // Ensured this is not optional
 }
-

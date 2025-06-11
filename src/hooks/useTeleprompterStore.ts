@@ -12,8 +12,7 @@ import {
   deleteUserScript as deleteUserScriptFromFirestore,
   saveUserScriptVersion as saveUserScriptVersionToFirestore,
 } from '@/firebase/firestoreService';
-import { auth } from '@/firebase/config';
-import { toast } from "@/hooks/use-toast"; // Import toast
+import { toast } from "@/hooks/use-toast";
 
 const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
@@ -29,7 +28,7 @@ const INITIAL_IS_MIRRORED = false;
 const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 const INITIAL_COUNTDOWN_ENABLED = false;
 const INITIAL_COUNTDOWN_DURATION = 3; // seconds
-const INITIAL_HORIZONTAL_PADDING = 3; // 3% DEFAULT AS PER USER REQUEST
+const INITIAL_HORIZONTAL_PADDING = 3; // percentage
 const INITIAL_ENABLE_HIGH_CONTRAST = false;
 
 const SERVER_DEFAULT_DARK_MODE = true;
@@ -55,8 +54,9 @@ To get started, you can:
     *   Change the focus line style (line or shaded paragraph) and its vertical position.
     *   Use "Mirror Mode" for physical teleprompter hardware.
     *   Toggle themes: Light, Dark, and High-Contrast.
-    *   Set up a countdown timer before playback.
-    *   Save your favorite setting combinations as "Settings Profiles".
+    *   Set up a countdown timer before playback (e.g., 3-2-1).
+    *   Adjust horizontal text padding to narrow or widen the script column.
+    *   Apply predefined "Layout Presets" or save your favorite setting combinations as "Settings Profiles".
 
 **Understanding Formatting & Cues:**
 
@@ -100,7 +100,9 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       fontFamily: INITIAL_FONT_FAMILY,
       scrollSpeed: INITIAL_SCROLL_SPEED,
       focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
-      horizontalPadding: INITIAL_HORIZONTAL_PADDING, // UPDATED DEFAULT
+      horizontalPadding: INITIAL_HORIZONTAL_PADDING,
+      countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
+      countdownDuration: INITIAL_COUNTDOWN_DURATION,
     }
   },
   {
@@ -113,6 +115,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       scrollSpeed: 25,
       focusLineStyle: 'line',
       horizontalPadding: 5,
+      countdownEnabled: true,
+      countdownDuration: 5,
     }
   },
   {
@@ -125,6 +129,7 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       scrollSpeed: 35,
       focusLineStyle: 'shadedParagraph',
       horizontalPadding: 10,
+      countdownEnabled: false,
     }
   },
   {
@@ -137,6 +142,8 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       scrollSpeed: 40,
       focusLineStyle: 'line',
       horizontalPadding: 0,
+      countdownEnabled: true,
+      countdownDuration: 2,
     }
   }
 ];
@@ -534,8 +541,8 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         setFontFamily: (font) => set({ fontFamily: font, activeLayoutPresetName: null }),
         setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)), activeLayoutPresetName: null }),
         setFocusLineStyle: (style) => set({ focusLineStyle: style, activeLayoutPresetName: null }),
-        setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled }),
-        setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(60, duration)) }),
+        setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled, activeLayoutPresetName: null }),
+        setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(60, duration)), activeLayoutPresetName: null }),
         setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }),
         setEnableHighContrast: (enabled) => set({ enableHighContrast: enabled }),
         setIsPresentationMode: (enabled) => set({ isPresentationMode: enabled }),
@@ -543,7 +550,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
           if (preset?.settings) { 
-            const { fontSize, lineHeight, focusLinePercentage, fontFamily, scrollSpeed, focusLineStyle, horizontalPadding } = preset.settings;
+            const { fontSize, lineHeight, focusLinePercentage, fontFamily, scrollSpeed, focusLineStyle, horizontalPadding, countdownEnabled, countdownDuration } = preset.settings;
             set(state => ({ 
               ...state, 
               fontSize: fontSize ?? state.fontSize,
@@ -553,6 +560,8 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
               scrollSpeed: scrollSpeed ?? state.scrollSpeed,
               focusLineStyle: focusLineStyle ?? state.focusLineStyle,
               horizontalPadding: horizontalPadding ?? state.horizontalPadding,
+              countdownEnabled: countdownEnabled ?? state.countdownEnabled,
+              countdownDuration: countdownDuration ?? state.countdownDuration,
               activeLayoutPresetName: presetName 
             }));
             toast({title: "Layout Preset Applied", description: `"${presetName}" preset has been applied.`, variant: "default"});
@@ -571,8 +580,8 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             fontFamily: defaultSettings.fontFamily ?? INITIAL_FONT_FAMILY,
             focusLinePercentage: defaultSettings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
             focusLineStyle: defaultSettings.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE,
-            countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
-            countdownDuration: INITIAL_COUNTDOWN_DURATION,
+            countdownEnabled: defaultSettings.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED,
+            countdownDuration: defaultSettings.countdownDuration ?? INITIAL_COUNTDOWN_DURATION,
             horizontalPadding: defaultSettings.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
@@ -696,12 +705,3 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
     }
   )
 );
-
-// Remove the redundant onAuthStateChanged listener from here. AuthContext handles this.
-// const unsub = useTeleprompterStore.subscribe(
-//   (currentState) => {
-//     if (!currentState.currentUserId && currentState.scripts.length === 0 && currentState.activeScriptName === null && currentState.scriptText !== currentState.LONGER_DEFAULT_SCRIPT_TEXT) {
-//         useTeleprompterStore.setState({ scriptText: currentState.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
-//     }
-//   }
-// );

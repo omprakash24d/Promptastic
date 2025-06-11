@@ -6,7 +6,7 @@ import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2 } from 'lucide-react';
+import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2, Timer, ClockIcon, SlidersHorizontalIcon } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
 import { ShareButtons } from '@/components/promptastic/ShareButtons';
@@ -43,7 +43,7 @@ export default function HowToUsePage() {
                 <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="teleprompter-view-heading">
                   <li><strong>Smooth Scrolling:</strong> The script scrolls automatically at an adjustable speed.</li>
                   <li><strong>Playback Controls:</strong> Use the <Play className="inline h-4 w-4"/> Play/Pause, <RotateCcw className="inline h-4 w-4"/> Reset, and other controls in the footer of the main teleprompter page.</li>
-                  <li><strong>Keyboard Control:</strong> Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code> to toggle play/pause when not focused on an input field.</li>
+                  <li><strong>Countdown Timer:</strong> Optionally enable a countdown (1-60 seconds) in Settings to give you a moment to prepare before scrolling begins.</li>
                   <li><strong>Manual Scroll & Jump:</strong> When paused, you can manually scroll. Clicking on a paragraph while paused will set it as the new starting point for playback.</li>
                   <li><strong>Rich Text & Cues:</strong>
                     The teleprompter supports basic formatting like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">**bold**</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">*italic*</code>, and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">_underline_</code>.
@@ -54,7 +54,8 @@ export default function HowToUsePage() {
                 <h4 id="script-management-heading" className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
                 <p>Access the Script Manager by clicking the "Scripts" (<FileText className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
                 <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="script-management-heading">
-                  <li><strong>Create & Edit:</strong> Type or paste your script directly into the editor. The estimated reading time is shown.</li>
+                  <li><strong>Create & Edit:</strong> Type or paste your script directly into the editor.</li>
+                  <li><strong>Estimated Reading Time:</strong> An estimated reading time (<ClockIcon className="inline h-4 w-4"/>) is shown in the Script Editor to help you gauge script length.</li>
                   <li><strong>Save Scripts:</strong> Save your work with a unique name. If you are logged in, scripts sync to the cloud (Firebase Firestore); otherwise, they are saved in your browser's local storage.</li>
                   <li><strong>Load Scripts:</strong> Select a script from the "Saved Scripts" list to load it into the teleprompter.</li>
                   <li><strong>Organize:</strong> Rename, duplicate, or delete scripts as needed.</li>
@@ -67,12 +68,12 @@ export default function HowToUsePage() {
                     <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage or synced with Firestore if logged in.</p>
                 </div>
 
-                <h4 id="settings-panel-heading" className="font-medium flex items-center pt-2"><Settings className="mr-2 h-5 w-5"/>Settings Panel</h4>
+                <h4 id="settings-panel-heading" className="font-medium flex items-center pt-2"><SlidersHorizontalIcon className="mr-2 h-5 w-5"/>Settings Panel</h4>
                 <p>Access Teleprompter Settings by clicking the "Settings" (<Settings className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
                  <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="settings-panel-heading">
                     <li><strong>Appearance:</strong> Customize font size, line spacing, font family (including Atkinson Hyperlegible for readability), text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, and themes (Light/Dark/High-Contrast).</li>
-                    <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (duration 1-60s).</li>
-                    <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets or save/load your custom combinations of settings as named profiles for different scenarios.</li>
+                    <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (<Timer className="inline h-4 w-4"/> enable/disable, duration 1-60s).</li>
+                    <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets (e.g., "Default", "Studio Recording") or save/load your custom combinations of settings as named profiles for different scenarios.</li>
                     <li><strong>General:</strong> Reset core settings to their "Default" preset values.</li>
                  </ul>
 
@@ -93,6 +94,7 @@ export default function HowToUsePage() {
                 <h3 id="keyboard-shortcuts-heading" className="text-lg font-semibold mb-2 flex items-center"><Palette className="mr-2 h-5 w-5 text-primary"/>Keyboard Shortcuts</h3>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling (when not focused on an input field).</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">R</code>: Reset scroll to the beginning (when not focused on an input field).</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen mode.</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script (when Script Manager is open and focused on the script editor).</li>
                 </ul>
@@ -119,4 +121,3 @@ export default function HowToUsePage() {
     </div>
   );
 }
-

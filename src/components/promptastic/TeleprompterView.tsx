@@ -375,7 +375,7 @@ export function TeleprompterView() {
       const timer = setTimeout(performSyncAndHighlight, 250); 
       return () => clearTimeout(timer);
     }
-  }, [scriptText, fontFamily, fontSize, lineHeight, focusLinePercentage, currentScrollPositionFromStore, checkHighlightedParagraph, isMounted, isPlaying]);
+  }, [scriptText, fontFamily, fontSize, lineHeight, focusLinePercentage, currentScrollPositionFromStore, checkHighlightedParagraph, isMounted, isPlaying, horizontalPadding]);
   
 
   const handleParagraphClick = useCallback((paragraphIndex: number) => {
@@ -588,4 +588,3 @@ export function TeleprompterView() {
     </div>
   );
 }
-
