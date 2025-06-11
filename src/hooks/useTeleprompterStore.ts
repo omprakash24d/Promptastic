@@ -11,19 +11,20 @@ const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
 
 // Default text colors for different modes
-const INITIAL_TEXT_COLOR_LIGHT_MODE = 'hsl(0 0% 0%)'; // Black HSL
-const INITIAL_TEXT_COLOR_DARK_MODE = 'hsl(0 0% 100%)'; // White HSL
-const BLACK_HEX = '#000000'; // Black Hex
-const WHITE_HEX = '#ffffff'; // White Hex
+const INITIAL_TEXT_COLOR_LIGHT_MODE_HSL = 'hsl(0 0% 0%)'; // Black HSL
+const INITIAL_TEXT_COLOR_DARK_MODE_HSL = 'hsl(0 0% 100%)'; // White HSL
+const BLACK_HEX = '#000000';
+const WHITE_HEX = '#ffffff';
+const BLACK_RGB = 'rgb(0,0,0)';
+const WHITE_RGB = 'rgb(255,255,255)';
 
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
-// SSR-safe defaults for initial store state before hydration from localStorage
-const SERVER_DEFAULT_DARK_MODE = true; // App defaults to dark mode on first load / SSR
-// SERVER_DEFAULT_TEXT_COLOR is the text color that the app's initial state (pre-hydration) will have.
-// Since SERVER_DEFAULT_DARK_MODE is true (dark mode), the corresponding text color is white.
-const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE;
+// Default app theme is dark mode.
+const SERVER_DEFAULT_DARK_MODE = true; 
+// Corresponding text color for default dark mode.
+const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
 
 interface TeleprompterState extends TeleprompterSettings {
@@ -59,18 +60,23 @@ interface TeleprompterState extends TeleprompterSettings {
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => {
-      // Helper to check if a color is effectively black (HSL or Hex)
+      // Helper to check if a color is effectively black (HSL, Hex, or RGB)
+      // Normalizes by removing spaces for rgb formats e.g. "rgb(0, 0, 0)" -> "rgb(0,0,0)"
       const isEffectivelyBlack = (color: string | undefined | null): boolean => {
         if (!color) return false;
-        const c = color.toLowerCase();
-        return c === INITIAL_TEXT_COLOR_LIGHT_MODE.toLowerCase() || c === BLACK_HEX.toLowerCase();
+        const c = color.toLowerCase().replace(/\s/g, '');
+        return c === INITIAL_TEXT_COLOR_LIGHT_MODE_HSL.toLowerCase() || 
+               c === BLACK_HEX.toLowerCase() ||
+               c === BLACK_RGB;
       };
       
-      // Helper to check if a color is effectively white (HSL or Hex)
+      // Helper to check if a color is effectively white (HSL, Hex, or RGB)
       const isEffectivelyWhite = (color: string | undefined | null): boolean => {
         if (!color) return false;
-        const c = color.toLowerCase();
-        return c === INITIAL_TEXT_COLOR_DARK_MODE.toLowerCase() || c === WHITE_HEX.toLowerCase();
+        const c = color.toLowerCase().replace(/\s/g, '');
+        return c === INITIAL_TEXT_COLOR_DARK_MODE_HSL.toLowerCase() || 
+               c === WHITE_HEX.toLowerCase() ||
+               c === WHITE_RGB;
       };
 
       return {
@@ -132,32 +138,23 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
         
         setDarkMode: (newDarkModeValue) => {
-          const currentTextColor = get().textColor; // Get current text color
-          let newFinalTextColor = currentTextColor; // Assume it stays the same by default
-
-          // Check if the current color is one of the known "default" colors (black or white in HSL/HEX)
-          // We convert to lowercase for case-insensitive comparison, especially for HEX.
-          const isCurrentColorDefaultBlack = isEffectivelyBlack(currentTextColor);
-          const isCurrentColorDefaultWhite = isEffectivelyWhite(currentTextColor);
-          const isCustomColor = !isCurrentColorDefaultBlack && !isCurrentColorDefaultWhite;
-
-          // If the color is NOT a custom color (i.e., it's one of our defaults)
-          if (!isCustomColor) {
-            if (newDarkModeValue) { // Switching to Dark Mode
-              newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE; // Enforce white text
-            } else { // Switching to Light Mode
-              newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE; // Enforce black text
-            }
+          // This simplified logic ensures text color is always white in dark mode and black in light mode
+          // when the theme is toggled, prioritizing visibility.
+          let newFinalTextColor;
+          if (newDarkModeValue) { // Switching to Dark Mode
+            newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE_HSL; // Always set to white
+          } else { // Switching to Light Mode
+            newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE_HSL; // Always set to black
           }
-          // If it IS a custom color, newFinalTextColor remains as currentTextColor, preserving the user's choice.
-          
           set({ 
             darkMode: newDarkModeValue,
-            textColor: newFinalTextColor
+            textColor: newFinalTextColor 
           });
         },
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
-        // When user explicitly sets a text color via the color picker, it's considered custom.
+        // When user explicitly sets a text color via the color picker,
+        // it's considered custom for the current mode.
+        // The setDarkMode action will reset it if the theme changes.
         setTextColor: (color) => set({ textColor: color }), 
         setFontFamily: (font) => set({ fontFamily: font }),
 
@@ -184,12 +181,9 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isMirrored: state.isMirrored,
         darkMode: state.darkMode,
         isAutoSyncEnabled: state.isAutoSyncEnabled,
-        textColor: state.textColor, // Persist custom text color
+        textColor: state.textColor,
         fontFamily: state.fontFamily,
-        // scriptText is intentionally not persisted here to avoid large localStorage items by default
-        // currentScrollPosition and isPlaying are runtime states, not typically persisted
       }),
     }
   )
 );
-
