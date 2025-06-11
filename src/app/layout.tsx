@@ -7,6 +7,8 @@ import { ThemeManager } from '@/components/layout/ThemeManager';
 
 const APP_NAME = 'Promptastic!';
 const APP_DESCRIPTION = 'Promptastic! is a modern, feature-rich teleprompter application designed for presenters and content creators. Manage scripts, customize display, and use AI-powered enhancements.';
+// APP_URL is still useful for canonical URLs or absolute URLs if needed elsewhere,
+// but for assets served by Next.js, relative paths are preferred.
 const APP_URL = 'https://prompt.indhinditech.com/';
 
 export const metadata: Metadata = {
@@ -17,7 +19,7 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   keywords: ['teleprompter', 'Next.js', 'React', 'presentation tool', 'script management', 'public speaking', 'content creation', 'AI teleprompter'],
-  manifest: '/site.webmanifest',
+  manifest: '/site.webmanifest', // Relative path
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -29,15 +31,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: APP_NAME,
-    title: { // OG title can also use the template or a default
+    title: {
         default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
         template: `%s | ${APP_NAME}`,
     },
     description: APP_DESCRIPTION,
-    url: APP_URL,
+    url: APP_URL, // Canonical URL can remain absolute
     images: [
       {
-        url: `${APP_URL}og-image.png`,
+        url: '/og-image.png', // Relative path
         width: 1200,
         height: 630,
         alt: 'Promptastic! Teleprompter Application Interface',
@@ -46,27 +48,27 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: { // Twitter title can also use the template or a default
+    title: {
         default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
         template: `%s | ${APP_NAME}`,
     },
     description: APP_DESCRIPTION,
-    images: [`${APP_URL}twitter-image.png`],
+    images: ['/twitter-image.png'], // Relative path
   },
   icons: {
     icon: [
-      { url: '/favicon.ico', type: 'image/x-icon', sizes: 'any' },
-      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
-      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+      { url: '/favicon.ico', type: 'image/x-icon', sizes: 'any' }, // Relative path
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' }, // Relative path
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' }, // Relative path
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' } // Relative path
     ],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#5DADE2',
+  themeColor: '#5DADE2', // This should match a color in your theme
 };
 
 
