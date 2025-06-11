@@ -103,19 +103,6 @@ export default function ContactUsPage() {
 
     setIsLoading(true);
 
-    if (!GOOGLE_FORM_ACTION_URL || GOOGLE_FORM_ACTION_URL === "YOUR_GOOGLE_FORM_ACTION_URL_HERE" || Object.values(GOOGLE_FORM_FIELD_IDS).some(id => id.startsWith("entry.X") || id.startsWith("entry.Y") || id.startsWith("entry.Z") || id.startsWith("entry.A"))) {
-      toast({
-        title: "Developer Note: Google Form Not Configured",
-        description: "The contact form is not yet configured to send emails. Please update GOOGLE_FORM_ACTION_URL and GOOGLE_FORM_FIELD_IDS in src/app/contact-us/page.tsx with your Google Form details.",
-        variant: "destructive",
-        duration: 15000,
-      });
-      console.warn("Contact form submission attempted, but Google Form details are not configured in the code.");
-      console.log("Form Data (would be sent to Google Form):", formData);
-      setIsLoading(false);
-      return;
-    }
-
     const dataToSubmit = new URLSearchParams();
     dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.name, formData.name);
     dataToSubmit.append(GOOGLE_FORM_FIELD_IDS.email, formData.email);
@@ -125,7 +112,7 @@ export default function ContactUsPage() {
     try {
       await fetch(GOOGLE_FORM_ACTION_URL, {
         method: 'POST',
-        mode: 'no-cors',
+        mode: 'no-cors', // Important for submitting to Google Forms to avoid CORS errors
         body: dataToSubmit,
       });
 
@@ -288,3 +275,4 @@ export default function ContactUsPage() {
     </div>
   );
 }
+
