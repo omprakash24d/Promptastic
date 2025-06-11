@@ -35,7 +35,7 @@ export interface TeleprompterSettings {
 
 export interface LayoutPreset {
   name: string;
-  settings: Partial<Pick<TeleprompterSettings, 'fontSize' | 'lineHeight' | 'focusLinePercentage' | 'fontFamily' | 'scrollSpeed'>>;
+  settings: Partial<Pick<TeleprompterSettings, 'fontSize' | 'lineHeight' | 'focusLinePercentage' | 'fontFamily' | 'scrollSpeed' | 'focusLineStyle' | 'horizontalPadding' >>;
 }
 
 export interface UserSettingsProfile {
@@ -64,3 +64,12 @@ export interface ParsedSegment {
   originalMarker?: string; // For cues like //PAUSE//
 }
 
+// User type for Authentication
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  phoneNumber?: string | null;
+  photoURL?: string | null;
+  // Add other Firebase user properties as needed
+}

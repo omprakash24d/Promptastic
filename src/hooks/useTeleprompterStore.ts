@@ -112,12 +112,13 @@ interface TeleprompterStateStore extends TeleprompterSettings {
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
   loadScript: (name: string) => void;
-  saveScript: (name: string, content?: string) => void;
-  deleteScript: (name: string) => void;
-  renameScript: (oldName: string, newName: string) => void;
-  duplicateScript: (name: string) => string | null; // Returns new name or null
-  saveScriptVersion: (scriptName: string, notes?: string) => void;
-  loadScriptVersion: (scriptName: string, versionId: string) => void;
+  saveScript: (name: string, content?: string) => void; // TODO: Modify for Firestore if user logged in
+  deleteScript: (name: string) => void; // TODO: Modify for Firestore
+  renameScript: (oldName: string, newName: string) => void; // TODO: Modify for Firestore
+  duplicateScript: (name: string) => string | null; // TODO: Modify for Firestore
+  saveScriptVersion: (scriptName: string, notes?: string) => void; // TODO: Modify for Firestore
+  loadScriptVersion: (scriptName: string, versionId: string) => void; // TODO: Modify for Firestore
+  // TODO: Add fetchUserScripts action to load scripts from Firestore on login
 
   setFontSize: (size: number) => void;
   setScrollSpeed: (speed: number) => void;
@@ -193,7 +194,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
         focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
         countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
-        countdownDuration: INITIAL_COUNTDOWN_DURATION,
+        countdownDuration: INITIAL_COUNTDOWN_DURATION, // Max 60 in setter
         horizontalPadding: INITIAL_HORIZONTAL_PADDING,
         
         isPlaying: false,
@@ -203,13 +204,21 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         setScriptText: (text) => set({ scriptText: text, activeScriptName: null, currentScrollPosition: 0 }),
         setActiveScriptName: (name) => set({ activeScriptName: name }),
         
+        // TODO: When Firebase auth is integrated, these script functions will need to:
+        // 1. Check if a user is logged in.
+        // 2. If logged in, interact with Firestore (e.g., call functions from `src/firebase/firestore.ts`).
+        // 3. If not logged in, (optionally) fall back to local storage or disable the functionality.
+        // For now, they continue to use local storage-backed state.
+
         loadScript: (name) => {
+          // TODO: If logged in, attempt to load from user's Firestore scripts first.
           const script = get().scripts.find(s => s.name === name);
           if (script) {
             set({ scriptText: script.content, activeScriptName: name, currentScrollPosition: 0 });
           }
         },
         saveScript: (name, content) => {
+          // TODO: If logged in, save to user's Firestore scripts.
           const scriptContent = content ?? get().scriptText;
           const now = Date.now();
           let scripts = get().scripts;
@@ -223,17 +232,20 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           set({ scripts: [...scripts], activeScriptName: name, scriptText: scriptContent });
         },
         deleteScript: (name) => {
+          // TODO: If logged in, delete from user's Firestore scripts.
           set(state => ({
             scripts: state.scripts.filter(s => s.name !== name),
           }));
         },
         renameScript: (oldName, newName) => {
+          // TODO: If logged in, rename in user's Firestore scripts.
           set(state => ({
             scripts: state.scripts.map(s => s.name === oldName ? { ...s, name: newName } : s),
             activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
           }));
         },
         duplicateScript: (name) => {
+          // TODO: If logged in, duplicate in user's Firestore scripts.
           const originalScript = get().scripts.find(s => s.name === name);
           if (!originalScript) return null;
 
@@ -247,7 +259,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           
           const now = Date.now();
           const duplicatedScript: Script = {
-            ...originalScript, // copies content and versions
+            ...originalScript, 
             name: newName,
             createdAt: now,
             updatedAt: now,
@@ -255,13 +267,14 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
 
           set(state => ({
             scripts: [...state.scripts, duplicatedScript],
-            activeScriptName: newName, // Make the new script active
-            scriptText: duplicatedScript.content, // Load its content into editor
+            activeScriptName: newName, 
+            scriptText: duplicatedScript.content, 
             currentScrollPosition: 0,
           }));
           return newName;
         },
         saveScriptVersion: (scriptName, notes) => {
+          // TODO: If logged in, save version to Firestore script.
           const script = get().scripts.find(s => s.name === scriptName);
           if (script) {
             const currentContent = (get().activeScriptName === scriptName) ? get().scriptText : script.content;
@@ -278,6 +291,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           }
         },
         loadScriptVersion: (scriptName, versionId) => {
+          // TODO: If logged in, load version from Firestore script.
           const script = get().scripts.find(s => s.name === scriptName);
           const version = script?.versions.find(v => v.versionId === versionId);
           if (script && version) {
@@ -292,7 +306,8 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         setDarkMode: (newDarkModeValue) => {
           set({
             darkMode: newDarkModeValue,
-            textColor: newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
+            // Text color is now primarily handled by CSS variables and high contrast mode
+            // textColor: newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
           });
         },
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
@@ -308,7 +323,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
-          if (preset?.settings) { // Check if preset.settings is defined
+          if (preset?.settings) { 
             const { fontSize, lineHeight, focusLinePercentage, fontFamily, scrollSpeed, focusLineStyle, horizontalPadding } = preset.settings;
             set(state => ({ 
               ...state, 
@@ -325,7 +340,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         },
 
         resetSettingsToDefaults: () => {
-          const currentDarkMode = get().darkMode;
+          // const currentDarkMode = get().darkMode; // Dark mode itself is not reset by this
           const defaultPreset = get().layoutPresets.find(p => p.name === "Default");
           const defaultSettings = defaultPreset?.settings ?? {};
           set({
@@ -334,7 +349,8 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             lineHeight: defaultSettings.lineHeight ?? INITIAL_LINE_HEIGHT,
             isMirrored: INITIAL_IS_MIRRORED,
             isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
-            textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
+            // textColor is primarily theme-driven now
+            // textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
             fontFamily: defaultSettings.fontFamily ?? INITIAL_FONT_FAMILY,
             focusLinePercentage: defaultSettings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
             focusLineStyle: defaultSettings.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE,
@@ -402,14 +418,14 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
       }
     },
     {
-      name: 'promptastic-store',
+      name: 'promptastic-store', // Local storage key
       storage: createJSONStorage(() => ({
         getItem: (name) => JSON.stringify(loadFromLocalStorage(name, {})),
         setItem: (name, value) => saveToLocalStorage(name, JSON.parse(value)),
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
-        scripts: state.scripts,
+        scripts: state.scripts, // Scripts will be managed by Firestore for logged-in users
         activeScriptName: state.activeScriptName,
         fontSize: state.fontSize,
         scrollSpeed: state.scrollSpeed,
@@ -428,12 +444,9 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         horizontalPadding: state.horizontalPadding,
         enableHighContrast: state.enableHighContrast,
         userSettingsProfiles: state.userSettingsProfiles,
-        // scriptText is intentionally not persisted here to avoid large local storage entries if not careful.
-        // It's reloaded from activeScriptName or default on app load.
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Ensure default values for potentially new settings if loading older persisted state
           state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
           state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
@@ -443,13 +456,13 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
           state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
           state.userSettingsProfiles = state.userSettingsProfiles ?? [];
+          state.textColor = state.textColor ?? (state.darkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL);
         }
       }
     }
   )
 );
 
-// Initialize with default script if no scripts are loaded
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
     const currentStore = useTeleprompterStore.getState();
@@ -459,3 +472,11 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
+
+// TODO for user:
+// 1. Create `src/firebase/config.ts` with your Firebase project configuration and export `auth` and `db` (Firestore instance).
+// 2. Implement actual Firebase calls in `src/contexts/AuthContext.tsx` replacing placeholders.
+// 3. Create `src/firebase/firestore.ts` for script CRUD operations.
+// 4. Update `useTeleprompterStore` script actions to call Firestore functions when a user is logged in.
+// 5. Set up Firestore security rules.
+// 6. For Phone Auth, implement RecaptchaVerifier.
