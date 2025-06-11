@@ -1,23 +1,41 @@
+
 "use client";
 
 import type React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2 } from 'lucide-react';
+import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
 }
 
+interface FileTypeOption {
+  label: string;
+  accept: string;
+  icon: React.ElementType;
+  handler: (file: File) => Promise<string | null>;
+}
 
 export function ScriptManager() {
   const { toast } = useToast();
@@ -33,34 +51,92 @@ export function ScriptManager() {
   const [renamingScript, setRenamingScript] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
 
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
+    setIsDirty(false); 
   }, [scriptText]);
-  
 
-  const handleSave = () => {
-    if (!newScriptName.trim() && !activeScriptName) {
-      toast({ title: "Error", description: "Please enter a name for the new script.", variant: "destructive" });
-      return;
+  useEffect(() => {
+    if (currentEditingScriptText !== scriptText) {
+      setIsDirty(true);
+    } else {
+      setIsDirty(false);
     }
+  }, [currentEditingScriptText, scriptText]);
+
+  const handleConfirmDiscard = () => {
+    if (pendingAction) {
+      pendingAction();
+    }
+    setShowConfirmDialog(false);
+    setPendingAction(null);
+    setIsDirty(false);
+  };
+
+  const handleCancelDiscard = () => {
+    setShowConfirmDialog(false);
+    setPendingAction(null);
+  };
+
+  const executeOrConfirm = (action: () => void) => {
+    if (isDirty) {
+      setPendingAction(() => action);
+      setShowConfirmDialog(true);
+    } else {
+      action();
+    }
+  };
+  
+  const handleSave = useCallback(() => {
     const nameToSave = activeScriptName || newScriptName.trim();
     if (!nameToSave) {
-       toast({ title: "Error", description: "Script name cannot be empty.", variant: "destructive" });
-       return;
+      toast({ title: "Error", description: "Script name cannot be empty.", variant: "destructive" });
+      return;
     }
+     if (!currentEditingScriptText.trim()) {
+      toast({ title: "Error", description: "Cannot save an empty script.", variant: "destructive" });
+      return;
+    }
+
+    if (!activeScriptName && scripts.some(s => s.name === nameToSave)) {
+      toast({ title: "Error", description: `A script named "${nameToSave}" already exists. Please choose a different name.`, variant: "destructive" });
+      return;
+    }
+
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
     if (!activeScriptName) setNewScriptName(""); 
-  };
+    setIsDirty(false);
+  }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+        event.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSave]);
+
 
   const handleLoad = (name: string) => {
-    loadScript(name); 
-    toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
+     executeOrConfirm(() => {
+        loadScript(name); 
+        toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
+     });
   };
 
   const handleDelete = (name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
+    if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
       const wasActive = activeScriptName === name;
       const remainingScripts = scripts.filter(s => s.name !== name); 
       deleteScript(name);
@@ -70,7 +146,7 @@ export function ScriptManager() {
         if (remainingScripts.length > 0) { 
             const newActiveScript = remainingScripts[0];
             if (newActiveScript) {
-                loadScript(newActiveScript.name);
+                loadScript(newActiveScript.name); 
             }
         } else {
              setScriptText(""); 
@@ -78,6 +154,7 @@ export function ScriptManager() {
              setActiveScriptName(null);
         }
       }
+       setIsDirty(false); // Ensure dirty flag is reset if active script was deleted
     }
   };
 
@@ -85,6 +162,11 @@ export function ScriptManager() {
     if (!renameValue.trim()) {
       toast({ title: "Error", description: "New name cannot be empty.", variant: "destructive" });
       return;
+    }
+    if (renameValue.trim() === name) {
+        setRenamingScript(null);
+        setRenameValue("");
+        return; 
     }
     if (scripts.some(s => s.name === renameValue.trim() && s.name !== name)) {
       toast({ title: "Error", description: `A script named "${renameValue.trim()}" already exists.`, variant: "destructive" });
@@ -97,11 +179,13 @@ export function ScriptManager() {
   };
 
   const handleNewScript = () => {
-    setActiveScriptName(null); 
-    setScriptText(""); 
-    setCurrentEditingScriptText(""); 
-    setNewScriptName("");
-    toast({ title: "New Script", description: "Ready for your new script."});
+    executeOrConfirm(() => {
+        setActiveScriptName(null); 
+        setScriptText(""); 
+        setCurrentEditingScriptText(""); 
+        setNewScriptName("");
+        toast({ title: "New Script", description: "Ready for your new script."});
+    });
   };
   
   const handleExportTxt = () => {
@@ -130,41 +214,71 @@ export function ScriptManager() {
 
   const processFileContent = (content: string, fileName: string) => {
     setActiveScriptName(null);
-    setScriptText(content); // This will update the store's scriptText
-    // setCurrentEditingScriptText(content); // This will be handled by useEffect on scriptText
+    setScriptText(content);
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
     setNewScriptName(fileNameWithoutExtension);
-    toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it.` });
+    toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
+    setIsDirty(true); // Imported content is considered an unsaved change
   };
+
+  const fileTypes: FileTypeOption[] = [
+    { 
+      label: "Import .txt", 
+      accept: ".txt", 
+      icon: FileUp,
+      handler: async (file) => file.text(),
+    },
+    { 
+      label: "Import .pdf", 
+      accept: ".pdf", 
+      icon: FileCode2,
+      handler: async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await getDocument({data: arrayBuffer}).promise;
+        let textContent = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const text = await page.getTextContent();
+          textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
+        }
+        return textContent;
+      } 
+    },
+    { 
+      label: "Import .docx", 
+      accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+      icon: FileText,
+      handler: async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+      }
+    },
+  ];
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const fileName = file.name;
-      try {
-        if (file.type === "text/plain") {
-          const content = await file.text();
-          processFileContent(content, fileName);
-        } else if (file.type === "application/pdf") {
-          const arrayBuffer = await file.arrayBuffer();
-          const pdf = await getDocument({data: arrayBuffer}).promise;
-          let textContent = "";
-          for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const text = await page.getTextContent();
-            textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
+      const fileExtension = "." + fileName.split('.').pop()?.toLowerCase();
+      const selectedType = fileTypes.find(ft => ft.accept.includes(fileExtension) || ft.accept.includes(file.type));
+
+      if (selectedType) {
+        executeOrConfirm(async () => {
+          try {
+            const content = await selectedType.handler(file);
+            if (content !== null) {
+              processFileContent(content, fileName);
+            } else {
+              toast({ title: "Import Error", description: `Could not extract text from "${fileName}". File might be empty or corrupted.`, variant: "destructive" });
+            }
+          } catch (error) {
+            console.error("Error importing file:", error);
+            toast({ title: "Import Error", description: `Could not read file "${fileName}". ${error instanceof Error ? error.message : "Unknown error."}`, variant: "destructive" });
           }
-          processFileContent(textContent, fileName);
-        } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.name.endsWith(".docx")) {
-           const arrayBuffer = await file.arrayBuffer();
-           const result = await mammoth.extractRawText({ arrayBuffer });
-           processFileContent(result.value, fileName);
-        } else {
-          toast({ title: "Import Error", description: "Unsupported file type. Please select .txt, .pdf, or .docx.", variant: "destructive" });
-        }
-      } catch (error) {
-        console.error("Error importing file:", error);
-        toast({ title: "Import Error", description: "Could not read file content. " + (error instanceof Error ? error.message : ""), variant: "destructive" });
+        });
+      } else {
+        toast({ title: "Import Error", description: "Unsupported file type. Please select .txt, .pdf, or .docx.", variant: "destructive" });
       }
       if (event.target) event.target.value = ""; 
     }
@@ -172,10 +286,33 @@ export function ScriptManager() {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
+              Unsaved Changes
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes. Do you want to discard them and continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelDiscard}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDiscard} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">
-            {activeScriptName ? `Editing: ${activeScriptName}` : "New/Imported Script"}
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>
+              {activeScriptName ? `Editing: ${activeScriptName}` : "New/Imported Script"}
+            </span>
+            {isDirty && <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">(Unsaved changes)</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -210,15 +347,11 @@ export function ScriptManager() {
              <Button onClick={handleExportTxt} variant="outline" className="flex-grow sm:flex-grow-0">
               <Download className="mr-2 h-4 w-4" /> Export .txt
             </Button>
-            <Button onClick={() => triggerFileInput('.txt')} variant="outline" className="flex-grow sm:flex-grow-0">
-              <FileUp className="mr-2 h-4 w-4" /> Import .txt
-            </Button>
-            <Button onClick={() => triggerFileInput('.pdf')} variant="outline" className="flex-grow sm:flex-grow-0">
-              <FileCode2 className="mr-2 h-4 w-4" /> Import .pdf
-            </Button>
-            <Button onClick={() => triggerFileInput('.docx')} variant="outline" className="flex-grow sm:flex-grow-0">
-              <FileText className="mr-2 h-4 w-4" /> Import .docx
-            </Button>
+            {fileTypes.map(ft => (
+              <Button key={ft.label} onClick={() => triggerFileInput(ft.accept)} variant="outline" className="flex-grow sm:flex-grow-0">
+                <ft.icon className="mr-2 h-4 w-4" /> {ft.label.replace("Import ", "")}
+              </Button>
+            ))}
         </CardFooter>
       </Card>
       
@@ -227,6 +360,7 @@ export function ScriptManager() {
         ref={fileInputRef}
         onChange={handleFileImport}
         className="hidden"
+        // `accept` will be set dynamically by triggerFileInput
       />
 
       {scripts.length > 0 && (
@@ -240,31 +374,34 @@ export function ScriptManager() {
                 {scripts.map((script) => (
                   <li key={script.name} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-sm">
                     {renamingScript === script.name ? (
-                      <div className="flex-grow flex items-center gap-2">
+                      <div className="flex-grow flex items-center gap-2 min-w-0"> {/* Added min-w-0 here */}
                         <Input
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
-                          className="h-8 bg-background text-sm"
+                          className="h-8 bg-background text-sm flex-1 min-w-0" // Added flex-1 and min-w-0 for input
                           autoFocus
-                          onKeyDown={(e) => e.key === 'Enter' && handleRename(script.name)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleRename(script.name);
+                            if (e.key === 'Escape') { setRenamingScript(null); setRenameValue("");}
+                          }}
                         />
                         <Button size="sm" onClick={() => handleRename(script.name)}>Save</Button>
-                        <Button size="sm" variant="ghost" onClick={() => setRenamingScript(null)}>Cancel</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setRenamingScript(null); setRenameValue(""); }}>Cancel</Button>
                       </div>
                     ) : (
                       <>
                         <span 
-                          className={`cursor-pointer hover:underline truncate flex-1 ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
+                          className={`cursor-pointer hover:underline truncate flex-1 min-w-0 ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
                           onClick={() => handleLoad(script.name)}
                           title={script.name}
                         >
                           {script.name}
                         </span>
-                        <div className="flex gap-0.5">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label="Rename script">
+                        <div className="flex gap-0.5 shrink-0"> {/* Added shrink-0 to button group */}
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label={`Rename script ${script.name}`}>
                             <Edit3 className="h-3.5 w-3.5" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label="Delete script">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label={`Delete script ${script.name}`}>
                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </div>
@@ -280,3 +417,4 @@ export function ScriptManager() {
     </div>
   );
 }
+
