@@ -18,8 +18,6 @@ export const metadata: Metadata = {
 };
 
 export default function ContactUsPage() {
-  const dummyOpen = () => {}; // Placeholder for Header props
-
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     // Placeholder: In a real app, you'd handle form submission here (e.g., send to an API endpoint)
@@ -30,7 +28,7 @@ export default function ContactUsPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
+      <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
           <CardHeader className="items-center">

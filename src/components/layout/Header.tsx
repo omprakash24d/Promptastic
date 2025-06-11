@@ -21,8 +21,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HeaderProps {
-  onOpenScripts: () => void;
-  onOpenSettings: () => void;
+  onOpenScripts?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const staticHelpPageItems = [
@@ -128,13 +128,17 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
           </>
         )}
         
-        {/* Scripts and Settings are always available in mobile menu */}
-        <DropdownMenuItem onClick={onOpenScripts}>
-          <FileText className="mr-2 h-4 w-4" /> Scripts
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onOpenSettings}>
-          <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings
-        </DropdownMenuItem>
+        {onOpenScripts && (
+            <DropdownMenuItem onClick={onOpenScripts}>
+                <FileText className="mr-2 h-4 w-4" /> Scripts
+            </DropdownMenuItem>
+        )}
+        {onOpenSettings && (
+            <DropdownMenuItem onClick={onOpenSettings}>
+                <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings
+            </DropdownMenuItem>
+        )}
+
 
         {user && !loading && (
              <DropdownMenuItem onClick={logout}>
@@ -191,14 +195,16 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
             </nav>
           ) : (
             <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
-              {!loading && user && (
+              {user && onOpenScripts && (
                 <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager" title="Open script manager">
                   <FileText className="mr-1 h-5 w-5" /> Scripts
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings" title="Open settings">
-                <SlidersHorizontal className="mr-1 h-5 w-5" /> Settings
-              </Button>
+              {onOpenSettings && (
+                <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings" title="Open settings">
+                    <SlidersHorizontal className="mr-1 h-5 w-5" /> Settings
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" aria-label="Open help menu" title="Open help menu">

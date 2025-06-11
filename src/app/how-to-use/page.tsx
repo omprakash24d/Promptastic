@@ -17,11 +17,9 @@ export const metadata: Metadata = {
 };
 
 export default function HowToUsePage() {
-  const dummyOpen = () => {}; 
-
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
+      <Header />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
           <CardHeader className="items-center">
