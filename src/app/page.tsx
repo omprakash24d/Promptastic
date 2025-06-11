@@ -370,7 +370,7 @@ export default function PromptasticPage() {
               <section aria-labelledby="contact-heading">
                 <h3 id="contact-heading" className="text-lg font-semibold mb-2 flex items-center"><Mail className="mr-2 h-5 w-5 text-primary"/>Contact & Support</h3>
                 <p>For support, feedback, or inquiries, please reach out:</p>
-                <p className="mt-1">Email: <a href="mailto:support@promptastic.com" className="underline hover:text-primary">support@promptastic.com</a> (Placeholder)</p>
+                <p className="mt-1">Email: <a href="mailto:support@prompt.indhinditech.com" className="underline hover:text-primary">support@prompt.indhinditech.com</a> (Placeholder)</p>
                 <p className="mt-1">Instagram: <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">@omprakash24d</a></p>
               </section>
               
@@ -379,8 +379,7 @@ export default function PromptasticPage() {
               <section aria-labelledby="privacy-policy-heading">
                 <h3 id="privacy-policy-heading" className="text-lg font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Privacy Policy</h3>
                 <p>Your privacy is important. Our Privacy Policy explains how we collect, use, and protect your information.</p>
-                <p className="mt-1"><a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Read our full Privacy Policy here.</a> (Placeholder)</p>
-                 <p className="text-xs text-muted-foreground mt-1">Note: This is a placeholder link. A real privacy policy page needs to be created.</p>
+                <p className="mt-1"><Link href="/privacy-policy" className="underline hover:text-primary">Read our full Privacy Policy here.</Link></p>
               </section>
 
               <Separator />
@@ -388,8 +387,7 @@ export default function PromptasticPage() {
               <section aria-labelledby="terms-conditions-heading">
                 <h3 id="terms-conditions-heading" className="text-lg font-semibold mb-2 flex items-center"><Gavel className="mr-2 h-5 w-5 text-primary"/>Terms & Conditions</h3>
                 <p>By using Promptastic!, you agree to our Terms and Conditions.</p>
-                <p className="mt-1"><a href="/terms-conditions" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Read our full Terms & Conditions here.</a> (Placeholder)</p>
-                <p className="text-xs text-muted-foreground mt-1">Note: This is a placeholder link. A real terms and conditions page needs to be created.</p>
+                <p className="mt-1"><Link href="/terms-conditions" className="underline hover:text-primary">Read our full Terms & Conditions here.</Link></p>
               </section>
               
               <Separator />
