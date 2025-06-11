@@ -36,44 +36,57 @@ const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
 const LONGER_DEFAULT_SCRIPT_TEXT = `Welcome to Promptastic!
-Your modern teleprompter for smooth presentations.
+Your modern, high-performance teleprompter designed to help you deliver scripts smoothly and professionally.
 
-This is a sample script to demonstrate features.
-You can manage your scripts using the "Scripts" button in the header.
+This is a sample script to guide you through Promptastic's features.
+To get started, you can:
+1.  **Manage Your Scripts**: Click the "Scripts" button in the header (or in the main menu on mobile) to open the Script Manager.
+    *   Create new scripts or edit this one.
+    *   Save your scripts (they sync to the cloud if you're logged in, or save locally otherwise).
+    *   Load existing scripts.
+    *   Import scripts from .txt, .md, .pdf, and .docx files.
+    *   Export the current script as a .txt file.
+    *   Save and load different versions of your scripts.
 //PAUSE//
-(This "//PAUSE//" cue indicates a brief pause in delivery.)
+(This "//PAUSE//" cue indicates a brief pause in delivery. The teleprompter will show a visual cue.)
 
-Customize your view using the "Settings" button.
-Adjust **font size**, *scroll speed*, _line spacing_, and more!
+2.  **Customize Your View**: Click the "Settings" button in the header (or main menu on mobile).
+    *   Adjust **font size**, *scroll speed*, _line spacing_, colors, and font family (including Atkinson Hyperlegible for high readability).
+    *   Change the focus line style (line or shaded paragraph) and its vertical position.
+    *   Use "Mirror Mode" for physical teleprompter hardware.
+    *   Toggle themes: Light, Dark, and High-Contrast.
+    *   Set up a countdown timer before playback.
+    *   Save your favorite setting combinations as "Settings Profiles".
 
-Formatting is simple:
-Use **double asterisks for bold text**.
-*Single asterisks for italic text*.
-_Underscores for underlined text_.
-You can even combine them, like ***bold and italic***.
+**Understanding Formatting & Cues:**
 
-Special Cues:
+Promptastic supports basic text formatting:
+*   Use **double asterisks for bold text**.
+*   Use *single asterisks for italic text*.
+*   Use _underscores for underlined text_.
+*   You can even combine them, like ***bold and italic text***.
+
+Special Visual Cues (these are not spoken):
 //EMPHASIZE//
-The text following this cue will be highlighted in your primary color. This helps draw attention.
+The text immediately following this cue will be highlighted (usually in your app's primary color) to draw your attention. This is great for key phrases or words you want to stress.
 
 //SLOWDOWN//
-This cue suggests you slow down your speaking pace for this section.
+This cue suggests you should reduce your speaking pace for the section that follows. Helpful for complex points or to add dramatic effect.
 
-Combine formatting with cues: **//EMPHASIZE//This is bold and emphasized!**
+Combine formatting with cues: **//EMPHASIZE//This important point is bold and emphasized!**
 
-Other Features:
-- Save and load scripts. Logged-in users sync to the cloud!
-- Import scripts from .txt, .md, .pdf, and .docx files.
-- Export your current script as a .txt file.
-- Create versions of your scripts.
-- Use Mirror Mode for physical teleprompter setups.
-- Try the experimental AI Scroll Sync feature (enable in Settings, then use the Mic button in playback controls).
+**Advanced Features:**
+
+*   **AI Scroll Sync (Experimental)**: Enable this in Settings, then use the "AI Sync" button (microphone icon) in the playback controls. The app will attempt to listen to your speech and adjust scroll speed. (Note: Speech analysis is currently a placeholder and requires future integration with a Speech-to-Text API for full functionality.)
+*   **AI Script Summary**: In the Script Manager or via the playback controls, click "Summarize" to get an AI-generated summary of your script.
+
+**About the Developer:**
+Promptastic! was developed by Om Prakash. To learn more about the project and the developer, please visit the "About Us" page accessible from the "Help" menu in the header.
 
 //PAUSE//
 
-Explore the "Settings" panel to tailor Promptastic to your needs.
-You can save your favorite combinations as "Settings Profiles".
-
+We hope you find Promptastic! useful for all your presentation needs.
+Explore all the settings and features to tailor it perfectly for you.
 Happy prompting and successful presentations!
 `;
 
@@ -684,11 +697,11 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
   )
 );
 
-const unsub = useTeleprompterStore.subscribe(
-  (currentState) => {
-    if (!currentState.currentUserId && currentState.scripts.length === 0 && currentState.activeScriptName === null && currentState.scriptText !== currentState.LONGER_DEFAULT_SCRIPT_TEXT) {
-        useTeleprompterStore.setState({ scriptText: currentState.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
-    }
-  }
-);
-
+// Remove the redundant onAuthStateChanged listener from here. AuthContext handles this.
+// const unsub = useTeleprompterStore.subscribe(
+//   (currentState) => {
+//     if (!currentState.currentUserId && currentState.scripts.length === 0 && currentState.activeScriptName === null && currentState.scriptText !== currentState.LONGER_DEFAULT_SCRIPT_TEXT) {
+//         useTeleprompterStore.setState({ scriptText: currentState.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
+//     }
+//   }
+// );

@@ -3,7 +3,7 @@
 
 Promptastic! is a modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally. Built with Next.js, React, and ShadCN UI, it offers a clean, intuitive interface, real-time customization, and AI-powered enhancements.
 
-[![Promptastic Screenshot](https://placehold.co/800x450.png?text=Promptastic+App+Interface)](#)
+[![Promptastic Screenshot](/home/user/studio/public/cover_image.png)](#)
 *Caption: Placeholder for a screenshot of the Promptastic! interface.*
 
 ## ✨ Core Features
