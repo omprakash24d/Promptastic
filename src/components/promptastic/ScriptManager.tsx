@@ -4,17 +4,14 @@
 import type React from 'react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2, CopyPlus, History, Eye, Clock } from 'lucide-react';
+import { ScriptEditor } from './ScriptEditor';
+import { ScriptList } from './ScriptList';
+import { ScriptVersionHistory } from './ScriptVersionHistory';
+import { ScriptSummaryDisplay } from './ScriptSummaryDisplay';
+import { fileTypes as allFileTypes, type FileTypeOption } from '@/lib/fileParser'; // Import from new utility
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import mammoth from 'mammoth';
-import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
-import { summarizeScript } from '@/ai/flows/summarize-script-flow';
+import { Input } from '@/components/ui/input';
+import { AlertTriangle } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,23 +22,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle as DialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { format } from 'date-fns';
-import type { ScriptVersion } from '@/types';
 
-if (typeof window !== 'undefined') {
-  GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
-}
-
-interface FileTypeOption {
-  label: string;
-  shortLabel: string;
-  accept: string;
-  icon: React.ElementType;
-  handler: (file: File) => Promise<string | null>;
-}
-
-const AVERAGE_WPM = 140; // Words per minute
+const AVERAGE_WPM = 140;
 
 export function ScriptManager() {
   const { toast } = useToast();
@@ -50,7 +32,8 @@ export function ScriptManager() {
     scripts, activeScriptName,
     loadScript, saveScript, deleteScript, renameScript, duplicateScript,
     saveScriptVersion, loadScriptVersion,
-    setActiveScriptName
+    setActiveScriptName,
+    LONGER_DEFAULT_SCRIPT_TEXT // Access directly from store, assuming it's static or selected once
   } = useTeleprompterStore();
 
   const [currentEditingScriptText, setCurrentEditingScriptText] = useState(scriptText);
@@ -67,22 +50,41 @@ export function ScriptManager() {
   const [showVersionNotesDialog, setShowVersionNotesDialog] = useState(false);
   const [pendingVersionSaveAction, setPendingVersionSaveAction] = useState<(() => void) | null>(null);
 
+  // Use the LONGER_DEFAULT_SCRIPT_TEXT from the store.
+  // It's part of the store's initial state and doesn't change, so direct access is fine.
+  const defaultScriptText = useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT;
+
+
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
-    setScriptSummary(null); 
+    setScriptSummary(null);
     setIsDirty(false);
   }, [scriptText, activeScriptName]);
 
   useEffect(() => {
     if (activeScriptName && scripts.find(s => s.name === activeScriptName)?.content !== currentEditingScriptText) {
       setIsDirty(true);
-    } else if (!activeScriptName && currentEditingScriptText !== "" && currentEditingScriptText !== useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT) { 
+    } else if (!activeScriptName && currentEditingScriptText !== "" && currentEditingScriptText !== defaultScriptText) {
       setIsDirty(true);
-    }
-     else {
+    } else {
       setIsDirty(false);
     }
-  }, [currentEditingScriptText, scriptText, activeScriptName, scripts]);
+  }, [currentEditingScriptText, scriptText, activeScriptName, scripts, defaultScriptText]);
+  
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        if (isDirty && currentEditingScriptText.trim() !== "" && currentEditingScriptText !== defaultScriptText) {
+            event.preventDefault();
+            event.returnValue = ''; // Required for Chrome
+        }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty, currentEditingScriptText, defaultScriptText]);
+
 
   const estimatedReadingTime = useMemo(() => {
     if (!currentEditingScriptText.trim()) return "Est. reading time: 0 min 0 sec";
@@ -109,12 +111,12 @@ export function ScriptManager() {
   };
 
   const executeOrConfirm = (action: () => void) => {
-    if (isDirty && currentEditingScriptText.trim() !== "" && currentEditingScriptText !== useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT) {
+    if (isDirty && currentEditingScriptText.trim() !== "" && currentEditingScriptText !== defaultScriptText) {
       setPendingAction(() => action);
       setShowConfirmDialog(true);
     } else {
       action();
-      setIsDirty(false);
+      setIsDirty(false); // Ensure dirty flag is cleared if action proceeds without confirm
     }
   };
 
@@ -124,19 +126,17 @@ export function ScriptManager() {
       toast({ title: "Error", description: "Script name cannot be empty.", variant: "destructive" });
       return;
     }
-     if (!currentEditingScriptText.trim()) {
+    if (!currentEditingScriptText.trim()) {
       toast({ title: "Error", description: "Cannot save an empty script.", variant: "destructive" });
       return;
     }
-
     if (!activeScriptName && scripts.some(s => s.name === nameToSave)) {
       toast({ title: "Error", description: `A script named "${nameToSave}" already exists. Please choose a different name.`, variant: "destructive" });
       return;
     }
-
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName(""); 
+    if (!activeScriptName) setNewScriptName("");
     setIsDirty(false);
   }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
 
@@ -147,18 +147,18 @@ export function ScriptManager() {
         handleSave();
       }
     };
+    // Use document for keydown listener for global shortcuts like Ctrl+S
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleSave]);
 
-
   const handleLoad = (name: string) => {
-     executeOrConfirm(() => {
-        loadScript(name);
-        toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
-     });
+    executeOrConfirm(() => {
+      loadScript(name);
+      toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
+    });
   };
 
   const handleDelete = (name: string) => {
@@ -168,32 +168,33 @@ export function ScriptManager() {
       const remainingScripts = scripts.filter(s => s.name !== name);
       deleteScript(name);
       toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
-
       if (wasActive) {
         if (remainingScripts.length > 0) {
-            const newActiveScript = remainingScripts[0];
-            if (newActiveScript) {
-                loadScript(newActiveScript.name);
-            }
+          loadScript(remainingScripts[0].name);
         } else {
-             setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT);
-             setActiveScriptName(null);
+          setCurrentEditingScriptText(defaultScriptText);
+          setActiveScriptName(null);
         }
       }
-       setIsDirty(false);
+      setIsDirty(false);
     }
   };
 
-  const handleRename = (name: string) => {
+  const handleStartRename = (name: string) => {
+    setRenamingScript(name);
+    setRenameValue(name);
+  };
+
+  const handleConfirmRename = (name: string) => {
     const trimmedRenameValue = renameValue.trim();
     if (!trimmedRenameValue) {
       toast({ title: "Error", description: "New name cannot be empty.", variant: "destructive" });
       return;
     }
     if (trimmedRenameValue === name) {
-        setRenamingScript(null);
-        setRenameValue("");
-        return;
+      setRenamingScript(null);
+      setRenameValue("");
+      return;
     }
     if (scripts.some(s => s.name === trimmedRenameValue && s.name !== name)) {
       toast({ title: "Error", description: `A script named "${trimmedRenameValue}" already exists.`, variant: "destructive" });
@@ -204,14 +205,19 @@ export function ScriptManager() {
     setRenamingScript(null);
     setRenameValue("");
   };
+  
+  const handleCancelRename = () => {
+    setRenamingScript(null);
+    setRenameValue("");
+  };
 
   const handleNewScript = () => {
     executeOrConfirm(() => {
-        setActiveScriptName(null);
-        setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT);
-        setNewScriptName("");
-        setScriptSummary(null);
-        toast({ title: "New Script", description: "Ready for your new script."});
+      setActiveScriptName(null);
+      setCurrentEditingScriptText(defaultScriptText);
+      setNewScriptName("");
+      setScriptSummary(null);
+      toast({ title: "New Script", description: "Ready for your new script." });
     });
   };
 
@@ -249,62 +255,26 @@ export function ScriptManager() {
   };
 
   const processFileContent = (content: string, fileName: string) => {
-    setActiveScriptName(null); 
+    setActiveScriptName(null);
     setCurrentEditingScriptText(content);
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-    setNewScriptName(fileNameWithoutExtension); 
+    setNewScriptName(fileNameWithoutExtension);
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
-    setIsDirty(true); 
+    setIsDirty(true);
   };
-
-  const fileTypes: FileTypeOption[] = [
-    {
-      label: "Import .txt",
-      shortLabel: ".txt",
-      accept: ".txt",
-      icon: FileUp,
-      handler: async (file) => file.text(),
-    },
-    {
-      label: "Import .pdf",
-      shortLabel: ".pdf",
-      accept: ".pdf",
-      icon: FileCode2,
-      handler: async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await getDocument({data: arrayBuffer}).promise;
-        let textContent = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const text = await page.getTextContent();
-          textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
-        }
-        return textContent;
-      }
-    },
-    {
-      label: "Import .docx",
-      shortLabel: ".docx",
-      accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      icon: FileText,
-      handler: async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        return result.value;
-      }
-    },
-  ];
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const fileName = file.name;
       const fileExtension = "." + fileName.split('.').pop()?.toLowerCase();
-      const selectedType = fileTypes.find(ft => ft.accept.includes(fileExtension) || ft.accept.includes(file.type));
+      // Use allFileTypes imported from fileParser.ts
+      const selectedType = allFileTypes.find(ft => ft.accept.split(',').map(a => a.trim()).some(a => a === fileExtension || a === file.type));
 
       if (selectedType) {
         executeOrConfirm(async () => {
           try {
+            toast({ title: "Importing...", description: `Processing ${fileName}. Please wait.`, duration: 5000});
             const content = await selectedType.handler(file);
             if (content !== null) {
               processFileContent(content, fileName);
@@ -313,13 +283,14 @@ export function ScriptManager() {
             }
           } catch (error) {
             console.error("Error importing file:", error);
-            toast({ title: "Import Error", description: `Could not read file "${fileName}". ${error instanceof Error ? error.message : "Unknown error."}`, variant: "destructive" });
+            const errorMessage = error instanceof Error ? error.message : "Unknown error during import.";
+            toast({ title: "Import Failed", description: `Could not import "${fileName}". ${errorMessage}`, variant: "destructive", duration: 7000 });
           }
         });
       } else {
-        toast({ title: "Import Error", description: "Unsupported file type. Please select .txt, .pdf, or .docx.", variant: "destructive" });
+        toast({ title: "Import Error", description: `Unsupported file type: "${fileExtension || file.type}". Please select .txt, .pdf, .docx or .md.`, variant: "destructive" });
       }
-      if (event.target) event.target.value = "";
+      if (event.target) event.target.value = ""; // Reset file input
     }
   };
 
@@ -329,11 +300,14 @@ export function ScriptManager() {
       return;
     }
     setIsSummarizing(true);
-    setScriptSummary(null);
+    setScriptSummary(null); // Clear previous summary
     try {
-      const result = await summarizeScript({ scriptText: currentEditingScriptText });
+      // const summarizeScript = (await import('@/ai/flows/summarize-script-flow')).summarizeScript; // Dynamic import if needed
+      // For this component, direct import is likely fine as it's part of its core functionality
+      const { summarizeScript: genkitSummarize } = await import('@/ai/flows/summarize-script-flow');
+      const result = await genkitSummarize({ scriptText: currentEditingScriptText });
       setScriptSummary(result.summary);
-      toast({ title: "Script Summarized", description: "Summary generated below the script editor." });
+      toast({ title: "Script Summarized", description: "Summary generated." });
     } catch (error) {
       console.error("Error summarizing script:", error);
       toast({ title: "Summarization Error", description: `Could not summarize script. ${error instanceof Error ? error.message : "Unknown error."}`, variant: "destructive" });
@@ -342,32 +316,32 @@ export function ScriptManager() {
       setIsSummarizing(false);
     }
   };
-  
+
   const openSaveVersionDialog = () => {
     if (!activeScriptName) {
-        toast({ title: "Cannot Save Version", description: "You must save the script first before saving versions.", variant: "destructive" });
-        return;
+      toast({ title: "Cannot Save Version", description: "You must save the script first before saving versions.", variant: "destructive" });
+      return;
     }
-    setVersionNotes(""); 
+    setVersionNotes("");
     setShowVersionNotesDialog(true);
-    setPendingVersionSaveAction(() => () => { 
-        saveScriptVersion(activeScriptName, versionNotes);
-        toast({ title: "Version Saved", description: `New version for "${activeScriptName}" saved.` });
-        setShowVersionNotesDialog(false);
-        setVersionNotes("");
+    setPendingVersionSaveAction(() => () => {
+      saveScriptVersion(activeScriptName, versionNotes);
+      toast({ title: "Version Saved", description: `New version for "${activeScriptName}" saved.` });
+      setShowVersionNotesDialog(false);
+      setVersionNotes("");
     });
   };
 
   const handleConfirmSaveVersion = () => {
     if (pendingVersionSaveAction) {
-        pendingVersionSaveAction();
+      pendingVersionSaveAction();
     }
   };
 
   const handleLoadVersion = (scriptName: string, versionId: string) => {
     executeOrConfirm(() => {
-        loadScriptVersion(scriptName, versionId);
-        toast({ title: "Version Loaded", description: `Version loaded for script "${scriptName}".` });
+      loadScriptVersion(scriptName, versionId);
+      toast({ title: "Version Loaded", description: `Version loaded for script "${scriptName}".` });
     });
   };
 
@@ -375,15 +349,13 @@ export function ScriptManager() {
     return scripts.find(s => s.name === activeScriptName);
   }, [scripts, activeScriptName]);
 
-
   return (
     <div className="space-y-6">
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <DialogTitle className="flex items-center">
-              <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
-              Unsaved Changes
+              <AlertTriangle className="mr-2 h-5 w-5 text-destructive" /> Unsaved Changes
             </DialogTitle>
             <AlertDialogDescription>
               You have unsaved changes. Do you want to discard them and continue?
@@ -411,6 +383,7 @@ export function ScriptManager() {
             onChange={(e) => setVersionNotes(e.target.value)}
             placeholder="E.g., Final draft for client review"
             className="mt-2"
+            aria-label="Version notes"
           />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setShowVersionNotesDialog(false)}>Cancel</AlertDialogCancel>
@@ -419,174 +392,55 @@ export function ScriptManager() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <ScriptEditor
+        scriptText={currentEditingScriptText}
+        onScriptTextChange={setCurrentEditingScriptText}
+        activeScriptName={activeScriptName}
+        newScriptName={newScriptName}
+        onNewScriptNameChange={setNewScriptName}
+        estimatedReadingTime={estimatedReadingTime}
+        isDirty={isDirty}
+        onSave={handleSave}
+        onNew={handleNewScript}
+        onSaveVersion={openSaveVersionDialog}
+        onSummarize={handleSummarizeScript}
+        isSummarizing={isSummarizing}
+        onTriggerImport={triggerFileInput}
+        onExportTxt={handleExportTxt}
+        importFileTypes={allFileTypes}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center justify-between">
-            <span>
-              {activeScriptName ? `Editing: ${activeScriptName}` : "New/Imported Script"}
-            </span>
-            <div className="flex items-center">
-              {isDirty && <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2 mr-2">(Unsaved changes)</span>}
-              <span className="text-xs font-normal text-muted-foreground">{estimatedReadingTime}</span>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            id="script-textarea"
-            value={currentEditingScriptText}
-            onChange={(e) => setCurrentEditingScriptText(e.target.value)}
-            placeholder="Paste or type your script here..."
-            className="min-h-[250px] text-sm bg-background"
-            rows={15}
-          />
-          {!activeScriptName && (
-            <div>
-              <Label htmlFor="new-script-name" className="text-xs">Script Name (for saving new/imported)</Label>
-              <Input
-                id="new-script-name"
-                value={newScriptName}
-                onChange={(e) => setNewScriptName(e.target.value)}
-                placeholder="Enter script name"
-                className="bg-background mt-1 text-sm"
-              />
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex flex-wrap justify-start gap-2 pt-4">
-            <Button onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save New Script'}
-            </Button>
-            {activeScriptName && (
-                <Button onClick={openSaveVersionDialog} variant="outline">
-                    <CopyPlus className="mr-2 h-4 w-4" /> Save Version
-                </Button>
-            )}
-            <Button onClick={handleNewScript} variant="outline">
-              <FilePlus2 className="mr-2 h-4 w-4" /> New
-            </Button>
-             <Button onClick={handleExportTxt} variant="outline">
-              <Download className="mr-2 h-4 w-4" /> Export .txt
-            </Button>
-            {fileTypes.map(ft => (
-              <Button key={ft.label} onClick={() => triggerFileInput(ft.accept)} variant="outline">
-                <ft.icon className="mr-2 h-4 w-4" /> {ft.shortLabel}
-              </Button>
-            ))}
-            <Button onClick={handleSummarizeScript} variant="outline" disabled={isSummarizing || !currentEditingScriptText.trim()}>
-              {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpenText className="mr-2 h-4 w-4" />}
-              {isSummarizing ? 'Summarizing...' : 'Summarize'}
-            </Button>
-        </CardFooter>
-      </Card>
-      
-      {scriptSummary && (
-        <Alert>
-          <BookOpenText className="h-4 w-4" />
-          <AlertTitle className="font-semibold">Script Summary</AlertTitle>
-          <AlertDescription className="mt-1 text-sm">
-            <ScrollArea className="h-[100px] w-full rounded-md p-1 bg-muted/20 border">
-             <p className="p-2 whitespace-pre-wrap">{scriptSummary}</p>
-            </ScrollArea>
-          </AlertDescription>
-        </Alert>
+      <ScriptSummaryDisplay summary={scriptSummary} isSummarizing={isSummarizing} />
+
+      {activeScriptDetails && (
+        <ScriptVersionHistory
+          scriptName={activeScriptDetails.name}
+          versions={activeScriptDetails.versions || []}
+          onLoadVersion={handleLoadVersion}
+        />
       )}
-
-      {activeScriptDetails && activeScriptDetails.versions && activeScriptDetails.versions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center">
-                <History className="mr-2 h-5 w-5" /> Script Versions for "{activeScriptDetails.name}"
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[150px] w-full rounded-md border bg-muted/20">
-              <ul className="space-y-1 p-1">
-                {activeScriptDetails.versions.sort((a,b) => b.timestamp - a.timestamp).map((version) => (
-                  <li key={version.versionId} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-sm">
-                    <div>
-                      <span className="font-medium">{format(new Date(version.timestamp), "MMM d, yyyy HH:mm:ss")}</span>
-                      {version.notes && <p className="text-xs text-muted-foreground italic mt-0.5">{version.notes}</p>}
-                    </div>
-                    <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(activeScriptDetails.name, version.versionId)}>
-                      <Eye className="mr-1.5 h-3.5 w-3.5" /> Load
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
-
 
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
         className="hidden"
+        aria-hidden="true" 
       />
 
-      {scripts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Saved Scripts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[200px] w-full rounded-md border bg-muted/20">
-              <ul className="space-y-1 p-1">
-                {scripts.sort((a, b) => b.updatedAt - a.updatedAt).map((script) => (
-                  <li key={script.name} className="p-2 rounded-md hover:bg-muted text-sm">
-                    {renamingScript === script.name ? (
-                      <div className="flex flex-grow items-center gap-2 min-w-0">
-                        <Input
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          className="h-8 bg-background text-sm flex-1 min-w-0"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRename(script.name);
-                            if (e.key === 'Escape') { setRenamingScript(null); setRenameValue("");}
-                          }}
-                        />
-                        <Button size="sm" onClick={() => handleRename(script.name)} className="flex-shrink-0">Save</Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setRenamingScript(null); setRenameValue(""); }} className="flex-shrink-0">Cancel</Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <span
-                            className={`block truncate cursor-pointer hover:underline ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
-                            onClick={() => handleLoad(script.name)}
-                            title={script.name}
-                          >
-                            {script.name}
-                          </span>
-                           <span className="text-xs text-muted-foreground flex items-center mt-0.5">
-                             <Clock className="h-3 w-3 mr-1" /> Last updated: {format(new Date(script.updatedAt), "MMM d, yyyy HH:mm")}
-                           </span>
-                        </div>
-                        <div className="flex-shrink-0 flex items-center gap-0.5">
-                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(script.name)} aria-label={`Duplicate script ${script.name}`} title="Duplicate script">
-                            <CopyPlus className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label={`Rename script ${script.name}`} title="Rename script">
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(script.name)} aria-label={`Delete script ${script.name}`} title="Delete script">
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
+      <ScriptList
+        scripts={scripts}
+        activeScriptName={activeScriptName}
+        renamingScript={renamingScript}
+        renameValue={renameValue}
+        onRenameValueChange={setRenameValue}
+        onLoad={handleLoad}
+        onDelete={handleDelete}
+        onStartRename={handleStartRename}
+        onConfirmRename={handleConfirmRename}
+        onCancelRename={handleCancelRename}
+        onDuplicate={handleDuplicate}
+      />
     </div>
   );
 }
