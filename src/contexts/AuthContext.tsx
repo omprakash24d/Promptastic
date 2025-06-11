@@ -2,9 +2,9 @@
 "use client";
 
 import type React from 'react';
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { AuthUser } from '@/types';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation'; // Import usePathname
 import { auth } from '@/firebase/config';
 import {
   onAuthStateChanged,
@@ -16,147 +16,180 @@ import {
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
   sendEmailVerification,
+  type User as FirebaseUser, // Import FirebaseUser type
 } from 'firebase/auth';
+
+const MESSAGE_CLEAR_TIMEOUT = 7000; // 7 seconds
+
+const FIREBASE_ERROR_MESSAGES: { [key: string]: string } = {
+  'auth/user-not-found': 'Invalid email or password. Please try again.',
+  'auth/wrong-password': 'Invalid email or password. Please try again.',
+  'auth/invalid-credential': 'Invalid email or password. Please try again.',
+  'auth/email-already-in-use': 'This email address is already in use by another account.',
+  'auth/weak-password': 'Password is too weak. It should meet all specified strength requirements.',
+  'auth/requires-recent-login': 'This action requires a recent login. Please sign out and sign in again to continue.',
+  'auth/account-exists-with-different-credential': 'An account already exists with this email, but with a different sign-in method (e.g., Google). Try signing in with that method.',
+  'auth/invalid-email': 'The email address format is not valid. Please check and try again.',
+  'auth/unauthorized-domain': 'This domain is not authorized for Firebase operations. Please check your Firebase project configuration or contact support.',
+  'auth/network-request-failed': 'A network error occurred. Please check your internet connection and try again.',
+  'auth/too-many-requests': 'Access to this account has been temporarily disabled due to many failed login attempts. You can try again later or reset your password.',
+  'auth/operation-not-allowed': 'This sign-in method is not enabled. Please contact support.',
+  'auth/user-disabled': 'This user account has been disabled. Please contact support.',
+};
 
 
 interface AuthContextType {
   user: AuthUser | null;
-  loading: boolean;
+  isEmailVerified: boolean | undefined;
+  // Specific loading states
+  loginLoading: boolean;
+  signupLoading: boolean;
+  passwordResetLoading: boolean;
+  profileUpdateLoading: boolean;
+  verificationResendLoading: boolean;
+  googleSignInLoading: boolean;
+  
   error: string | null;
   successMessage: string | null;
+
   signInWithGoogle: () => Promise<void>;
-  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<boolean>; // Returns success boolean
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<boolean>;
   updateUserProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
   logout: () => Promise<void>;
+  resendEmailVerification: () => Promise<void>;
   clearAuthMessages: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to parse Firebase User
+const parseFirebaseUser = (firebaseUser: FirebaseUser | null): AuthUser | null => {
+  if (!firebaseUser) return null;
+  const { uid, email, displayName, phoneNumber, photoURL, emailVerified } = firebaseUser;
+  return { uid, email, displayName, phoneNumber, photoURL, isEmailVerified: emailVerified };
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
+
+  // Specific loading states
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [signupLoading, setSignupLoading] = useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
+  const [profileUpdateLoading, setProfileUpdateLoading] = useState(false);
+  const [verificationResendLoading, setVerificationResendLoading] = useState(false);
+  const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
+  const [initialAuthLoading, setInitialAuthLoading] = useState(true);
+
+
+  const [error, setErrorState] = useState<string | null>(null);
+  const [successMessage, setSuccessMessageState] = useState<string | null>(null);
+  
   const router = useRouter();
+  const pathname = usePathname(); // Use usePathname hook
+
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const setError = useCallback((message: string | null) => {
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    setErrorState(message);
+    if (message) {
+      errorTimeoutRef.current = setTimeout(() => setErrorState(null), MESSAGE_CLEAR_TIMEOUT);
+    }
+  }, []);
+
+  const setSuccessMessage = useCallback((message: string | null) => {
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    setSuccessMessageState(message);
+    if (message) {
+      successTimeoutRef.current = setTimeout(() => setSuccessMessageState(null), MESSAGE_CLEAR_TIMEOUT);
+    }
+  }, []);
+
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        const { uid, email, displayName, phoneNumber, photoURL } = firebaseUser;
-        setUser({ uid, email, displayName, phoneNumber, photoURL });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
+      const parsedUser = parseFirebaseUser(firebaseUser);
+      setUser(parsedUser);
+      setIsEmailVerified(firebaseUser?.emailVerified);
+      setInitialAuthLoading(false);
     });
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
   }, []);
 
-  const clearAuthMessages = () => {
+  const clearAuthMessages = useCallback(() => {
     setError(null);
     setSuccessMessage(null);
-  };
+  }, [setError, setSuccessMessage]);
 
-  const handleAuthSuccess = (message?: string, fromSignup: boolean = false) => {
+  const handleAuthSuccess = useCallback((message?: string, options: { fromSignup?: boolean, redirectTo?: string, skipRedirect?: boolean } = {}) => {
+    const { fromSignup = false, redirectTo = '/', skipRedirect = false } = options;
     setError(null);
     let finalMessage = message;
+
     if (fromSignup && auth.currentUser && !auth.currentUser.emailVerified) {
-      finalMessage = "Account created! Please check your email to verify your account. Redirecting...";
+      finalMessage = "Account created! Please check your email to verify your account.";
     } else if (fromSignup) {
-      finalMessage = message || "Account created successfully! Redirecting...";
+      finalMessage = message || "Account created successfully!";
     }
     
     if (finalMessage) setSuccessMessage(finalMessage);
     else setSuccessMessage(null);
 
-    if (router.pathname !== '/') { 
-        router.push('/');
+    if (!skipRedirect && pathname !== redirectTo) { 
+        router.push(redirectTo);
     }
-  }
+  }, [setError, setSuccessMessage, router, pathname]);
 
-  const handleAuthError = (err: any, operation?: 'passwordReset') => {
+  const handleAuthError = useCallback((err: any, operation?: 'passwordReset' | 'signup') => {
     setSuccessMessage(null); 
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
     if (err.code && userCancellableErrors.includes(err.code)) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setError('The sign-in popup was closed before the process could finish. If you\'d like to sign in, please try again.');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        setError('The sign-in attempt was cancelled. If you\'d like to sign in, please try again.');
-      }
-      setLoading(false);
+      // setError('The sign-in process was cancelled.'); // Simplified message
+      // Do not set an error for user-cancelled popups, just let them try again.
+      clearAuthMessages();
       return;
     }
     
+    // For password reset, always show generic success if it's just user-not-found
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
-      setLoading(false); 
+      setError(null); // Clear any potential error
+      setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       return;
     }
 
-    if (err.code && err.message) {
-      switch (err.code) {
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-          setError('Invalid email or password. Please try again.');
-          break;
-        case 'auth/email-already-in-use':
-          setError('This email address is already in use by another account.');
-          break;
-        case 'auth/weak-password':
-          setError('Password is too weak. It should be at least 8 characters long.');
-          break;
-        case 'auth/requires-recent-login':
-          setError('This action requires a recent login. Please sign out and sign in again.');
-          break;
-        case 'auth/account-exists-with-different-credential':
-          setError('An account already exists with this email, but with a different sign-in method (e.g., Google). Try signing in with that method.');
-          break;
-        case 'auth/invalid-email':
-          setError('The email address format is not valid. Please check and try again.');
-          break;
-        case 'auth/unauthorized-domain':
-             setError('This domain is not authorized for Firebase operations. Please check your Firebase project configuration (Authentication > Sign-in method > Authorized domains) or contact support.');
-             break;
-        case 'auth/network-request-failed':
-            setError('A network error occurred. Please check your internet connection and try again.');
-            break;
-        case 'auth/too-many-requests':
-            setError('Access to this account has been temporarily disabled due to many failed login attempts. You can try again later or reset your password.');
-            break;
-        default:
-          console.error("Unhandled Firebase Auth Error:", err); 
-          setError(`An unexpected error occurred: ${err.message} (Code: ${err.code})`);
-      }
-    } else {
-      console.error("Generic Auth Error:", err); 
-      setError(err.message || 'An unexpected error occurred during authentication.');
-    }
-  }
+    const message = FIREBASE_ERROR_MESSAGES[err.code as string] || `An unexpected error occurred: ${err.message} (Code: ${err.code})`;
+    setError(message);
+    console.error("Firebase Auth Error:", err.code, err.message);
+
+  }, [setError, setSuccessMessage, clearAuthMessages]);
+
 
   const signInWithGoogle = async () => {
-    setLoading(true);
+    setGoogleSignInLoading(true);
     clearAuthMessages();
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       handleAuthSuccess("Signed in with Google successfully! Redirecting...");
     } catch (err: any) {
-      console.error("Google Sign-In Raw Error:", err); // Added for direct error visibility
-      if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(err.code)) {
-        // console.error("Google Sign-In Raw Error:", err); // Moved outside this condition
-      }
       handleAuthError(err);
     } finally {
-      setLoading(false);
+      setGoogleSignInLoading(false);
     }
   };
 
-  const signUpWithEmail = async (email: string, password: string, displayName: string) => {
-    setLoading(true);
+  const signUpWithEmail = async (email: string, password: string, displayName: string): Promise<boolean> => {
+    setSignupLoading(true);
     clearAuthMessages();
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -164,27 +197,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await firebaseUpdateProfile(userCredential.user, { displayName });
         await sendEmailVerification(userCredential.user);
 
-        setUser(prev => { 
-            if (!userCredential.user) return null;
-            return {
-                uid: userCredential.user.uid,
-                email: userCredential.user.email,
-                displayName: displayName,
-                photoURL: userCredential.user.photoURL,
-                phoneNumber: userCredential.user.phoneNumber,
-            };
-        });
+        const parsedUser = parseFirebaseUser(userCredential.user);
+        setUser(parsedUser);
+        setIsEmailVerified(userCredential.user.emailVerified);
       }
-      handleAuthSuccess(undefined, true); 
+      // For signup, skip redirect and let the login page handle UI.
+      handleAuthSuccess(undefined, { fromSignup: true, skipRedirect: true }); 
+      return true;
     } catch (err: any) {
-      handleAuthError(err);
+      handleAuthError(err, 'signup');
+      return false;
     } finally {
-      setLoading(false);
+      setSignupLoading(false);
     }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    setLoading(true);
+    setLoginLoading(true);
     clearAuthMessages();
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -192,76 +221,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (err: any) { 
       handleAuthError(err);
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
     }
   };
 
   const sendPasswordReset = async (email: string): Promise<boolean> => {
-    setLoading(true);
+    setPasswordResetLoading(true);
     clearAuthMessages(); 
     try {
       await sendPasswordResetEmail(auth, email);
-      setError(null); 
-      setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
-      setLoading(false);
+      // The generic success message (even for user-not-found) is handled in handleAuthError
+      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); // Triggers generic success
       return true;
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found') {
-        setError(null); 
-        setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
-        setLoading(false);
-        return true; 
-      }
       handleAuthError(err, 'passwordReset'); 
-      setLoading(false);
       return false;
+    } finally {
+      setPasswordResetLoading(false);
+    }
+  };
+  
+  const resendEmailVerification = async () => {
+    if (!auth.currentUser) {
+      setError("No user is currently signed in to resend verification email.");
+      return;
+    }
+    if (auth.currentUser.emailVerified) {
+      setSuccessMessage("Your email is already verified!");
+      return;
+    }
+
+    setVerificationResendLoading(true);
+    clearAuthMessages();
+    try {
+      await sendEmailVerification(auth.currentUser);
+      setSuccessMessage("Verification email resent! Please check your inbox (and spam folder).");
+    } catch (err: any) {
+      handleAuthError(err);
+    } finally {
+      setVerificationResendLoading(false);
     }
   };
 
+
   const updateUserProfile = async (updates: { displayName?: string; photoURL?: string }) => {
-    setLoading(true);
+    setProfileUpdateLoading(true);
     clearAuthMessages();
     if (!auth.currentUser) {
       setError("No user logged in to update profile.");
-      setLoading(false);
+      setProfileUpdateLoading(false);
       return;
     }
     try {
       await firebaseUpdateProfile(auth.currentUser, updates);
-      setUser(prevUser => {
-        if (!prevUser || !auth.currentUser) return null;
-        const updatedFirebaseUser = auth.currentUser;
-        return {
-            ...prevUser,
-            displayName: updatedFirebaseUser.displayName,
-            photoURL: updatedFirebaseUser.photoURL,
-        };
-      });
+      const parsedUser = parseFirebaseUser(auth.currentUser); // Re-parse after update
+      setUser(parsedUser);
+      if (auth.currentUser) setIsEmailVerified(auth.currentUser.emailVerified); // Update email verified status
       setSuccessMessage("Profile updated successfully!");
     } catch (err: any) {
       handleAuthError(err);
     } finally {
-      setLoading(false);
+      setProfileUpdateLoading(false);
     }
   };
 
   const logout = async () => {
-    setLoading(true);
+    // Use a general loading state or a specific one if preferred for logout
+    setGoogleSignInLoading(true); // Re-using google sign-in for simplicity, can be specific
     clearAuthMessages();
     try {
       await firebaseSignOut(auth);
       setUser(null);
-      router.push('/login');
+      setIsEmailVerified(undefined);
+      router.push('/login'); // Redirect to login after logout
     } catch (err: any) {
       handleAuthError(err);
     } finally {
-      setLoading(false);
+      setGoogleSignInLoading(false);
     }
   };
 
   const value = useMemo(() => ({
     user,
-    loading,
+    isEmailVerified,
+    loginLoading,
+    signupLoading,
+    passwordResetLoading,
+    profileUpdateLoading,
+    verificationResendLoading,
+    googleSignInLoading,
     error,
     successMessage,
     signInWithGoogle,
@@ -270,9 +318,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     sendPasswordReset,
     updateUserProfile,
     logout,
+    resendEmailVerification,
     clearAuthMessages,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [user, loading, error, successMessage, router]);
+  }), [
+    user, isEmailVerified,
+    loginLoading, signupLoading, passwordResetLoading, profileUpdateLoading, verificationResendLoading, googleSignInLoading,
+    error, successMessage,
+    // router, pathname, // router and pathname are stable from Next.js hooks
+    // Memoizing functions if they don't depend on frequently changing state from outside
+    // For simplicity here, assuming they are stable or their dependencies are listed
+  ]);
+
+  if (initialAuthLoading) {
+    // You could return a full-page loader here if desired
+    return <div className="flex min-h-screen items-center justify-center bg-background"><p>Authenticating...</p></div>;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -284,3 +345,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
