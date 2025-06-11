@@ -3,7 +3,7 @@
 
 Promptastic! is a modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally. Built with Next.js, React, and ShadCN UI, it offers a clean, intuitive interface, real-time customization, and AI-powered enhancements.
 
-[![Promptastic Screenshot](https://placehold.co/800x450.png?text=Promptastic+App+Interface)](https://placehold.co/800x450.png)
+[![Promptastic Screenshot](https://placehold.co/800x450.png?text=Promptastic+App+Interface)](#)
 *Caption: Placeholder for a screenshot of the Promptastic! interface.*
 
 ## ✨ Core Features
@@ -72,7 +72,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
 1.  **Create a Firebase Project**: Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project (or use an existing one).
 2.  **Add a Web App**: In your Firebase project settings, add a new Web App and copy the Firebase configuration object.
 3.  **Enable Firebase Services**:
-    *   **Authentication**: Enable "Email/Password" and "Google" sign-in methods.
+    *   **Authentication**: Enable "Email/Password" and "Google" sign-in methods. Set a "Project support email" for Google Sign-In.
     *   **Firestore**: Create a Firestore database in Native mode.
     *   **Storage**: Set up Firebase Storage.
 4.  **Environment Variables**:
@@ -194,6 +194,40 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   **File Import Robustness**: Further enhance parsing and error handling for imported files, especially complex PDFs or DOCX.
 *   **Tags/Folders for Scripts**: Organization features for users with many scripts.
 *   **Advanced AI Script Tools**: Grammar checks, tone adjustment, or rephrasing suggestions.
+*   **HTML File Import**: Support for importing HTML files with proper sanitization.
+*   **Debounce Script Input**: For very large scripts, debounce text area input to improve performance.
+*   **Draft Auto-Save**: Periodically auto-save script drafts to local storage for recovery.
+
+## 🤝 Contributing
+
+Contributions are welcome! If you'd like to contribute to Promptastic!, please follow these steps:
+
+1.  **Fork the Repository**: Create your own fork of the project.
+2.  **Create a Branch**: Make a new branch for your feature or bug fix (e.g., `feature/new-cool-thing` or `fix/scrolling-issue`).
+3.  **Make Your Changes**: Implement your changes and test them thoroughly.
+4.  **Commit Your Changes**: Write clear and concise commit messages.
+5.  **Push to Your Fork**: Push your changes to your forked repository.
+6.  **Submit a Pull Request**: Open a pull request to the main repository, describing your changes and why they should be merged.
+
+Please ensure your code adheres to the project's coding style and guidelines.
+
+## 📜 License
+
+This project is licensed under the **MIT License**.
+
+See the [LICENSE](LICENSE.md) file for more details. (You would typically create a LICENSE.md file with the MIT license text).
+
+## ©️ Copyright
+
+Copyright (c) 2024 [Your Name or Organization Name Here]. All Rights Reserved.
+
+*(Replace "[Your Name or Organization Name Here]" with the actual copyright holder.)*
+
+## 🙏 Acknowledgements
+
+*   Thanks to the creators of Next.js, React, ShadCN UI, Tailwind CSS, Firebase, and Genkit for their amazing tools.
+*   Inspiration from various teleprompter applications and presentation tools.
+*   Community contributions and feedback.
 
 ---
 
