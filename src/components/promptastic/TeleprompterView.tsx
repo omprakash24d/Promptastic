@@ -7,9 +7,9 @@ import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { cn } from '@/lib/utils';
 
 // SSR-safe defaults
-const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)'; 
-const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; 
-const VIEW_SSR_DEFAULT_DARK_MODE = true; 
+const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)';
+const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif'; // Ensured definition
+const VIEW_SSR_DEFAULT_DARK_MODE = true;
 
 // Threshold for detecting user scroll intervention during active playback.
 const USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR = 0.5;
@@ -20,13 +20,13 @@ export function TeleprompterView() {
   const {
     scriptText,
     fontSize,
-    scrollSpeed,
+    // scrollSpeed is read fresh in scrollLoop
     lineHeight,
     isMirrored,
     darkMode,
     textColor,
     fontFamily,
-    focusLinePercentage, // Get new setting
+    focusLinePercentage,
     isPlaying,
     currentScrollPosition,
     setCurrentScrollPosition,
@@ -56,21 +56,19 @@ export function TeleprompterView() {
       return;
     }
     const container = scrollContainerRef.current;
-    // Use focusLinePercentage from store
-    const focusLine = container.scrollTop + container.clientHeight * focusLinePercentage; 
+    const currentFocusLinePercentage = useTeleprompterStore.getState().focusLinePercentage;
+    const focusLine = container.scrollTop + container.clientHeight * currentFocusLinePercentage;
 
     let newHighlightedIndex: number | null = null;
 
-    // Special handling for the very top: if scrolled to top, and first paragraph is in view
     if (container.scrollTop < 5 && paragraphRefs.current[0]) {
         const firstPRef = paragraphRefs.current[0];
-        // Check if the first paragraph is sufficiently visible and near the top focus area
-        if (firstPRef.offsetTop < container.clientHeight * focusLinePercentage + firstPRef.offsetHeight * 0.5 && 
-            firstPRef.offsetTop + firstPRef.offsetHeight > container.clientHeight * focusLinePercentage - firstPRef.offsetHeight * 0.5) {
+        if (firstPRef.offsetTop < container.clientHeight * currentFocusLinePercentage + firstPRef.offsetHeight * 0.5 &&
+            firstPRef.offsetTop + firstPRef.offsetHeight > container.clientHeight * currentFocusLinePercentage - firstPRef.offsetHeight * 0.5) {
              newHighlightedIndex = 0;
         }
     }
-    
+
     if (newHighlightedIndex === null) {
         for (let i = 0; i < paragraphRefs.current.length; i++) {
             const pRef = paragraphRefs.current[i];
@@ -84,19 +82,19 @@ export function TeleprompterView() {
             }
         }
     }
-    
+
     setHighlightedParagraphIndex(prevIndex => {
         if (prevIndex !== newHighlightedIndex) {
             return newHighlightedIndex;
         }
         return prevIndex;
     });
-  }, [setHighlightedParagraphIndex, focusLinePercentage]);
+  }, [setHighlightedParagraphIndex]);
 
 
   const scrollLoop = useCallback((timestamp: number) => {
-    const currentIsPlaying = useTeleprompterStore.getState().isPlaying; 
-    if (!currentIsPlaying || !scrollContainerRef.current) {
+    const currentIsPlayingState = useTeleprompterStore.getState().isPlaying;
+    if (!currentIsPlayingState || !scrollContainerRef.current) {
       lastTimestampRef.current = 0;
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
@@ -115,13 +113,13 @@ export function TeleprompterView() {
     lastTimestampRef.current = timestamp;
 
     const container = scrollContainerRef.current;
-    const currentScrollSpeed = useTeleprompterStore.getState().scrollSpeed; 
-    const newScrollTop = container.scrollTop + currentScrollSpeed * deltaTime;
+    const currentStoreScrollSpeed = useTeleprompterStore.getState().scrollSpeed;
+    const newScrollTop = container.scrollTop + currentStoreScrollSpeed * deltaTime;
 
     if (newScrollTop >= container.scrollHeight - container.clientHeight) {
       container.scrollTop = container.scrollHeight - container.clientHeight;
       setCurrentScrollPosition(container.scrollTop);
-      setIsPlaying(false); 
+      setIsPlaying(false);
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
@@ -135,34 +133,68 @@ export function TeleprompterView() {
   }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
 
 
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const currentPhysicalScroll = container.scrollTop;
+    const storeState = useTeleprompterStore.getState(); // Get fresh state once
+
+    // If playback just started AND is intended to be playing (according to store),
+    // ONLY update the scroll position in the store. Do NOTHING else.
+    // This prevents immediate misinterpretation of initial scroll events as intervention.
+    if (justStartedPlayingRef.current && storeState.isPlaying) {
+      setCurrentScrollPosition(currentPhysicalScroll);
+      return; // CRUCIAL: Early return to avoid any intervention logic or highlight checks
+    }
+
+    // If not playing (either never started, or was stopped by loop/user/intervention),
+    // then this is considered a manual scroll. Update position and check highlight.
+    if (!storeState.isPlaying) {
+       setCurrentScrollPosition(currentPhysicalScroll);
+       checkHighlightedParagraph();
+       return;
+    }
+
+    // If we reach here, storeState.isPlaying is true, and it's *not* the "just started" phase.
+    // This means we are in active, ongoing playback. Check for user intervention.
+    const calculatedThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
+    const scrollThreshold = Math.max(MIN_SCROLL_INTERVENTION_THRESHOLD_PX, calculatedThreshold);
+
+    if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollThreshold) {
+      // User has manually scrolled significantly during playback. Stop playback.
+      userInteractedRef.current = true; // Mark interaction
+      setIsPlaying(false);              // Stop playback in the store
+      setCurrentScrollPosition(currentPhysicalScroll); // Sync store to the new manual position
+      checkHighlightedParagraph();      // Update highlight based on new position
+    } else {
+      // Scroll is within tolerance, likely from the scrollLoop or minor drift not considered intervention.
+      // Sync position. Highlight update will be driven by scrollLoop.
+      setCurrentScrollPosition(currentPhysicalScroll);
+    }
+  }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
+
+
   useEffect(() => {
     let timerId: NodeJS.Timeout | null = null;
     if (isPlaying) {
       if (scrollContainerRef.current) {
+        // Ensure the physical scroll position matches the store's currentScrollPosition
+        // when playback starts. This is crucial if there was any drift before play.
         scrollContainerRef.current.scrollTop = currentScrollPosition;
       }
-      
-      lastTimestampRef.current = 0; 
-      userInteractedRef.current = false; 
-      justStartedPlayingRef.current = true; 
-      
+
+      lastTimestampRef.current = 0;
+      userInteractedRef.current = false;
+      justStartedPlayingRef.current = true;
+
       timerId = setTimeout(() => {
         justStartedPlayingRef.current = false;
-      }, 150); 
+      }, 150); // 150ms grace period
 
       animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
     } else {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-      if (timerId) {
-        clearTimeout(timerId); 
-      }
-      justStartedPlayingRef.current = false; 
-    }
-    
-    return () => { 
+      // Cleanup when isPlaying becomes false
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
@@ -170,53 +202,20 @@ export function TeleprompterView() {
       if (timerId) {
         clearTimeout(timerId);
       }
-      justStartedPlayingRef.current = false; 
-    };
-  }, [isPlaying, scrollLoop, currentScrollPosition]);
-
-
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const currentPhysicalScroll = container.scrollTop;
-
-    if (justStartedPlayingRef.current) {
-      setCurrentScrollPosition(currentPhysicalScroll);
-      checkHighlightedParagraph();
-      return; 
+      justStartedPlayingRef.current = false; // Ensure it's reset if playback stops early
     }
 
-    const storeState = useTeleprompterStore.getState(); 
-
-    if (!storeState.isPlaying) {
-       setCurrentScrollPosition(currentPhysicalScroll);
-       checkHighlightedParagraph();
-       return;
-    }
-    
-    const calculatedThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
-    const scrollThreshold = Math.max(MIN_SCROLL_INTERVENTION_THRESHOLD_PX, calculatedThreshold);
-    
-    if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollThreshold) {
-      userInteractedRef.current = true; 
-      setIsPlaying(false); 
-      setCurrentScrollPosition(currentPhysicalScroll); 
-    } else {
-      setCurrentScrollPosition(currentPhysicalScroll);
-    }
-
-    checkHighlightedParagraph();
-  }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
-
-
-  useEffect(() => {
-    if (scrollContainerRef.current) {
-      if(!isPlaying) {
-        scrollContainerRef.current.scrollTop = currentScrollPosition;
+    return () => { // Cleanup on unmount or before effect re-runs
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
       }
-    }
-  }, [currentScrollPosition, isPlaying]);
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+      justStartedPlayingRef.current = false;
+    };
+  }, [isPlaying, scrollLoop, currentScrollPosition]); // scrollLoop and currentScrollPosition are dependencies
 
 
   useEffect(() => {
@@ -225,13 +224,13 @@ export function TeleprompterView() {
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]); 
+  }, [handleScroll]);
 
   useEffect(() => {
-    setHighlightedParagraphIndex(null); 
+    setHighlightedParagraphIndex(null);
     const timer = setTimeout(() => {
-       checkHighlightedParagraph(); 
-    }, 50); 
+       checkHighlightedParagraph();
+    }, 50); // Delay allows DOM to update before checking highlight
     return () => clearTimeout(timer);
   }, [scriptText, fontFamily, fontSize, lineHeight, checkHighlightedParagraph, focusLinePercentage]);
 
@@ -248,38 +247,38 @@ export function TeleprompterView() {
       >
         {paragraphBlock.split('\n').map((line, lineIndex) => (
           <p key={lineIndex} className="mb-1 last:mb-0">
-            {line.trim() === "" && paragraphBlock.split('\n').length > 1 ? <>&nbsp;</> : (line || <>&nbsp;</>)}
+            {line.trim() === "" ? <>&nbsp;</> : (line || <>&nbsp;</>)}
           </p>
         ))}
       </div>
     ));
   }, [scriptText, highlightedParagraphIndex]);
 
-  const currentTextColor = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
-  const currentFontFamily = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
+  const currentTextColorToUse = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
+  const currentFontFamilyToUse = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
   const mirrorTransform = isMounted && isMirrored ? 'scaleX(-1)' : 'none';
 
   const teleprompterContainerStyles: React.CSSProperties = {
-    color: currentTextColor,
-    fontFamily: currentFontFamily,
+    color: currentTextColorToUse,
+    fontFamily: currentFontFamilyToUse,
     fontSize: `${fontSize}px`,
     lineHeight: lineHeight,
     transform: mirrorTransform,
-    position: 'relative', // Needed for absolute positioning of the focus line
+    position: 'relative',
   };
 
   const scriptContentStyles: React.CSSProperties = {};
-  
+
   const focusLineStyle: React.CSSProperties = {
     position: 'absolute',
     top: `calc(${focusLinePercentage * 100}%)`,
     left: '0',
     right: '0',
-    height: '2px', // Make it a bit more visible
-    backgroundColor: 'hsla(var(--primary), 0.5)', // Use primary color with alpha
+    height: '2px',
+    backgroundColor: 'hsla(var(--primary), 0.5)',
     pointerEvents: 'none',
-    zIndex: 10, // Ensure it's above the text but below controls if any were overlaid
-    transition: 'top 0.3s ease-out', // Smooth transition if percentage changes
+    zIndex: 10,
+    transition: 'top 0.3s ease-out',
   };
 
   return (
@@ -291,13 +290,13 @@ export function TeleprompterView() {
         (!isMounted ? VIEW_SSR_DEFAULT_DARK_MODE : darkMode) ? "bg-gray-900" : "bg-gray-50",
       )}
       style={teleprompterContainerStyles}
-      tabIndex={0} 
+      tabIndex={0}
       role="region"
       aria-label="Teleprompter Script Viewport. Press Space or Backspace to play or pause scrolling."
     >
       <div style={focusLineStyle} data-testid="focus-line-overlay" />
       <div
-        className="select-none" 
+        className="select-none"
         style={scriptContentStyles}
       >
         {scriptText.trim() === "" ? (
@@ -311,4 +310,3 @@ export function TeleprompterView() {
     </div>
   );
 }
-
