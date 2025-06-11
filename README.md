@@ -185,10 +185,18 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 
 ## ⌨️ Keyboard Shortcuts
 
-*   **Spacebar / Backspace**: Toggle Play/Pause scrolling (when not focused on an input field).
-*   **R**: Reset scroll to the beginning (when not focused on an input field).
+(When not focused on an input field like the script editor or settings input):
+
+*   **Spacebar / Backspace**: Toggle Play/Pause scrolling.
+*   **R**: Reset scroll to the beginning.
+*   **F**: Toggle Fullscreen mode.
 *   **Esc**: Exit Fullscreen or Presentation mode.
-*   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and focused).
+*   **[`**: Decrease scroll speed.
+*   **`]**: Increase scroll speed.
+*   **-** (Minus/Hyphen): Decrease font size.
+*   **=** (Equals/Plus): Increase font size.
+*   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and focused on the script editor).
+
 
 ## 🔮 Known Issues / Future Enhancements
 

@@ -15,7 +15,15 @@ import {
 import { toast } from "@/hooks/use-toast";
 
 const INITIAL_FONT_SIZE = 48; // px
+const MIN_FONT_SIZE = 12;
+const MAX_FONT_SIZE = 150;
+const FONT_SIZE_STEP = 2;
+
 const INITIAL_SCROLL_SPEED = 30; // px per second
+const MIN_SCROLL_SPEED = 1;
+const MAX_SCROLL_SPEED = 200;
+const SCROLL_SPEED_STEP = 5;
+
 const INITIAL_LINE_HEIGHT = 1.5;
 
 const INITIAL_TEXT_COLOR_LIGHT_MODE_HSL = 'hsl(0 0% 0%)'; // Black HSL
@@ -35,7 +43,7 @@ const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
 const LONGER_DEFAULT_SCRIPT_TEXT = `Welcome to Promptastic!
-Your modern, high-performance teleprompter designed to help you deliver scripts smoothly and professionally.
+Your modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally.
 
 This is a sample script to guide you through Promptastic's features.
 To get started, you can:
@@ -46,6 +54,8 @@ To get started, you can:
     *   Import scripts from .txt, .md, .pdf, and .docx files.
     *   Export the current script as a .txt file.
     *   Save and load different versions of your scripts.
+    *   Get an AI-powered summary of your script.
+    *   An "Estimated Reading Time" is shown to help you gauge script length.
 //PAUSE//
 (This "//PAUSE//" cue indicates a brief pause in delivery. The teleprompter will show a visual cue.)
 
@@ -54,9 +64,9 @@ To get started, you can:
     *   Change the focus line style (line or shaded paragraph) and its vertical position.
     *   Use "Mirror Mode" for physical teleprompter hardware.
     *   Toggle themes: Light, Dark, and High-Contrast.
-    *   Set up a countdown timer before playback (e.g., 3-2-1).
-    *   Adjust horizontal text padding to narrow or widen the script column.
-    *   Apply predefined "Layout Presets" or save your favorite setting combinations as "Settings Profiles".
+    *   Set up a "Countdown Timer" before playback (e.g., 3-2-1, duration 1-60s).
+    *   Adjust "Horizontal Text Padding" to narrow or widen the script column.
+    *   Apply predefined "Layout Presets" (e.g., "Default", "Studio Recording") or save your favorite setting combinations as "Settings Profiles".
 
 **Understanding Formatting & Cues:**
 
@@ -80,8 +90,19 @@ Combine formatting with cues: **//EMPHASIZE//This important point is bold and em
 *   **AI Scroll Sync (Experimental)**: Enable this in Settings, then use the "AI Sync" button (microphone icon) in the playback controls. The app will attempt to listen to your speech and adjust scroll speed. (Note: Speech analysis is currently a placeholder and requires future integration with a Speech-to-Text API for full functionality.)
 *   **AI Script Summary**: In the Script Manager or via the playback controls, click "Summarize" to get an AI-generated summary of your script.
 
+**Keyboard Shortcuts (when not typing in an input field):**
+*   **Spacebar / Backspace**: Toggle Play/Pause scrolling.
+*   **R**: Reset scroll to the beginning.
+*   **F**: Toggle Fullscreen mode.
+*   **Esc**: Exit Fullscreen or Presentation mode.
+*   **[** (Left Bracket): Decrease scroll speed.
+*   **]** (Right Bracket): Increase scroll speed.
+*   **-** (Minus/Hyphen): Decrease font size.
+*   **=** (Equals/Plus): Increase font size.
+*   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and focused on the script editor).
+
 **About the Developer:**
-Promptastic! was developed by Om Prakash. To learn more about the project and the developer, please visit the "About Us" page accessible from the "Help" menu in the header.
+Promptastic! was conceived, designed, and developed by Om Prakash. For more details about the project and the developer, please visit the "About Us" page accessible from the "Help" menu in the header.
 
 //PAUSE//
 
@@ -181,8 +202,8 @@ interface TeleprompterStateStore extends TeleprompterSettings {
   setCurrentUserId: (userId: string | null) => void;
 
 
-  setFontSize: (size: number) => void;
-  setScrollSpeed: (speed: number) => void;
+  setFontSize: (size: number | ((prevSize: number) => number)) => void;
+  setScrollSpeed: (speed: number | ((prevSpeed: number) => number)) => void;
   setLineHeight: (height: number) => void;
   setIsMirrored: (mirrored: boolean) => void;
   setDarkMode: (darkMode: boolean) => void;
@@ -527,8 +548,14 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           }
         },
 
-        setFontSize: (size) => set({ fontSize: Math.max(12, size), activeLayoutPresetName: null }),
-        setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed), activeLayoutPresetName: null }),
+        setFontSize: (sizeOrFn) => set(state => {
+          const newSize = typeof sizeOrFn === 'function' ? sizeOrFn(state.fontSize) : sizeOrFn;
+          return { fontSize: Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, newSize)), activeLayoutPresetName: null };
+        }),
+        setScrollSpeed: (speedOrFn) => set(state => {
+          const newSpeed = typeof speedOrFn === 'function' ? speedOrFn(state.scrollSpeed) : speedOrFn;
+          return { scrollSpeed: Math.max(MIN_SCROLL_SPEED, Math.min(MAX_SCROLL_SPEED, newSpeed)), activeLayoutPresetName: null };
+        }),
         setLineHeight: (height) => set({ lineHeight: Math.max(1, height), activeLayoutPresetName: null }),
         setIsMirrored: (mirrored) => set({ isMirrored: mirrored }), 
         setDarkMode: (newDarkModeValue) => {

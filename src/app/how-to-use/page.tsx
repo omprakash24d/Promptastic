@@ -6,7 +6,7 @@ import Footer from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2, Timer, ClockIcon, SlidersHorizontalIcon } from 'lucide-react';
+import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2, Timer, ClockIcon, SlidersHorizontalIcon, Type, MinusSquare, VenetianMask, AlignCenterVertical, Gauge, Contrast, Speaker } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
 import { ShareButtons } from '@/components/promptastic/ShareButtons';
@@ -71,8 +71,10 @@ export default function HowToUsePage() {
                 <h4 id="settings-panel-heading" className="font-medium flex items-center pt-2"><SlidersHorizontalIcon className="mr-2 h-5 w-5"/>Settings Panel</h4>
                 <p>Access Teleprompter Settings by clicking the "Settings" (<Settings className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
                  <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="settings-panel-heading">
-                    <li><strong>Appearance:</strong> Customize font size, line spacing, font family (including Atkinson Hyperlegible for readability), text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, and themes (Light/Dark/High-Contrast).</li>
-                    <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (<Timer className="inline h-4 w-4"/> enable/disable, duration 1-60s).</li>
+                    <li><strong>Appearance:</strong>
+                        Customize <strong className="font-medium">Font Size</strong> (<Type className="inline h-4 w-4"/>), <strong className="font-medium">Line Spacing</strong>, <strong className="font-medium">Font Family</strong> (including Atkinson Hyperlegible for readability), <strong className="font-medium">Text Color</strong> (<Palette className="inline h-4 w-4"/>), <strong className="font-medium">Horizontal Text Padding</strong> (<MinusSquare className="inline h-4 w-4"/>), <strong className="font-medium">Focus Line Position</strong> (<AlignCenterVertical className="inline h-4 w-4"/>) and <strong className="font-medium">Focus Style</strong> (<VenetianMask className="inline h-4 w-4"/>: line or shaded paragraph), <strong className="font-medium">Mirror Mode</strong> (<Speaker className="inline h-4 w-4" /> - example, use actual icon), and <strong className="font-medium">Themes</strong> (Light/Dark <Contrast className="inline h-4 w-4"/>/High-Contrast).
+                    </li>
+                    <li><strong>Playback:</strong> Adjust <strong className="font-medium">Scroll Speed</strong> (<Gauge className="inline h-4 w-4"/>), enable/disable <strong className="font-medium">AI Scroll Sync</strong> (<Mic className="inline h-4 w-4"/>), and configure the optional <strong className="font-medium">Countdown Timer</strong> (<Timer className="inline h-4 w-4"/> enable/disable, duration 1-60s).</li>
                     <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets (e.g., "Default", "Studio Recording") or save/load your custom combinations of settings as named profiles for different scenarios.</li>
                     <li><strong>General:</strong> Reset core settings to their "Default" preset values.</li>
                  </ul>
@@ -92,10 +94,16 @@ export default function HowToUsePage() {
 
               <section aria-labelledby="keyboard-shortcuts-heading">
                 <h3 id="keyboard-shortcuts-heading" className="text-lg font-semibold mb-2 flex items-center"><Palette className="mr-2 h-5 w-5 text-primary"/>Keyboard Shortcuts</h3>
-                <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling (when not focused on an input field).</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">R</code>: Reset scroll to the beginning (when not focused on an input field).</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen mode.</li>
+                <p className="text-sm text-muted-foreground">These shortcuts work when you are not focused on an input field (like the script editor or settings input).</p>
+                <ul className="list-disc list-outside pl-5 space-y-1 mt-2">
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">R</code>: Reset scroll to the beginning.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">F</code>: Toggle Fullscreen mode.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen or Presentation mode.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">[</code> (Left Square Bracket): Decrease scroll speed.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">]</code> (Right Square Bracket): Increase scroll speed.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">-</code> (Minus/Hyphen): Decrease font size.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">=</code> (Equals/Plus): Increase font size.</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script (when Script Manager is open and focused on the script editor).</li>
                 </ul>
               </section>

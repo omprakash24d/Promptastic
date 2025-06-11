@@ -18,6 +18,9 @@ import { Settings, FileText, Maximize } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+const FONT_SIZE_STEP = 2;
+const SCROLL_SPEED_STEP = 5;
+
 interface PersistedStorePreferences {
   darkMode?: boolean;
   enableHighContrast?: boolean;
@@ -32,12 +35,13 @@ export default function PromptasticPage() {
     isPresentationMode, setIsPresentationMode,
     enableHighContrast,
     LONGER_DEFAULT_SCRIPT_TEXT,
+    setFontSize,
+    setScrollSpeed,
   } = useTeleprompterStore();
 
   const { toast } = useToast();
   const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
   const [scriptsSheetOpen, setScriptsSheetOpen] = useState(false);
-  // Help sheet state is removed as help is now handled by dedicated pages via header dropdown
   const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -175,16 +179,34 @@ export default function PromptasticPage() {
       const activeElement = document.activeElement;
       const isTyping = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'textbox');
 
-      if ((event.code === 'Space' || event.code === 'Backspace') && !isTyping) {
+      if (isTyping) return; // Do not process shortcuts if typing
+
+      if ((event.code === 'Space' || event.code === 'Backspace')) {
         event.preventDefault();
         togglePlayPause();
-      } else if (event.key.toUpperCase() === 'R' && !isTyping && !event.ctrlKey && !event.metaKey) {
+      } else if (event.key.toUpperCase() === 'R' && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         resetScroll();
         toast({ title: "Scroll Reset", description: "Teleprompter scroll position has been reset to the beginning." });
-      } else if (event.key.toUpperCase() === 'F' && !isTyping) {
+      } else if (event.key.toUpperCase() === 'F') {
         event.preventDefault();
         handleToggleFullScreen();
+      } else if (event.key === '[') { // Decrease scroll speed
+        event.preventDefault();
+        setScrollSpeed(prev => prev - SCROLL_SPEED_STEP);
+        toast({ description: `Scroll speed decreased to ${useTeleprompterStore.getState().scrollSpeed}.` });
+      } else if (event.key === ']') { // Increase scroll speed
+        event.preventDefault();
+        setScrollSpeed(prev => prev + SCROLL_SPEED_STEP);
+        toast({ description: `Scroll speed increased to ${useTeleprompterStore.getState().scrollSpeed}.` });
+      } else if (event.key === '-') { // Decrease font size
+        event.preventDefault();
+        setFontSize(prev => prev - FONT_SIZE_STEP);
+        toast({ description: `Font size decreased to ${useTeleprompterStore.getState().fontSize}px.` });
+      } else if (event.key === '=') { // Increase font size (equals key, often unshifted +)
+        event.preventDefault();
+        setFontSize(prev => prev + FONT_SIZE_STEP);
+        toast({ description: `Font size increased to ${useTeleprompterStore.getState().fontSize}px.` });
       } else if (event.key === 'Escape') {
         if (isPresentationMode) {
             setIsPresentationMode(false);
@@ -206,7 +228,7 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode, handleToggleFullScreen]);
+  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode, handleToggleFullScreen, setFontSize, setScrollSpeed]);
 
   const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
