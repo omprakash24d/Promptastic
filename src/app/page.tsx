@@ -19,10 +19,9 @@ export default function PromptasticPage() {
   const {
     darkMode,
     setDarkMode,
-    scripts,
-    activeScriptName,
-    loadScript: loadScriptFromStore,
-    scriptText: currentGlobalScriptText,
+    scripts, // For dependency array
+    activeScriptName, // For dependency array
+    loadScript: loadScriptFromStore, // Stable store action
     togglePlayPause,
   } = useTeleprompterStore();
 
@@ -32,6 +31,7 @@ export default function PromptasticPage() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
+  // Effect for initializing dark mode from localStorage or system preference
   useEffect(() => {
     const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
     let initialDarkMode = persistedStore.darkMode;
@@ -40,13 +40,16 @@ export default function PromptasticPage() {
       if (typeof window !== 'undefined') {
         initialDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
       } else {
+        // Fallback for non-browser environments or if window.matchMedia isn't available (shouldn't happen in Next.js client)
         initialDarkMode = useTeleprompterStore.getState().darkMode; 
       }
     }
+    // Call setDarkMode to ensure store logic (including text color adjustment) runs
     setDarkMode(initialDarkMode);
-  }, [setDarkMode]);
+  }, [setDarkMode]); // setDarkMode is a stable reference from Zustand
 
 
+  // Effect to apply dark class to HTML element
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -55,25 +58,42 @@ export default function PromptasticPage() {
     }
   }, [darkMode]);
 
+
+  // Effect for initializing scriptText based on activeScriptName or first script
   useEffect(() => {
     const storeState = useTeleprompterStore.getState();
-    if (storeState.scripts.length > 0) {
-      const scriptToLoadName = storeState.activeScriptName && storeState.scripts.some(s => s.name === storeState.activeScriptName)
-        ? storeState.activeScriptName
-        : storeState.scripts[0].name;
+    const { scriptText: currentText, activeScriptName: currentActive, scripts: currentScripts, LONGER_DEFAULT_SCRIPT_TEXT: defaultText } = storeState;
 
-      const targetScript = storeState.scripts.find(s => s.name === scriptToLoadName);
-      if (targetScript && (storeState.scriptText !== targetScript.content || !storeState.scriptText)) {
-        loadScriptFromStore(scriptToLoadName);
-      } else if (!targetScript && !storeState.scriptText && storeState.scripts.length > 0) {
-        loadScriptFromStore(storeState.scripts[0].name);
+    // Use LONGER_DEFAULT_SCRIPT_TEXT from the store if available, otherwise fallback
+    const actualDefaultText = typeof defaultText === 'string' ? defaultText : "Welcome to Promptastic!";
+
+
+    if (currentActive && currentScripts.some(s => s.name === currentActive)) {
+      // Valid active script name exists
+      const activeScript = currentScripts.find(s => s.name === currentActive)!;
+      // Only load if current text is the placeholder or empty, to avoid overwriting edits.
+      if (currentText === actualDefaultText || currentText === "") { 
+        loadScriptFromStore(activeScript.name);
       }
-    } else if (storeState.scriptText === "" && storeState.activeScriptName) {
-        loadScriptFromStore(storeState.activeScriptName);
-    } else if (storeState.scripts.length === 0 && storeState.scriptText === "" && !storeState.activeScriptName) {
-       // Store's initial state handles welcome message.
+    } else if (currentScripts.length > 0) {
+      // No valid active script name, but scripts exist: load the first script.
+      // Only load if current text is the placeholder or empty.
+      if (currentText === actualDefaultText || currentText === "") { 
+        loadScriptFromStore(currentScripts[0].name);
+        // If activeScriptName was null/invalid, update it in the store to reflect this default loading.
+        if(currentActive !== currentScripts[0].name) {
+            useTeleprompterStore.setState({ activeScriptName: currentScripts[0].name });
+        }
+      }
+    } else {
+      // No scripts exist. Ensure scriptText is the default if it's not already.
+      if (currentText !== actualDefaultText) {
+        useTeleprompterStore.setState({ scriptText: actualDefaultText, activeScriptName: null, currentScrollPosition: 0 });
+      }
     }
-  }, [activeScriptName, scripts, loadScriptFromStore, currentGlobalScriptText]);
+  // Dependencies: activeScriptName (from store), scripts (array from store), loadScriptFromStore (stable action)
+  // These ensure the effect runs when the active script might need to change or on initial load.
+  }, [activeScriptName, scripts, loadScriptFromStore]);
 
 
   const handleToggleFullScreen = () => {
@@ -85,7 +105,7 @@ export default function PromptasticPage() {
         toast({
           variant: "destructive",
           title: "Fullscreen Error",
-          description: `Could not enter full-screen mode: ${err.message}`,
+          description: `Could not enter full-screen mode. ${err.message}`,
         });
       });
     } else {
@@ -95,7 +115,7 @@ export default function PromptasticPage() {
            toast({
             variant: "destructive",
             title: "Fullscreen Error",
-            description: `Could not exit full-screen mode: ${err.message}`,
+            description: `Could not exit full-screen mode. ${err.message}`,
           });
         });
       }
@@ -114,6 +134,7 @@ export default function PromptasticPage() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code === 'Space') {
         const activeElement = document.activeElement;
+        // Prevent play/pause if focus is on an input, textarea, or button
         if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'button')) {
           return;
         }
@@ -123,7 +144,11 @@ export default function PromptasticPage() {
       if (event.key === 'Escape' && document.fullscreenElement) {
         document.exitFullscreen().catch(err => {
           console.error(`Error attempting to exit full-screen mode via Escape: ${err.message} (${err.name})`);
-          // Optionally toast here as well, though browser usually handles Escape well.
+          toast({
+            variant: "destructive",
+            title: "Fullscreen Error",
+            description: "Could not exit full-screen mode.", // Simplified message for Escape key
+          });
         });
       }
     };
@@ -132,7 +157,7 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause]);
+  }, [togglePlayPause, toast]); // Added toast to dependencies as it's used in the effect
 
 
   return (
@@ -192,3 +217,4 @@ export default function PromptasticPage() {
     </div>
   );
 }
+

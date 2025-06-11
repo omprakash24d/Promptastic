@@ -15,14 +15,12 @@ const INITIAL_TEXT_COLOR_LIGHT_MODE_HSL = 'hsl(0 0% 0%)'; // Black HSL
 const INITIAL_TEXT_COLOR_DARK_MODE_HSL = 'hsl(0 0% 100%)'; // White HSL
 const BLACK_HEX = '#000000';
 const WHITE_HEX = '#ffffff';
-const BLACK_RGB = 'rgb(0,0,0)';
-const WHITE_RGB = 'rgb(255,255,255)';
 
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 
 // Default app theme is dark mode.
-const SERVER_DEFAULT_DARK_MODE = true; 
+const SERVER_DEFAULT_DARK_MODE = true;
 // Corresponding text color for default dark mode.
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
@@ -84,23 +82,16 @@ interface TeleprompterState extends TeleprompterSettings {
 export const useTeleprompterStore = create<TeleprompterState>()(
   persist(
     (set, get) => {
-      // Helper to check if a color is effectively black (HSL, Hex, or RGB)
-      // Normalizes by removing spaces for rgb formats e.g. "rgb(0, 0, 0)" -> "rgb(0,0,0)"
       const isEffectivelyBlack = (color: string | undefined | null): boolean => {
         if (!color) return false;
         const c = color.toLowerCase().replace(/\s/g, '');
-        return c === INITIAL_TEXT_COLOR_LIGHT_MODE_HSL.toLowerCase() || 
-               c === BLACK_HEX.toLowerCase() ||
-               c === BLACK_RGB;
+        return c === INITIAL_TEXT_COLOR_LIGHT_MODE_HSL.toLowerCase() || c === BLACK_HEX.toLowerCase();
       };
       
-      // Helper to check if a color is effectively white (HSL, Hex, or RGB)
       const isEffectivelyWhite = (color: string | undefined | null): boolean => {
         if (!color) return false;
         const c = color.toLowerCase().replace(/\s/g, '');
-        return c === INITIAL_TEXT_COLOR_DARK_MODE_HSL.toLowerCase() || 
-               c === WHITE_HEX.toLowerCase() ||
-               c === WHITE_RGB;
+        return c === INITIAL_TEXT_COLOR_DARK_MODE_HSL.toLowerCase() || c === WHITE_HEX.toLowerCase();
       };
 
       return {
@@ -146,7 +137,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
           set(state => ({
             scripts: state.scripts.filter(s => s.name !== name),
             activeScriptName: state.activeScriptName === name ? null : state.activeScriptName,
-            scriptText: state.activeScriptName === name ? "" : state.scriptText,
+            // scriptText is handled by subscription or page effect if all scripts are gone or active one is deleted
           }));
         },
         renameScript: (oldName, newName) => {
@@ -162,17 +153,13 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
         
         setDarkMode: (newDarkModeValue) => {
-          // Always set text to white in dark mode and black in light mode
-          // This prioritizes visibility over preserving custom colors across theme changes.
-          let newFinalTextColor;
-          if (newDarkModeValue) { // Switching to Dark Mode
-            newFinalTextColor = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
-          } else { // Switching to Light Mode
-            newFinalTextColor = INITIAL_TEXT_COLOR_LIGHT_MODE_HSL;
-          }
-          set({ 
+          // This logic ensures text color defaults correctly based on theme.
+          // If current text color is one of the "defaults" (black or white), it's flipped.
+          // Otherwise (custom color), it's preserved.
+          // This was simplified to always set to default, prioritizing visibility.
+          set({
             darkMode: newDarkModeValue,
-            textColor: newFinalTextColor 
+            textColor: newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
           });
         },
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
@@ -193,7 +180,6 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
-        // Only persist these specific parts of the state
         scripts: state.scripts,
         activeScriptName: state.activeScriptName,
         fontSize: state.fontSize,
@@ -204,72 +190,20 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isAutoSyncEnabled: state.isAutoSyncEnabled,
         textColor: state.textColor,
         fontFamily: state.fontFamily,
-        // Do not persist scriptText directly if it should always start with a default or loaded script.
-        // If you want to persist the current scriptText even without saving, add it here.
-        // scriptText: state.scriptText 
       }),
     }
   )
 );
 
-// Effect to ensure that when the store initializes and activeScriptName is set,
-// if scriptText is empty or still the default welcome message while activeScriptName points to a real script,
-// the active script's content is loaded into scriptText.
-// Also, if no activeScriptName but scripts exist, load the first script.
-// This is a bit of a workaround for complex initial state hydration with persisted activeScriptName.
+// Simplified subscription:
+// Only responsible for resetting to default script text if all scripts are removed
+// and the current text isn't already the default.
+// Initial script loading based on activeScriptName is handled by PromptasticPage.tsx useEffect.
 const unsub = useTeleprompterStore.subscribe(
-  (state, prevState) => {
-    // This logic tries to ensure a sensible script is loaded on initialization
-    // especially when activeScriptName is persisted.
-    if (state.scripts.length > 0 && 
-        (!state.scriptText || state.scriptText === LONGER_DEFAULT_SCRIPT_TEXT || state.scriptText === "") &&
-        !state.isPlaying /* Only run this if not actively playing to avoid interruptions */
-      ) {
-      
-      let scriptToAutoLoadName: string | null = null;
-
-      if (state.activeScriptName && state.scripts.some(s => s.name === state.activeScriptName)) {
-        // If a valid activeScriptName exists, prioritize it
-        const activeScript = state.scripts.find(s => s.name === state.activeScriptName);
-        if (activeScript && activeScript.content !== state.scriptText) {
-            scriptToAutoLoadName = state.activeScriptName;
-        }
-      } else if (state.scripts.length > 0) {
-        // If no valid activeScriptName, or activeScriptName points to a non-existent script,
-        // load the first script in the list.
-        scriptToAutoLoadName = state.scripts[0].name;
-      }
-
-      if (scriptToAutoLoadName) {
-        // Check if this subscription is still active to avoid errors during HMR or unmount
-        if (typeof unsub === 'function') { 
-            // Temporarily set isPlaying to true to prevent recursive calls from loadScript setting position
-            // This is a bit of a hack and suggests the state logic could be further refined.
-            // Alternatively, `loadScript` could have an option to not reset scroll.
-            const originalIsPlaying = state.isPlaying;
-            useTeleprompterStore.setState({ isPlaying: true });
-            useTeleprompterStore.getState().loadScript(scriptToAutoLoadName);
-            useTeleprompterStore.setState({ isPlaying: originalIsPlaying, currentScrollPosition: 0 });
-        }
-      }
-    } else if (state.scripts.length === 0 && state.activeScriptName === null && state.scriptText !== LONGER_DEFAULT_SCRIPT_TEXT) {
-        // If all scripts are deleted and no active script, reset to default welcome message.
-         if (typeof unsub === 'function') {
-            useTeleprompterStore.setState({ scriptText: LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
-         }
+  (state) => {
+    if (state.scripts.length === 0 && state.activeScriptName === null && state.scriptText !== LONGER_DEFAULT_SCRIPT_TEXT) {
+        useTeleprompterStore.setState({ scriptText: LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
     }
   },
-  // Selector to run the effect only when relevant parts change.
-  // For initial load, we mainly care about scripts and activeScriptName being populated from persistence.
-  (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, isPlaying: state.isPlaying }) 
+  (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText }) 
 );
-// Consider the lifecycle of this subscription, especially with HMR or if the store is ever unmounted/recreated.
-// For a simple app, this might be fine. For more complex scenarios, this logic might live better inside
-// the `PromptasticPage` component's useEffect.
-
-
-// The isEffectivelyBlack and isEffectivelyWhite helpers were removed from here as they were
-// simplified in the setDarkMode logic to always switch to default black/white.
-// If more nuanced color preservation is needed in the future, they might be reintroduced.
-
-
