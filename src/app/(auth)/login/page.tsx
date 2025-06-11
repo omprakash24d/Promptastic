@@ -23,14 +23,15 @@ export default function LoginPage() {
     sendPasswordReset,
     loading,
     error,
-    successMessage, // Get success message
-    clearAuthMessages, // Function to clear messages
+    successMessage,
+    clearAuthMessages,
   } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [displayName, setDisplayName] = useState(''); // Added for sign-up
   const [activeTab, setActiveTab] = useState<'signIn' | 'signUp'>('signIn');
 
   const [resetEmail, setResetEmail] = useState('');
@@ -38,7 +39,6 @@ export default function LoginPage() {
   const [passwordMismatchError, setPasswordMismatchError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Clear messages when component mounts or when user switches forms
     return () => {
       clearAuthMessages();
     };
@@ -50,6 +50,7 @@ export default function LoginPage() {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setDisplayName(''); // Clear display name on tab change
     setActiveTab(value as 'signIn' | 'signUp');
   };
 
@@ -59,16 +60,19 @@ export default function LoginPage() {
     setPasswordMismatchError(null);
 
     if (activeTab === 'signUp') {
+      if (!displayName.trim()) {
+        setPasswordMismatchError("Display Name cannot be empty."); // Basic check for display name
+        return;
+      }
       if (password !== confirmPassword) {
         setPasswordMismatchError("Passwords do not match.");
         return;
       }
       if (password.length < 6) {
-         // Firebase will also throw weak-password, but good to have client-side too
         setPasswordMismatchError("Password must be at least 6 characters long.");
         return;
       }
-      await signUpWithEmail(email, password);
+      await signUpWithEmail(email, password, displayName);
     } else {
       await signInWithEmail(email, password);
     }
@@ -89,13 +93,8 @@ export default function LoginPage() {
     if (password.length > 0 && password.length < 6 && activeTab === 'signUp') {
       return <p className="text-xs text-destructive mt-1">Password must be at least 6 characters.</p>;
     }
-    // Placeholder for more advanced strength meter
-    // if (password.length >= 6 && activeTab === 'signUp') {
-    //   return <p className="text-xs text-green-600 mt-1">Password strength: Okay</p>;
-    // }
     return null;
   };
-
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -124,7 +123,6 @@ export default function LoginPage() {
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
             </div>
           )}
-
 
           {showForgotPassword ? (
             <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
@@ -155,6 +153,21 @@ export default function LoginPage() {
 
                 <TabsContent value={activeTab}>
                   <form onSubmit={handleEmailPasswordSubmit} className="space-y-4">
+                    {activeTab === 'signUp' && (
+                      <div>
+                        <Label htmlFor="displayName">Display Name</Label>
+                        <Input
+                          id="displayName"
+                          type="text"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          placeholder="Your Name"
+                          required
+                          className="mt-1"
+                          autoComplete="name"
+                        />
+                      </div>
+                    )}
                     <div>
                       <Label htmlFor="email">Email Address</Label>
                       <Input
@@ -236,7 +249,6 @@ export default function LoginPage() {
             </Button>
           ) : (
             <>
-              {/* Toggle between Sign In/Sign Up is now handled by Tabs */}
               <Button variant="link" size="sm" onClick={() => { setShowForgotPassword(true); setResetEmail(email); clearAuthMessages();}} className="text-sm text-muted-foreground hover:text-primary">
                 Forgot Password?
               </Button>
@@ -247,8 +259,6 @@ export default function LoginPage() {
           </p>
         </CardFooter>
       </Card>
-       {/* Hidden div for reCAPTCHA, if you implement phone auth */}
-       {/* <div id="recaptcha-container-id"></div> */}
     </div>
   );
 }

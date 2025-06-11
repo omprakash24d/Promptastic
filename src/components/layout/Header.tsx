@@ -3,12 +3,12 @@
 
 import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle } from 'lucide-react';
+import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2 } from 'lucide-react'; // Changed UserCircle to UserCircle2 for filled icon
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import Link from 'next/link'; // Import Link for navigation
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,14 +33,14 @@ interface NavButtonConfig {
   href?: string;
   ariaLabel: string;
   showTextOnDesktop?: boolean;
-  isAuthAction?: boolean; 
-  requiresAuth?: boolean; 
-  hideIfAuth?: boolean; 
+  isAuthAction?: boolean;
+  requiresAuth?: boolean;
+  hideIfAuth?: boolean;
 }
 
 const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpenHelp }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
-  const { user, logout, loading } = useAuth(); 
+  const { user, logout, loading } = useAuth();
 
   const toggleTheme = useCallback(() => {
     setDarkMode(!darkMode);
@@ -54,7 +54,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
         onClick: onOpenScripts,
         ariaLabel: 'Open script manager',
         showTextOnDesktop: true,
-        requiresAuth: true, 
+        requiresAuth: true,
       },
       {
         label: 'Settings',
@@ -80,21 +80,17 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
     ];
 
     if (loading) {
-      // Show only non-auth related buttons while auth state is loading
       return dynamicButtons.filter(b => !b.requiresAuth && !b.isAuthAction && !b.hideIfAuth);
     }
 
-    // Filter buttons based on auth state (requiresAuth, hideIfAuth)
-    // The UserNav component will handle the login/logout button itself.
     return dynamicButtons.filter(b => {
-      if (b.requiresAuth && !user) return false; // Hide if requires auth and no user
-      if (b.hideIfAuth && user) return false;   // Hide if meant to be hidden when authenticated
+      if (b.requiresAuth && !user) return false;
+      if (b.hideIfAuth && user) return false;
       return true;
     });
   };
-  
-  const navButtons = getNavButtons();
 
+  const navButtons = getNavButtons();
 
   const UserNav = () => {
     if (loading) {
@@ -115,7 +111,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
               <AvatarImage src={user.photoURL || undefined} alt={user.displayName || user.email || 'User'} />
-              <AvatarFallback>{user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : <UserCircle />)}</AvatarFallback>
+              <AvatarFallback>{user.displayName ? user.displayName.charAt(0).toUpperCase() : (user.email ? user.email.charAt(0).toUpperCase() : <UserCircle2 />)}</AvatarFallback>
             </Avatar>
           </Button>
         </DropdownMenuTrigger>
@@ -129,7 +125,14 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {/* Add other items like "Profile", "Settings" later */}
+          <Link href="/profile" passHref legacyBehavior>
+            <DropdownMenuItem asChild>
+              <a>
+                <UserCircle2 className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+              </a>
+            </DropdownMenuItem>
+          </Link>
           <DropdownMenuItem onClick={logout}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Log out</span>
@@ -138,7 +141,6 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
       </DropdownMenu>
     );
   };
-
 
   return (
     <header className="border-b bg-card py-3 shadow-sm shrink-0 print:hidden" role="banner">
@@ -167,10 +169,9 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
             </span>
           </Link>
 
-
           <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
             {navButtons.map((button) => (
-              button.href ? ( // Should not be login button here as UserNav handles it
+              button.href ? (
                 <Link key={button.label} href={button.href} passHref legacyBehavior>
                   <Button
                     variant="ghost"
@@ -199,12 +200,10 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
                 </Button>
               )
             ))}
-             <UserNav /> {/* UserNav handles Login button or User Avatar */}
+             <UserNav />
           </nav>
 
-
           <nav className="flex items-center md:hidden space-x-1" aria-label="Mobile navigation">
-             {/* For mobile, we only show icon buttons from navButtons, UserNav handles login/avatar */}
             {navButtons.map((button) => (
                 <Button
                     key={button.label}
@@ -213,13 +212,11 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
                     onClick={button.onClick}
                     aria-label={button.ariaLabel}
                     title={button.ariaLabel}
-                    // If it has an href, wrap with Link (but it won't be the login button)
-                    // This part might need adjustment if some of these navButtons had hrefs
                 >
                     <button.icon className="h-5 w-5" aria-hidden="true"/>
                 </Button>
             ))}
-             <UserNav /> 
+             <UserNav />
           </nav>
         </div>
       </div>
