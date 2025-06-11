@@ -2,7 +2,7 @@
 "use client";
 
 import type React from 'react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
 import { PlaybackControls } from '@/components/promptastic/PlaybackControls';
@@ -142,12 +142,14 @@ export default function PromptasticPage() {
     };
   }, [togglePlayPause, toast]);
 
+  const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
+  const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <Header
-        onOpenScripts={() => setScriptsSheetOpen(true)}
-        onOpenSettings={() => setSettingsSheetOpen(true)}
+        onOpenScripts={openScriptsSheet}
+        onOpenSettings={openSettingsSheet}
       />
 
       <main ref={mainRef} className="flex-1 bg-background">
