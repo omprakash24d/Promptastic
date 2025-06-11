@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2 } from 'lucide-react'; // Changed UserCircle to UserCircle2 for filled icon
+import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2, Hammer } from 'lucide-react'; // Added Hammer
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -65,9 +65,9 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
       },
       {
         label: 'Help',
-        icon: HelpCircle,
+        icon: Hammer, // Changed icon to Hammer
         onClick: onOpenHelp,
-        ariaLabel: 'Open help documentation',
+        ariaLabel: 'Open help and information', // Updated aria-label
         showTextOnDesktop: true,
       },
       {
@@ -204,7 +204,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
           </nav>
 
           <nav className="flex items-center md:hidden space-x-1" aria-label="Mobile navigation">
-            {navButtons.map((button) => (
+            {navButtons.filter(b => !b.showTextOnDesktop).map((button) => ( // Filter for icon-only buttons for mobile view compactness
                 <Button
                     key={button.label}
                     variant="ghost"
