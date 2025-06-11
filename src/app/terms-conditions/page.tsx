@@ -2,32 +2,25 @@
 "use client";
 
 import type React from 'react';
-import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
-
-// export const metadata: Metadata = { // Static metadata for Client Component
-//   title: 'Terms & Conditions',
-//   description: 'Terms and Conditions for using Promptastic!',
-// };
-// For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
-// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
+import { ChevronLeft, Gavel } from 'lucide-react';
 
 
 export default function TermsConditionsPage() {
-  // Dummy functions for Header props as sheets are not relevant here
   const dummyOpen = () => {};
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} onOpenHelp={dummyOpen} />
+      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
-          <CardHeader>
+          <CardHeader className="items-center">
+            <Gavel className="h-12 w-12 text-primary mb-3" />
             <CardTitle className="text-2xl md:text-3xl text-center">Terms & Conditions</CardTitle>
+            <CardDescription className="text-center">Please read these terms carefully before using Promptastic!.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
             <p className="text-muted-foreground text-center">Last updated: {new Date().toLocaleDateString()}</p>
@@ -42,27 +35,28 @@ export default function TermsConditionsPage() {
             <p>You agree not to disclose your password to any third party. You must notify us immediately upon becoming aware of any breach of security or unauthorized use of your account.</p>
 
             <h2 className="text-xl font-semibold mt-6">2. User Content</h2>
-            <p>Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"). You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness.</p>
-            <p>By posting Content to the Service, you grant us the right and license to use, modify, publicly perform, publicly display, reproduce, and distribute such Content on and through the Service for the purpose of operating and providing the Service. You retain any and all of your rights to any Content you submit, post or display on or through the Service and you are responsible for protecting those rights.</p>
+            <p>Our Service allows you to post, link, store, share and otherwise make available certain information, text, graphics, videos, or other material ("Content"). This primarily refers to the scripts you create and use within the teleprompter. You are responsible for the Content that you post to the Service, including its legality, reliability, and appropriateness.</p>
+            <p>By posting Content to the Service, you grant us the right and license to store and process such Content on and through the Service solely for the purpose of operating and providing the Service to you. You retain any and all of your rights to any Content you submit, post or display on or through the Service and you are responsible for protecting those rights.</p>
             <p>You represent and warrant that: (i) the Content is yours (you own it) or you have the right to use it and grant us the rights and license as provided in these Terms, and (ii) the posting of your Content on or through the Service does not violate the privacy rights, publicity rights, copyrights, contract rights or any other rights of any person.</p>
-            <p>We reserve the right to remove any Content that violates these Terms or is otherwise objectionable, in our sole discretion.</p>
+            <p>We reserve the right to remove any Content that violates these Terms or is otherwise objectionable, in our sole discretion, particularly if it poses a security risk or violates legal requirements.</p>
 
             <h2 className="text-xl font-semibold mt-6">3. Acceptable Use</h2>
             <p>You agree not to use the Service:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>In any way that violates any applicable national or international law or regulation.</li>
               <li>For the purpose of exploiting, harming, or attempting to exploit or harm minors in any way by exposing them to inappropriate content or otherwise.</li>
-              <li>To transmit, or procure the sending of, any advertising or promotional material, including any "junk mail", "chain letter," "spam," or any other similar solicitation.</li>
+              <li>To transmit, or procure the sending of, any advertising or promotional material, including any "junk mail", "chain letter," "spam," or any other similar solicitation through any communication features we might offer.</li>
               <li>To impersonate or attempt to impersonate the Company, a Company employee, another user, or any other person or entity.</li>
               <li>In any way that infringes upon the rights of others, or in any way is illegal, threatening, fraudulent, or harmful, or in connection with any unlawful, illegal, fraudulent, or harmful purpose or activity.</li>
+              <li>To engage in any other conduct that restricts or inhibits anyone’s use or enjoyment of the Service, or which, as determined by us, may harm the Company or users of the Service or expose them to liability.</li>
             </ul>
 
             <h2 className="text-xl font-semibold mt-6">4. Intellectual Property</h2>
-            <p>The Service and its original content (excluding Content provided by users), features and functionality are and will remain the exclusive property of Om Prakash and its licensors. The Service is protected by copyright, trademark, and other laws of both the India and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of Om Prakash.</p>
+            <p>The Service and its original content (excluding Content provided by users), features and functionality are and will remain the exclusive property of Om Prakash and its licensors. The Service is protected by copyright, trademark, and other laws of both India and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of Om Prakash.</p>
 
             <h2 className="text-xl font-semibold mt-6">5. Termination</h2>
             <p>We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms.</p>
-            <p>Upon termination, your right to use the Service will immediately cease. If you wish to terminate your account, you may simply discontinue using the Service or contact us to delete your account.</p>
+            <p>Upon termination, your right to use the Service will immediately cease. If you wish to terminate your account, you may simply discontinue using the Service or contact us to request account deletion as per our Privacy Policy.</p>
 
             <h2 className="text-xl font-semibold mt-6">6. Limitation Of Liability</h2>
             <p>In no event shall Om Prakash, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory, whether or not we have been informed of the possibility of such damage, and even if a remedy set forth herein is found to have failed of its essential purpose.</p>
@@ -80,7 +74,7 @@ export default function TermsConditionsPage() {
             <p>By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms. If you do not agree to the new terms, please stop using the Service.</p>
 
             <h2 className="text-xl font-semibold mt-6">10. Contact Us</h2>
-            <p>If you have any questions about these Terms, please contact us:</p>
+            <p>If you have any questions about these Terms, please visit our <Link href="/contact-us" className="text-primary hover:underline">Contact Us page</Link> or email us at:</p>
             <p>Email: <a href="mailto:terms@prompt.indhinditech.com" className="text-primary hover:underline">terms@prompt.indhinditech.com</a> (Placeholder)</p>
              <p>Via Instagram: <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@omprakash24d</a></p>
 

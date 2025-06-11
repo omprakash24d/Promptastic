@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2, Hammer } from 'lucide-react'; // Hammer is already here
+import { FileText, Moon, SlidersHorizontal, Sun, Hammer, LogIn, LogOut, UserCircle2, Info, FileQuestion, Mail, ShieldCheck, Gavel } from 'lucide-react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 interface HeaderProps {
   onOpenScripts: () => void;
   onOpenSettings: () => void;
-  onOpenHelp: () => void;
+  onOpenHelp?: () => void; // Made optional as it might be replaced by dropdown
 }
 
 interface NavButtonConfig {
@@ -31,20 +31,35 @@ interface NavButtonConfig {
   icon: React.ElementType;
   onClick?: () => void;
   href?: string;
+  isDropdown?: boolean;
+  dropdownItems?: DropdownItemConfig[];
   ariaLabel: string;
   showTextOnDesktop?: boolean;
-  isAuthAction?: boolean;
   requiresAuth?: boolean;
   hideIfAuth?: boolean;
 }
 
-const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpenHelp }: HeaderProps) {
+interface DropdownItemConfig {
+    label: string;
+    href: string;
+    icon: React.ElementType;
+}
+
+const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
   const { user, logout, loading } = useAuth();
 
   const toggleTheme = useCallback(() => {
     setDarkMode(!darkMode);
   }, [darkMode, setDarkMode]);
+
+  const helpDropdownItems: DropdownItemConfig[] = [
+    { label: "About Promptastic!", href: "/about-us", icon: Info },
+    { label: "How to Use", href: "/how-to-use", icon: FileQuestion },
+    { label: "Contact Us", href: "/contact-us", icon: Mail },
+    { label: "Privacy Policy", href: "/privacy-policy", icon: ShieldCheck },
+    { label: "Terms & Conditions", href: "/terms-conditions", icon: Gavel },
+  ];
 
   const getNavButtons = (): NavButtonConfig[] => {
     const dynamicButtons: NavButtonConfig[] = [
@@ -66,8 +81,9 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
       {
         label: 'Help',
         icon: Hammer, 
-        onClick: onOpenHelp,
-        ariaLabel: 'Open help and information',
+        isDropdown: true,
+        dropdownItems: helpDropdownItems,
+        ariaLabel: 'Open help menu',
         showTextOnDesktop: true,
       },
       {
@@ -75,18 +91,16 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
         icon: darkMode ? Sun : Moon,
         onClick: toggleTheme,
         ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`,
-        showTextOnDesktop: false, // This button will be icon-only on desktop too due to this
+        showTextOnDesktop: false, 
       },
     ];
 
     if (loading) {
-      // Show a minimal set or placeholders if auth state is loading
-      return dynamicButtons.filter(b => !b.requiresAuth && !b.isAuthAction && !b.hideIfAuth && b.label !== 'Scripts');
+      return dynamicButtons.filter(b => !b.requiresAuth && b.label !== 'Scripts');
     }
 
     return dynamicButtons.filter(b => {
       if (b.requiresAuth && !user) return false;
-      if (b.hideIfAuth && user) return false;
       return true;
     });
   };
@@ -143,6 +157,71 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
     );
   };
 
+  const renderNavButton = (button: NavButtonConfig, isMobile: boolean) => {
+    const buttonContent = (
+      <>
+        <button.icon className={cn((button.showTextOnDesktop && !isMobile) ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
+        {(button.showTextOnDesktop && !isMobile) && button.label}
+      </>
+    );
+
+    if (button.isDropdown && button.dropdownItems) {
+      return (
+        <DropdownMenu key={button.label + (isMobile ? "-mobile" : "-desktop")}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
+              aria-label={button.ariaLabel}
+              title={button.ariaLabel}
+            >
+              {buttonContent}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {button.dropdownItems.map(item => (
+              <Link key={item.href} href={item.href} passHref legacyBehavior>
+                <DropdownMenuItem asChild>
+                  <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
+                </DropdownMenuItem>
+              </Link>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+
+    if (button.href) {
+      return (
+        <Link key={button.label + (isMobile ? "-mobile" : "-desktop")} href={button.href} passHref legacyBehavior>
+          <Button
+            variant="ghost"
+            size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
+            aria-label={button.ariaLabel}
+            title={button.ariaLabel}
+            asChild
+          >
+            <a>{buttonContent}</a>
+          </Button>
+        </Link>
+      );
+    }
+
+    return (
+      <Button
+        key={button.label + (isMobile ? "-mobile" : "-desktop")}
+        variant="ghost"
+        size={(button.showTextOnDesktop && !isMobile) ? "sm" : "icon"}
+        onClick={button.onClick}
+        aria-label={button.ariaLabel}
+        title={button.ariaLabel}
+      >
+        {buttonContent}
+      </Button>
+    );
+  };
+
+
   return (
     <header className="border-b bg-card py-3 shadow-sm shrink-0 print:hidden" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -172,61 +251,13 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
 
           {/* Desktop Navigation */}
           <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
-            {navButtons.map((button) => (
-              button.href ? (
-                <Link key={button.label} href={button.href} passHref legacyBehavior>
-                  <Button
-                    variant="ghost"
-                    size={button.showTextOnDesktop ? "sm" : "icon"}
-                    aria-label={button.ariaLabel}
-                    title={button.ariaLabel}
-                    asChild
-                  >
-                    <a>
-                     <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
-                     {button.showTextOnDesktop && button.label}
-                    </a>
-                  </Button>
-                </Link>
-              ) : (
-                <Button
-                  key={button.label}
-                  variant="ghost"
-                  size={button.showTextOnDesktop ? "sm" : "icon"}
-                  onClick={button.onClick}
-                  aria-label={button.ariaLabel}
-                  title={button.ariaLabel}
-                >
-                  <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
-                  {button.showTextOnDesktop && button.label}
-                </Button>
-              )
-            ))}
-             <UserNav />
+            {navButtons.map(button => renderNavButton(button, false))}
+            <UserNav />
           </nav>
 
           {/* Mobile Navigation: Render all available buttons as icons */}
           <nav className="flex items-center md:hidden space-x-0.5" aria-label="Mobile navigation">
-            {navButtons.map((button) => (
-              button.href ? ( // For link-based navigation (currently none in navButtons)
-                <Link key={button.label + "-mobile"} href={button.href} passHref legacyBehavior>
-                  <Button variant="ghost" size="icon" title={button.ariaLabel} aria-label={button.ariaLabel} asChild>
-                    <a><button.icon className="h-5 w-5" /></a>
-                  </Button>
-                </Link>
-              ) : button.onClick ? ( // For onClick based navigation
-                <Button
-                  key={button.label + "-mobile"}
-                  variant="ghost"
-                  size="icon"
-                  onClick={button.onClick}
-                  title={button.ariaLabel}
-                  aria-label={button.ariaLabel}
-                >
-                  <button.icon className="h-5 w-5" />
-                </Button>
-              ) : null
-            ))}
+            {navButtons.map(button => renderNavButton(button, true))}
             <UserNav /> {/* UserNav is separate and already responsive */}
           </nav>
         </div>

@@ -2,31 +2,25 @@
 "use client";
 
 import type React from 'react';
-import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, ShieldCheck } from 'lucide-react';
 
-// export const metadata: Metadata = { // Static metadata for Client Component
-//   title: 'Privacy Policy',
-//   description: 'Privacy Policy for Promptastic! - How we handle your data.',
-// };
-// For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
-// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
 
 export default function PrivacyPolicyPage() {
-  // Dummy functions for Header props as sheets are not relevant here
   const dummyOpen = () => {};
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} onOpenHelp={dummyOpen} />
+      <Header onOpenScripts={dummyOpen} onOpenSettings={dummyOpen} />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Card className="max-w-3xl mx-auto shadow-lg">
-          <CardHeader>
+          <CardHeader className="items-center">
+            <ShieldCheck className="h-12 w-12 text-primary mb-3" />
             <CardTitle className="text-2xl md:text-3xl text-center">Privacy Policy</CardTitle>
+            <CardDescription className="text-center">How Promptastic! handles your data.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 prose prose-sm sm:prose-base dark:prose-invert max-w-none">
             <p className="text-muted-foreground text-center">Last updated: {new Date().toLocaleDateString()}</p>
@@ -36,8 +30,8 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-xl font-semibold mt-6">1. Information We Collect</h2>
             <p>We may collect information about you in a variety of ways. The information we may collect via the Application depends on the content and materials you use, and includes:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li><strong>Personal Data:</strong> Personally identifiable information, such as your name, email address, and display name, that you voluntarily give to us when you register with the Application.</li>
-              <li><strong>Script Data:</strong> Any scripts, text, or content you input, upload, or save within the teleprompter functionality of the Application. If you are a logged-in user, this data is stored in our secure cloud database (Firestore). For anonymous users, this data is stored locally in your browser.</li>
+              <li><strong>Personal Data:</strong> Personally identifiable information, such as your name, email address, and display name, that you voluntarily give to us when you register with the Application. Profile pictures are also stored if you upload one.</li>
+              <li><strong>Script Data:</strong> Any scripts, text, or content you input, upload, or save within the teleprompter functionality of the Application. If you are a logged-in user, this data is stored in our secure cloud database (Firebase Firestore). For anonymous users, this data is stored locally in your browser.</li>
               <li><strong>Usage Data:</strong> We may automatically collect standard log information and usage details, such as IP address, browser type, operating system, access times, and pages viewed directly before and after accessing the Application. This is primarily for analytics and improving our service. (Currently, extensive usage tracking is not implemented beyond standard server logs if applicable).</li>
             </ul>
 
@@ -46,6 +40,7 @@ export default function PrivacyPolicyPage() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Create and manage your account.</li>
               <li>Provide and manage your scripts and teleprompter settings.</li>
+              <li>Store and display your profile picture.</li>
               <li>Enable user-to-user communications (if such features are implemented).</li>
               <li>Email you regarding your account or order (e.g., password resets, email verification).</li>
               <li>Improve the Application and develop new features.</li>
@@ -60,19 +55,19 @@ export default function PrivacyPolicyPage() {
             </ul>
 
             <h2 className="text-xl font-semibold mt-6">4. Security of Your Information</h2>
-            <p>We use administrative, technical, and physical security measures to help protect your personal information. While we have taken reasonable steps to secure the personal information you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable, and no method of data transmission can be guaranteed against any interception or other type of misuse.</p>
+            <p>We use administrative, technical, and physical security measures to help protect your personal information. Firebase provides robust security for its services. While we have taken reasonable steps to secure the personal information you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable, and no method of data transmission can be guaranteed against any interception or other type of misuse.</p>
 
             <h2 className="text-xl font-semibold mt-6">5. Policy for Children</h2>
             <p>We do not knowingly solicit information from or market to children under the age of 13. If you become aware of any data we have collected from children under age 13, please contact us using the contact information provided below.</p>
             
             <h2 className="text-xl font-semibold mt-6">6. Your Data Rights</h2>
-            <p>You have the right to access, update, or delete your personal information. You can manage your account information through your profile page within the application or by contacting us.</p>
+            <p>You have the right to access, update, or delete your personal information. You can manage your account information (display name, profile picture) through your profile page within the application. To delete your account and associated data, please contact us.</p>
 
             <h2 className="text-xl font-semibold mt-6">7. Changes to This Privacy Policy</h2>
             <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.</p>
 
             <h2 className="text-xl font-semibold mt-6">8. Contact Us</h2>
-            <p>If you have questions or comments about this Privacy Policy, please contact us at:</p>
+            <p>If you have questions or comments about this Privacy Policy, please visit our <Link href="/contact-us" className="text-primary hover:underline">Contact Us page</Link> or email us at:</p>
             <p>Email: <a href="mailto:privacy@prompt.indhinditech.com" className="text-primary hover:underline">privacy@prompt.indhinditech.com</a> (Placeholder)</p>
             <p>Via Instagram: <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">@omprakash24d</a></p>
 
