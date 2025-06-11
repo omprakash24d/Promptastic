@@ -26,7 +26,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<boolean>; // Changed to Promise<boolean>
+  sendPasswordReset: (email: string) => Promise<boolean>;
   updateUserProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
   logout: () => Promise<void>;
   clearAuthMessages: () => void;
@@ -66,7 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else setSuccessMessage(null);
   }
 
-  const handleAuthError = (err: any) => {
+  const handleAuthError = (err: any, operation?: 'passwordReset') => {
     setSuccessMessage(null);
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
@@ -76,15 +76,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else if (err.code === 'auth/cancelled-popup-request') {
         setError('The sign-in attempt was cancelled. If you\'d like to sign in, please try again.');
       }
-      setLoading(false);
+      setLoading(false); // Ensure loading is false for these specific errors
+      return; // Don't log to console
+    }
+
+    if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
+      // This case is handled directly in sendPasswordReset to show a generic message
+      // and prevent email enumeration. So we don't set an error here.
       return;
     }
+
 
     if (err.code && err.message) {
       switch (err.code) {
         case 'auth/user-not-found':
         case 'auth/wrong-password':
-        case 'auth/invalid-credential': // Added for newer SDK versions
+        case 'auth/invalid-credential':
           setError('Invalid email or password.');
           break;
         case 'auth/email-already-in-use':
@@ -105,16 +112,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         case 'auth/unauthorized-domain':
              setError('This domain is not authorized for Firebase operations. Please check your Firebase project configuration (Authentication > Sign-in method > Authorized domains) or contact support.');
              break;
+        case 'auth/network-request-failed':
+            setError('A network error occurred. Please check your internet connection and try again.');
+            break;
         default:
-          if (!userCancellableErrors.includes(err.code)) { // Don't log user-cancelled popups
-            console.error("Unhandled Auth Error:", err);
-          }
+          // console.error("Unhandled Auth Error:", err); // Suppressed for now
           setError(`An unexpected error occurred: ${err.message} (Code: ${err.code})`);
       }
     } else {
-      if (!userCancellableErrors.includes(err.code)){
-          console.error("Generic Auth Error:", err);
-      }
+      // console.error("Generic Auth Error:", err); // Suppressed for now
       setError(err.message || 'An unexpected error occurred during authentication.');
     }
   }
@@ -127,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, provider);
       handleAuthSuccess();
     } catch (err: any) {
-      // console.error("Google Sign-In Raw Error:", err); // Already handled by handleAuthError below
+      // console.log("Google Sign-In Raw Error:", err); // For debugging specific Google sign-in issues
       handleAuthError(err);
     } finally {
       setLoading(false);
@@ -178,11 +184,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages();
     try {
       await sendPasswordResetEmail(auth, email);
-      setSuccessMessage("Password reset email sent! Check your inbox (and spam folder).");
+      setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       setError(null);
       return true;
     } catch (err: any) {
-      handleAuthError(err);
+      if (err.code === 'auth/user-not-found') {
+        // Prevent email enumeration: show generic success message even if user not found.
+        setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
+        setError(null);
+        // Return true so the UI (e.g., login page) behaves as if successful (starts cooldown, navigates back)
+        return true;
+      }
+      handleAuthError(err, 'passwordReset');
       return false;
     } finally {
       setLoading(false);
@@ -242,7 +255,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateUserProfile,
     logout,
     clearAuthMessages,
-  }), [user, loading, error, successMessage]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, loading, error, successMessage, router]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

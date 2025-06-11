@@ -2,16 +2,17 @@
 "use client";
 
 import type React from 'react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-// import { useRouter } from 'next/navigation'; // No longer explicitly needed here for navigation
+
+const RESET_COOLDOWN_SECONDS = 30;
 
 export default function LoginPage() {
   const {
@@ -24,7 +25,6 @@ export default function LoginPage() {
     successMessage,
     clearAuthMessages,
   } = useAuth();
-  // const router = useRouter(); // No longer explicitly needed here
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,11 +36,39 @@ export default function LoginPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [passwordMismatchError, setPasswordMismatchError] = useState<string | null>(null);
 
+  const [isResetCooldown, setIsResetCooldown] = useState(false);
+  const [currentCooldownSeconds, setCurrentCooldownSeconds] = useState(RESET_COOLDOWN_SECONDS);
+  const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     return () => {
       clearAuthMessages();
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
     };
   }, [clearAuthMessages]);
+
+  useEffect(() => {
+    if (isResetCooldown) {
+      cooldownIntervalRef.current = setInterval(() => {
+        setCurrentCooldownSeconds(prev => {
+          if (prev <= 1) {
+            if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
+            setIsResetCooldown(false);
+            return RESET_COOLDOWN_SECONDS; // Reset for next time
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, [isResetCooldown]);
+
 
   const handleTabChange = (value: string) => {
     clearAuthMessages();
@@ -49,6 +77,7 @@ export default function LoginPage() {
     setPassword('');
     setConfirmPassword('');
     setDisplayName('');
+    setShowForgotPassword(false); // Ensure forgot password form is hidden when switching tabs
     setActiveTab(value as 'signIn' | 'signUp');
   };
 
@@ -78,14 +107,16 @@ export default function LoginPage() {
 
   const handlePasswordResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // clearAuthMessages(); // sendPasswordReset in AuthContext now handles this
+    clearAuthMessages();
     const success = await sendPasswordReset(resetEmail);
     if (success) {
-      setShowForgotPassword(false); // Go back to Sign In view
-      setResetEmail(''); // Clear the input field
-      // Success message is set by AuthContext and will be displayed
+      setShowForgotPassword(false);
+      setResetEmail('');
+      setIsResetCooldown(true);
+      setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
+      // Success message is set by AuthContext and will be displayed on the main login view
     }
-    // If !success, error is set by AuthContext and will be displayed on the forgot password form
+    // If !success and it's not a 'user-not-found' error, the error is set by AuthContext and will be displayed on the forgot password form
   };
 
 
@@ -103,7 +134,7 @@ export default function LoginPage() {
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
-      setResetEmail(''); 
+      setResetEmail('');
     }
   };
 
@@ -126,12 +157,12 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           {error && (
-            <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive">
+            <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-center text-sm text-destructive" role="alert">
               <AlertCircle className="mr-2 inline h-4 w-4" /> {error}
             </div>
           )}
           {successMessage && (
-            <div className="mb-4 rounded-md border border-green-500/50 bg-green-500/10 p-3 text-center text-sm text-green-700 dark:text-green-400">
+            <div className="mb-4 rounded-md border border-green-500/50 bg-green-500/10 p-3 text-center text-sm text-green-700 dark:text-green-400" role="status">
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
             </div>
           )}
@@ -150,10 +181,13 @@ export default function LoginPage() {
                   required
                   className="mt-1"
                   autoComplete="email"
+                  aria-describedby="reset-email-description"
                 />
+                <p id="reset-email-description" className="sr-only">Enter the email associated with your account to receive a password reset link.</p>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Sending...' : 'Send Password Reset Email'}
+              <Button type="submit" className="w-full" disabled={loading || isResetCooldown}>
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {isResetCooldown ? `Resend in ${currentCooldownSeconds}s` : (loading ? 'Sending...' : 'Send Password Reset Email')}
               </Button>
             </form>
           ) : (
@@ -221,11 +255,12 @@ export default function LoginPage() {
                               className="mt-1"
                               autoComplete="new-password"
                             />
-                            {passwordMismatchError && <p className="text-xs text-destructive mt-1">{passwordMismatchError}</p>}
+                            {passwordMismatchError && <p className="text-xs text-destructive mt-1" role="alert">{passwordMismatchError}</p>}
                         </div>
                     )}
                     <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? 'Processing...' : (activeTab === 'signUp' ? 'Sign Up' : 'Sign In')}
+                       {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                       {loading ? 'Processing...' : (activeTab === 'signUp' ? 'Sign Up' : 'Sign In')}
                     </Button>
                   </form>
                 </TabsContent>
@@ -243,8 +278,8 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
-                  <Mail className="mr-2 h-5 w-5 hidden" /> {/* Hidden as requested for cleaner look, icon can be re-added if desired */}
-                  <Chrome className="mr-2 h-5 w-5" /> Google
+                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Chrome className="mr-2 h-5 w-5" /> }
+                   {loading && activeTab === 'signIn' ? 'Signing in...' : 'Google'}
                 </Button>
               </div>
             </>
