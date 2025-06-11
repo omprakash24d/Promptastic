@@ -27,6 +27,8 @@ export interface TeleprompterSettings {
   fontFamily: string; // e.g., 'Inter, sans-serif', 'Arial'
   focusLinePercentage: number; // e.g., 0.33 for 33% from the top
   focusLineStyle: FocusLineStyle;
+  countdownEnabled: boolean;
+  horizontalPadding: number; // percentage, e.g., 0 to 25
 }
 
 export interface LayoutPreset {
@@ -37,15 +39,18 @@ export interface LayoutPreset {
 
 export interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
-  activeScript: Script | null; // This was in the interface but not used in store, kept for consistency
+  activeScript: Script | null; 
   isPlaying: boolean;
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
 }
 
-// New type for visual cue parsing
-export interface ParsedLine {
+// Updated script segment parsing type
+export interface ParsedSegment {
   type: 'text' | 'pause' | 'emphasize' | 'slowdown';
   content: string;
-  originalMarker?: string;
+  isBold?: boolean;
+  isItalic?: boolean;
+  isUnderline?: boolean;
+  originalMarker?: string; // For cues like //PAUSE//
 }

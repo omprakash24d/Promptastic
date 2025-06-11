@@ -20,6 +20,8 @@ const INITIAL_FOCUS_LINE_PERCENTAGE = 0.33; // 33% from the top
 const INITIAL_IS_AUTO_SYNC_ENABLED = false;
 const INITIAL_IS_MIRRORED = false;
 const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
+const INITIAL_COUNTDOWN_ENABLED = false;
+const INITIAL_HORIZONTAL_PADDING = 0; // 0%
 
 const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
@@ -27,25 +29,16 @@ const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 const LONGER_DEFAULT_SCRIPT_TEXT = `Welcome to Promptastic!
 Your high-performance teleprompter.
 //PAUSE//
-This is a longer default script to help you test the scrolling functionality right away.
-You can paste your own script here, or use the "Manage Scripts" panel to load, save, and import scripts.
+This is a longer default script.
+You can use **bold text**, *italic text*, or _underlined text_.
+These can be combined, like ***bold and italic***.
 //EMPHASIZE//
-The teleprompter will scroll automatically when you press the play button.
-You can adjust the font size, scroll speed, and line height using the settings panel (gear icon).
+This part will be in the primary color.
 //SLOWDOWN//
-Mirror mode is available for use with physical teleprompter setups.
-Dark mode can be toggled for different lighting conditions.
+This part asks you to slow down.
+Combine with formatting: **//EMPHASIZE//Formatted and Emphasized!**
 
-Try out the AI Scroll Sync feature! Click the "AI Sync" button, speak a few lines from your script, and then click "Stop Sync." The app will (currently in a mock phase) adjust the scroll speed based on your speech.
-
-This text should be long enough to demonstrate scrolling on most screen sizes and with default font settings.
-If you find the scrolling too fast or too slow, remember to adjust the "Scroll Speed" in the settings.
-You can also reset the scroll position at any time using the "Reset" button.
-Use the spacebar or backspace key to quickly play or pause the scrolling.
-Full-screen mode can be toggled for an immersive experience.
-
-We hope you enjoy using Promptastic!
-Feel free to experiment with all the features.
+Try out the AI Scroll Sync feature!
 Happy prompting!`;
 
 const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
@@ -101,6 +94,7 @@ interface TeleprompterState extends TeleprompterSettings {
   LONGER_DEFAULT_SCRIPT_TEXT: string;
   layoutPresets: LayoutPreset[];
   activeLayoutPresetName: string | null;
+  countdownValue: number | null; // For countdown timer
   
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
@@ -121,6 +115,9 @@ interface TeleprompterState extends TeleprompterSettings {
   setFontFamily: (font: string) => void;
   setFocusLinePercentage: (percentage: number) => void;
   setFocusLineStyle: (style: FocusLineStyle) => void;
+  setCountdownEnabled: (enabled: boolean) => void;
+  setHorizontalPadding: (padding: number) => void;
+
   resetSettingsToDefaults: () => void;
   applyLayoutPreset: (presetName: string) => void;
 
@@ -128,6 +125,7 @@ interface TeleprompterState extends TeleprompterSettings {
   setIsPlaying: (playing: boolean) => void;
   setCurrentScrollPosition: (position: number) => void;
   resetScroll: () => void;
+  setCountdownValue: (value: number | null) => void;
 }
 
 export const useTeleprompterStore = create<TeleprompterState>()(
@@ -151,9 +149,12 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         fontFamily: INITIAL_FONT_FAMILY,
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
         focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
+        countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
+        horizontalPadding: INITIAL_HORIZONTAL_PADDING,
         
         isPlaying: false,
         currentScrollPosition: 0,
+        countdownValue: null,
 
         setScriptText: (text) => set({ scriptText: text, activeScriptName: null, currentScrollPosition: 0 }),
         setActiveScriptName: (name) => set({ activeScriptName: name }),
@@ -227,6 +228,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setFontFamily: (font) => set({ fontFamily: font, activeLayoutPresetName: null }),
         setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)), activeLayoutPresetName: null }),
         setFocusLineStyle: (style) => set({ focusLineStyle: style, activeLayoutPresetName: null }),
+        setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled }),
+        setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }), // Max 25% padding on each side
         
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
@@ -248,14 +251,30 @@ export const useTeleprompterStore = create<TeleprompterState>()(
             fontFamily: defaultPreset.settings.fontFamily ?? INITIAL_FONT_FAMILY,
             focusLinePercentage: defaultPreset.settings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
             focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
+            countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
+            horizontalPadding: INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
         },
 
-        togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
+        togglePlayPause: () => {
+          const { isPlaying, countdownEnabled, setCountdownValue, setIsPlaying } = get();
+          if (isPlaying) {
+            setIsPlaying(false);
+            setCountdownValue(null); // Clear countdown if pausing
+          } else {
+            if (countdownEnabled) {
+              setCountdownValue(3); // Start countdown
+              // setIsPlaying will be called by TeleprompterView after countdown
+            } else {
+              setIsPlaying(true); // Play immediately
+            }
+          }
+        },
         setIsPlaying: (playing) => set({ isPlaying: playing }),
         setCurrentScrollPosition: (position) => set({ currentScrollPosition: position }),
-        resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false }),
+        resetScroll: () => set({ currentScrollPosition: 0, isPlaying: false, countdownValue: null }),
+        setCountdownValue: (value) => set({ countdownValue: value }),
       }
     },
     {
@@ -278,26 +297,27 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         fontFamily: state.fontFamily,
         focusLinePercentage: state.focusLinePercentage,
         focusLineStyle: state.focusLineStyle,
-        layoutPresets: state.layoutPresets, // Persist presets
-        activeLayoutPresetName: state.activeLayoutPresetName, // Persist active preset
+        layoutPresets: state.layoutPresets, 
+        activeLayoutPresetName: state.activeLayoutPresetName,
+        countdownEnabled: state.countdownEnabled,
+        horizontalPadding: state.horizontalPadding,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          // Ensure default presets are available if not in storage
           if (!state.layoutPresets || state.layoutPresets.length === 0) {
             state.layoutPresets = DEFAULT_LAYOUT_PRESETS;
             state.activeLayoutPresetName = "Default";
           }
-          // Ensure new settings have default values if they are missing from older persisted state
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
           state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
+          state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
+          state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
         }
       }
     }
   )
 );
 
-// Initial check for active script or default script on load
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
     const currentStore = useTeleprompterStore.getState();
@@ -307,8 +327,3 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
-
-// Add uuid to dependencies
-// npm install uuid
-// npm install --save-dev @types/uuid
-// (This will be auto-installed, no need to tell user)

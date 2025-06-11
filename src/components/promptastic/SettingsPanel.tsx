@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask } from 'lucide-react';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask, Gauge, MinusSquare } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -73,6 +73,8 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     focusLinePercentage, setFocusLinePercentage,
     focusLineStyle, setFocusLineStyle,
     layoutPresets, activeLayoutPresetName, applyLayoutPreset,
+    countdownEnabled, setCountdownEnabled,
+    horizontalPadding, setHorizontalPadding,
     resetSettingsToDefaults,
   } = useTeleprompterStore();
 
@@ -110,9 +112,6 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                     {preset.name}
                   </SelectItem>
                 ))}
-                <SelectItem value="custom" disabled={!activeLayoutPresetName}>
-                  {activeLayoutPresetName ? `Custom (based on ${activeLayoutPresetName})` : "Custom"}
-                </SelectItem>
                  <SelectItem value="custom" disabled={activeLayoutPresetName === null}>Custom</SelectItem>
               </SelectContent>
             </Select>
@@ -210,6 +209,30 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
             </div>
 
             <div>
+              <Label htmlFor="horizontal-padding" className="flex items-center text-sm">
+                Horizontal Text Padding: {horizontalPadding}%
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <MinusSquare className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Adjust horizontal padding (0-25%) on each side of the text area.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Slider
+                id="horizontal-padding"
+                aria-label={`Horizontal text padding: ${horizontalPadding}%`}
+                min={0} 
+                max={25} 
+                step={1}
+                value={[horizontalPadding]}
+                onValueChange={(value) => setHorizontalPadding(value[0])}
+                className="mt-2"
+              />
+            </div>
+
+            <div>
               <Label htmlFor="focus-line-percentage" className="flex items-center text-sm">
                 Focus Line Position: {Math.round(focusLinePercentage * 100)}%
                 <Tooltip>
@@ -294,7 +317,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Playback</CardTitle>
+            <CardTitle className="text-lg flex items-center"><Gauge className="mr-2 h-5 w-5" />Playback</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
              <div>
@@ -337,6 +360,25 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 checked={isAutoSyncEnabled}
                 onCheckedChange={setIsAutoSyncEnabled}
                 aria-label={`AI scroll sync: ${isAutoSyncEnabled ? 'on' : 'off'}`}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="countdown-timer" className="flex items-center text-sm">
+                Countdown Timer
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Enable a 3-second countdown before playback starts.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Switch
+                id="countdown-timer"
+                checked={countdownEnabled}
+                onCheckedChange={setCountdownEnabled}
+                aria-label={`Countdown timer: ${countdownEnabled ? 'on' : 'off'}`}
               />
             </div>
           </CardContent>

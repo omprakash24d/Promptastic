@@ -5,7 +5,7 @@ import type React from 'react';
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { cn } from '@/lib/utils';
-import type { ParsedLine, FocusLineStyle } from '@/types';
+import type { ParsedSegment, FocusLineStyle } from '@/types';
 import { PauseCircle, ChevronsDown } from 'lucide-react';
 
 const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)';
@@ -17,49 +17,75 @@ const VIEW_SSR_DEFAULT_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 const PLAYBACK_START_GRACE_PERIOD_MS = 200;
 const AVERAGE_WPM = 140; // Words per minute
 
-const SCRIPT_CUE_REGEX = /(\/\/PAUSE\/\/|\/\/EMPHASIZE\/\/|\/\/SLOWDOWN\/\/)/g;
+// Regex for script cues and basic markdown-like formatting
+const SCRIPT_CUE_AND_FORMATTING_REGEX = /(\/\/(?:PAUSE|EMPHASIZE|SLOWDOWN)\/\/)|(\*\*\*(.*?)\*\*\*|\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_)/g;
 
-const parseLineForCues = (line: string): ParsedLine[] => {
-  if (!line.trim()) return [{ type: 'text', content: '\u00A0' }]; 
+const parseLineToSegments = (line: string): ParsedSegment[] => {
+  if (!line.trim()) return [{ type: 'text', content: '\u00A0' }];
 
-  const parts = line.split(SCRIPT_CUE_REGEX).filter(Boolean);
-  const parsed: ParsedLine[] = [];
+  const segments: ParsedSegment[] = [];
+  let lastIndex = 0;
 
-  parts.forEach(part => {
-    switch (part) {
-      case '//PAUSE//':
-        parsed.push({ type: 'pause', content: '', originalMarker: part });
-        break;
-      case '//EMPHASIZE//':
-        break; 
-      case '//SLOWDOWN//':
-        parsed.push({ type: 'slowdown', content: '', originalMarker: part });
-        break;
-      default:
-        parsed.push({ type: 'text', content: part });
+  // Helper to push plain text segments
+  const pushTextSegment = (text: string, bold?: boolean, italic?: boolean, underline?: boolean) => {
+    if (text) {
+      segments.push({
+        type: 'text',
+        content: text,
+        isBold: bold,
+        isItalic: italic,
+        isUnderline: underline,
+      });
     }
-    if (part === '//EMPHASIZE//' && (parsed.length === 0 || parsed[parsed.length -1]?.type !== 'emphasize')) {
-        parsed.push({ type: 'text', content: '//EMPHASIZE//_PLACEHOLDER_' }); 
+  };
+  
+  // First pass for Markdown-like formatting, then cues
+  // This is a simplified parser. For complex nesting, a more robust solution (e.g., AST) would be needed.
+  // Current approach: Cues take precedence if they are at the start of a formatted block.
+
+  const parts = line.split(/(\/\/(?:PAUSE|EMPHASIZE|SLOWDOWN)\/\/)/g).filter(Boolean);
+  
+  parts.forEach(part => {
+    if (part === '//PAUSE//') {
+      segments.push({ type: 'pause', content: '', originalMarker: part });
+    } else if (part === '//EMPHASIZE//') {
+      segments.push({ type: 'emphasize', content: '', originalMarker: part });
+    } else if (part === '//SLOWDOWN//') {
+      segments.push({ type: 'slowdown', content: '', originalMarker: part });
+    } else {
+      // Process this text part for markdown
+      let subLastIndex = 0;
+      const subSegments: ParsedSegment[] = [];
+      
+      part.replace(/(\*\*\*(.*?)\*\*\*|\*\*(.*?)\*\*|\*(.*?)\*|_(.*?)_)/g, (match, _fullMatch, tripleStarContent, doubleStarContent, singleStarContent, underscoreContent, offset) => {
+        // Text before match
+        if (offset > subLastIndex) {
+          subSegments.push({ type: 'text', content: part.substring(subLastIndex, offset) });
+        }
+        
+        if (tripleStarContent !== undefined) {
+          subSegments.push({ type: 'text', content: tripleStarContent, isBold: true, isItalic: true });
+        } else if (doubleStarContent !== undefined) {
+          subSegments.push({ type: 'text', content: doubleStarContent, isBold: true });
+        } else if (singleStarContent !== undefined) {
+          subSegments.push({ type: 'text', content: singleStarContent, isItalic: true });
+        } else if (underscoreContent !== undefined) {
+          subSegments.push({ type: 'text', content: underscoreContent, isUnderline: true });
+        }
+        subLastIndex = offset + match.length;
+        return match; // Necessary for replace
+      });
+
+      // Remaining text after last match
+      if (subLastIndex < part.length) {
+        subSegments.push({ type: 'text', content: part.substring(subLastIndex) });
+      }
+      segments.push(...subSegments);
     }
   });
-  
-  const finalParsed: ParsedLine[] = [];
-  for (let i = 0; i < parsed.length; i++) {
-    if (parsed[i].content === '//EMPHASIZE//_PLACEHOLDER_') {
-      if (i + 1 < parsed.length && parsed[i+1].type === 'text' && parsed[i+1].content.trim() !== '') {
-        finalParsed.push({ type: 'emphasize', content: parsed[i+1].content });
-        i++; 
-      } else {
-         if (finalParsed.length > 0 && finalParsed[finalParsed.length -1]?.type !== 'pause' && finalParsed[finalParsed.length -1]?.type !== 'slowdown') {
-            finalParsed.push({ type: 'text', content: '\u00A0' }); 
-         }
-      }
-    } else {
-      finalParsed.push(parsed[i]);
-    }
-  }
 
-  return finalParsed.length > 0 ? finalParsed : [{ type: 'text', content: '\u00A0' }];
+
+  return segments.length > 0 ? segments.filter(s => s.content !== '' || s.type !== 'text') : [{ type: 'text', content: '\u00A0' }];
 };
 
 
@@ -72,7 +98,8 @@ export function TeleprompterView() {
     darkMode,
     textColor,
     fontFamily,
-    focusLineStyle, // New
+    focusLineStyle,
+    horizontalPadding,
   } = useTeleprompterStore(
     (state) => ({
       scriptText: state.scriptText,
@@ -82,7 +109,8 @@ export function TeleprompterView() {
       darkMode: state.darkMode,
       textColor: state.textColor,
       fontFamily: state.fontFamily,
-      focusLineStyle: state.focusLineStyle, // New
+      focusLineStyle: state.focusLineStyle,
+      horizontalPadding: state.horizontalPadding,
     })
   );
   
@@ -92,6 +120,9 @@ export function TeleprompterView() {
   const setCurrentScrollPosition = useTeleprompterStore(state => state.setCurrentScrollPosition);
   const scrollSpeed = useTeleprompterStore(state => state.scrollSpeed);
   const currentScrollPositionFromStore = useTeleprompterStore(state => state.currentScrollPosition);
+  const countdownValue = useTeleprompterStore(state => state.countdownValue);
+  const setCountdownValue = useTeleprompterStore(state => state.setCountdownValue);
+
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameIdRef = useRef<number | null>(null);
@@ -99,6 +130,7 @@ export function TeleprompterView() {
   const justStartedPlayingRef = useRef(false);
   const playbackStartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const paragraphRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -106,7 +138,15 @@ export function TeleprompterView() {
   const scriptParagraphs = useMemo(() => scriptText.split('\n\n'), [scriptText]);
 
   const rawParagraphTexts = useMemo(() => {
-    return scriptParagraphs.map(p => p.replace(SCRIPT_CUE_REGEX, ' ').trim());
+     return scriptParagraphs.map(p => 
+        p.replace(SCRIPT_CUE_AND_FORMATTING_REGEX, (match, cue, formatting, _t, _d, _s, _u) => {
+            if (cue) return ' '; // Replace cues with a space or empty
+            if (formatting) { // Return the content of the formatting
+                 return _t || _d || _s || _u || '';
+            }
+            return ' ';
+        }).replace(/\s+/g, ' ').trim()
+    );
   }, [scriptParagraphs]);
   
   const highlightedParagraphText = useMemo(() => {
@@ -125,6 +165,9 @@ export function TeleprompterView() {
     const handleVisibilityChange = () => {
       if (document.hidden && useTeleprompterStore.getState().isPlaying) {
         setIsPlaying(false);
+        if(useTeleprompterStore.getState().countdownValue !== null) {
+           setCountdownValue(null); // Also clear countdown if tab becomes hidden
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -132,8 +175,35 @@ export function TeleprompterView() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (playbackStartTimerRef.current) clearTimeout(playbackStartTimerRef.current);
       if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     };
-  }, [setIsPlaying]);
+  }, [setIsPlaying, setCountdownValue]);
+
+
+  // Countdown logic
+  useEffect(() => {
+    if (countdownValue === null || countdownValue < 0) {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      return;
+    }
+
+    if (countdownValue === 0) {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      setCountdownValue(null);
+      setIsPlaying(true); // Start actual playback
+      return;
+    }
+
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current); // Clear existing before setting new
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdownValue(getNonNullCountdown => getNonNullCountdown !== null ? getNonNullCountdown - 1 : null);
+    }, 1000);
+
+    return () => {
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    };
+  }, [countdownValue, setIsPlaying, setCountdownValue]);
+
 
   useEffect(() => {
     paragraphRefs.current = paragraphRefs.current.slice(0, scriptParagraphs.length);
@@ -151,7 +221,7 @@ export function TeleprompterView() {
 
     if (container.scrollTop < 5 && paragraphRefs.current.length > 0 && paragraphRefs.current[0]) {
         const firstPRef = paragraphRefs.current[0];
-        if (firstPRef) { // Ensure firstPRef is not null
+        if (firstPRef) { 
           const pTop = firstPRef.offsetTop;
           const pBottom = pTop + firstPRef.offsetHeight;
           if (currentFocusLinePoint >= pTop && currentFocusLinePoint < pBottom) {
@@ -179,7 +249,7 @@ export function TeleprompterView() {
 
   const scrollLoop = useCallback((timestamp: number) => {
     const store = useTeleprompterStore.getState(); 
-    if (!store.isPlaying || !scrollContainerRef.current) {
+    if (!store.isPlaying || !scrollContainerRef.current || store.countdownValue !== null) { // Also check for countdown
       lastTimestampRef.current = 0;
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
@@ -215,7 +285,7 @@ export function TeleprompterView() {
   useEffect(() => {
     if (!isMounted) return;
     
-    if (isPlaying) {
+    if (isPlaying && countdownValue === null) { // Only start scrollLoop if not counting down
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
       }
@@ -245,7 +315,7 @@ export function TeleprompterView() {
       if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
       if (playbackStartTimerRef.current) clearTimeout(playbackStartTimerRef.current);
     };
-  }, [isPlaying, scrollLoop, checkHighlightedParagraph, isMounted]);
+  }, [isPlaying, scrollLoop, checkHighlightedParagraph, isMounted, countdownValue]);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -268,6 +338,7 @@ export function TeleprompterView() {
 
     if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollDeltaThreshold) {
       storeState.setIsPlaying(false); 
+      storeState.setCountdownValue(null); // Stop countdown if manual scroll occurs
       storeState.setCurrentScrollPosition(currentPhysicalScroll);
     } else {
        if (container.scrollTop !== storeState.currentScrollPosition) {
@@ -302,8 +373,6 @@ export function TeleprompterView() {
       const timer = setTimeout(performSyncAndHighlight, 250); 
       return () => clearTimeout(timer);
     }
-  // This effect should run when these props change, AND when currentScrollPositionFromStore changes if NOT playing
-  // isPlaying is included to re-evaluate if we switch from playing to paused.
   }, [scriptText, fontFamily, fontSize, lineHeight, focusLinePercentage, currentScrollPositionFromStore, checkHighlightedParagraph, isMounted, isPlaying]);
   
 
@@ -322,7 +391,7 @@ export function TeleprompterView() {
     container.focus(); 
   }, [focusLinePercentage]); 
 
-  const formattedScriptText = useMemo(() => {
+  const formattedScriptContent = useMemo(() => {
     return scriptParagraphs.map((paragraphBlock, blockIndex) => {
       const lines = paragraphBlock.split('\n');
       const isHighlighted = highlightedParagraphIndex === blockIndex;
@@ -333,7 +402,7 @@ export function TeleprompterView() {
           className={cn(
             "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out",
             focusLineStyle === 'line' && (isHighlighted ? "opacity-100" : "opacity-60"),
-            focusLineStyle === 'shadedParagraph' && isHighlighted && "bg-primary/10 dark:bg-primary/20 rounded-md p-1 -m-1", // Style for shaded paragraph
+            focusLineStyle === 'shadedParagraph' && isHighlighted && "bg-primary/10 dark:bg-primary/20 rounded-md p-1 -m-1",
             !useTeleprompterStore.getState().isPlaying && "hover:opacity-80 cursor-pointer" 
           )}
           onClick={() => handleParagraphClick(blockIndex)}
@@ -348,12 +417,25 @@ export function TeleprompterView() {
           aria-label={!useTeleprompterStore.getState().isPlaying ? `Start from paragraph: ${paragraphBlock.substring(0, 50)}...` : undefined} 
         >
           {lines.map((line, lineIndex) => {
-            const parsedSegments = parseLineForCues(line);
+            const parsedSegments = parseLineToSegments(line);
+            let emphasizeNext = false;
             return (
               <p key={lineIndex} className="mb-1 last:mb-0 min-h-[1em]">
                 {parsedSegments.map((segment, segmentIndex) => {
+                  let content = <>{segment.content}</>;
+                  if (segment.isUnderline) content = <u>{content}</u>;
+                  if (segment.isItalic) content = <em>{content}</em>;
+                  if (segment.isBold) content = <strong>{content}</strong>;
+                  
+                  let segmentClassName = "";
+                  if (emphasizeNext && segment.type === 'text') {
+                    segmentClassName = "text-primary";
+                    emphasizeNext = false; 
+                  }
+
                   switch (segment.type) {
                     case 'pause':
+                      emphasizeNext = false;
                       return (
                         <span key={segmentIndex} className="inline-flex items-center mx-1 opacity-70 text-sm">
                           <PauseCircle className="h-4 w-4 mr-1 text-blue-400" />
@@ -361,20 +443,18 @@ export function TeleprompterView() {
                         </span>
                       );
                     case 'emphasize':
-                      return (
-                        <strong key={segmentIndex} className="font-bold text-primary">
-                          {segment.content}
-                        </strong>
-                      );
+                      emphasizeNext = true; // Mark next text segment for emphasis
+                      return null; // The cue itself is not rendered, it affects next segment
                     case 'slowdown':
+                       emphasizeNext = false;
                       return (
                         <span key={segmentIndex} className="inline-flex items-center mx-1 opacity-80">
                           <ChevronsDown className="h-4 w-4 mr-1 text-orange-400" />
                           <span className="italic">(slow down)</span>
                         </span>
                       );
-                    default: 
-                      return <span key={segmentIndex}>{segment.content}</span>;
+                    default: // text
+                      return <span key={segmentIndex} className={segmentClassName}>{content}</span>;
                   }
                 })}
               </p>
@@ -383,7 +463,7 @@ export function TeleprompterView() {
         </div>
       );
     });
-  }, [scriptParagraphs, highlightedParagraphIndex, handleParagraphClick, focusLineStyle]); 
+  }, [scriptParagraphs, highlightedParagraphIndex, handleParagraphClick, focusLineStyle, parseLineToSegments]);
 
   const currentTextColorToUse = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
   const currentFontFamilyToUse = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
@@ -403,8 +483,8 @@ export function TeleprompterView() {
   const focusLineElementStyle: React.CSSProperties = {
     position: 'absolute',
     top: `calc(${focusLinePercentage * 100}%)`,
-    left: '0',
-    right: '0',
+    left: `${horizontalPadding}%`, // Adjust for horizontal padding
+    right: `${horizontalPadding}%`,// Adjust for horizontal padding
     height: '2px',
     backgroundColor: 'hsla(var(--primary), 0.5)',
     pointerEvents: 'none',
@@ -427,7 +507,7 @@ export function TeleprompterView() {
     <div
       ref={scrollContainerRef}
       className={cn(
-        "w-full h-full overflow-y-auto p-8 md:p-16 focus:outline-none",
+        "w-full h-full overflow-y-auto focus:outline-none relative", // Added relative for countdown
         "transition-colors duration-300 ease-in-out",
         currentDarkMode ? "bg-gray-900" : "bg-gray-50",
       )}
@@ -436,6 +516,11 @@ export function TeleprompterView() {
       role="region"
       aria-label="Teleprompter Script Viewport. Press Space or Backspace to play or pause scrolling."
     >
+      {countdownValue !== null && countdownValue > 0 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-50 pointer-events-none">
+          <span className="text-9xl font-bold text-white opacity-80 tabular-nums">{countdownValue}</span>
+        </div>
+      )}
       <div
         className="sr-only"
         aria-live="polite"
@@ -460,14 +545,18 @@ export function TeleprompterView() {
         <div style={focusLineElementStyle} data-testid="focus-line-overlay" />
       )}
       <div
-        className="select-none" 
+        className="select-none px-8 md:px-16 py-8 md:py-16" // Base padding, actual text area padding applied by inner div
+        style={{
+           paddingLeft: `${horizontalPadding}%`,
+           paddingRight: `${horizontalPadding}%`,
+        }}
       >
         {scriptText.trim() === "" ? (
           <p className="text-center opacity-50">
             Your script is empty. Paste your content or load a script to begin.
           </p>
         ) : (
-          formattedScriptText
+          formattedScriptContent
         )}
       </div>
     </div>
