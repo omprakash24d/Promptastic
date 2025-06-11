@@ -5,19 +5,19 @@ import type React from 'react';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { AuthUser } from '@/types';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/firebase/config'; // Assuming firebase config is correctly set up
+import { auth } from '@/firebase/config';
 import {
   onAuthStateChanged,
   GoogleAuthProvider,
   GithubAuthProvider,
-  PhoneAuthProvider,
+  PhoneAuthProvider, 
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
-  // RecaptchaVerifier // Keep for potential future use
+  // RecaptchaVerifier 
 } from 'firebase/auth';
 
 
@@ -28,7 +28,7 @@ interface AuthContextType {
   successMessage: string | null;
   signInWithGoogle: () => Promise<void>;
   signInWithGithub: () => Promise<void>;
-  signInWithPhoneNumber: (phoneNumber: string, appVerifier: any) => Promise<any>; // Placeholder
+  signInWithPhoneNumber: (phoneNumber: string, appVerifier: any) => Promise<any>; 
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -123,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, provider);
       handleAuthSuccess();
     } catch (err) {
+      console.error("Google Sign-In Raw Error:", err); 
       handleAuthError(err);
     } finally {
       setLoading(false);
@@ -164,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return {
                 uid: userCredential.user.uid,
                 email: userCredential.user.email,
-                displayName: displayName,
+                displayName: displayName, 
                 photoURL: userCredential.user.photoURL,
                 phoneNumber: userCredential.user.phoneNumber,
             };
@@ -217,12 +218,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await firebaseUpdateProfile(auth.currentUser, updates);
       setUser(prevUser => {
         if (!prevUser || !auth.currentUser) return null;
-        // Prefer fresh data from auth.currentUser after update if available
         const updatedFirebaseUser = auth.currentUser;
         return {
             ...prevUser,
-            displayName: updatedFirebaseUser.displayName, // updates.displayName !== undefined ? updates.displayName : prevUser.displayName,
-            photoURL: updatedFirebaseUser.photoURL, // updates.photoURL !== undefined ? updates.photoURL : prevUser.photoURL,
+            displayName: updatedFirebaseUser.displayName, 
+            photoURL: updatedFirebaseUser.photoURL, 
         };
       });
       setSuccessMessage("Profile updated successfully!");
