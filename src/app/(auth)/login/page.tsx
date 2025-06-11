@@ -166,11 +166,13 @@ export default function LoginPage() {
 
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
     setAuthAttemptError(null);
+    clearAuthMessages(); // Clear messages when toggling this view
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
       setResetEmail('');
+      // Clear cooldown if returning to sign-in view
       if (isResetCooldown) {
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
@@ -395,3 +397,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
