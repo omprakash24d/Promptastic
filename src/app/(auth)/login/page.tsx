@@ -2,7 +2,7 @@
 "use client";
 
 import type React from 'react';
-import type { Metadata } from 'next';
+// import type { Metadata } from 'next'; // Metadata export is for Server Components
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,10 +15,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 // For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
-// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
-// If specific, dynamic metadata for THIS page is needed, consider converting to Server Component
-// or using a more advanced pattern for client-side metadata updates if absolutely necessary (less common for SEO).
-
+// The title will be "Promptastic! - Modern Teleprompter & Script Tool" by default from layout.tsx
+// or "Login / Sign Up | Promptastic!" if the template were `%s | Promptastic!` and this page could provide "Login / Sign Up"
 // export const metadata: Metadata = {
 //   title: 'Login / Sign Up',
 //   description: 'Log in or create an account to access Promptastic! and save your scripts and settings to the cloud.',

@@ -10,7 +10,10 @@ const APP_URL = 'https://prompt.indhinditech.com/';
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
-  title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static title for all pages
+  title: {
+    default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
+    template: `%s | ${APP_NAME}`,
+  },
   description: APP_DESCRIPTION,
   keywords: ['teleprompter', 'Next.js', 'React', 'presentation tool', 'script management', 'public speaking', 'content creation', 'AI teleprompter'],
   manifest: '/site.webmanifest',
@@ -25,7 +28,10 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: APP_NAME,
-    title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static OG title
+    title: { // OG title can also use the template or a default
+        default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
+        template: `%s | ${APP_NAME}`,
+    },
     description: APP_DESCRIPTION,
     url: APP_URL,
     images: [
@@ -39,7 +45,10 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static Twitter title
+    title: { // Twitter title can also use the template or a default
+        default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
+        template: `%s | ${APP_NAME}`,
+    },
     description: APP_DESCRIPTION,
     images: [`${APP_URL}twitter-image.png`],
   },

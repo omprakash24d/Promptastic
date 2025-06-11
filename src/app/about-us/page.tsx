@@ -2,12 +2,18 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ChevronLeft, Info } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'About Promptastic!',
+  description: 'Learn about the Promptastic! teleprompter application, its mission, features, and the developer behind it.',
+};
 
 export default function AboutUsPage() {
   const dummyOpen = () => {}; // Placeholder for Header props

@@ -2,6 +2,7 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ChevronLeft, Gavel } from 'lucide-react';
 
+export const metadata: Metadata = {
+    title: 'Terms & Conditions',
+    description: 'Review the Terms and Conditions for using the Promptastic! teleprompter application.',
+};
 
 export default function TermsConditionsPage() {
   const dummyOpen = () => {};

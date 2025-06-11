@@ -2,6 +2,7 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,6 +11,11 @@ import Link from 'next/link';
 import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
+
+export const metadata: Metadata = {
+    title: 'How to Use Promptastic!',
+    description: 'A comprehensive guide on using Promptastic! teleprompter features, script management, settings, and AI tools.',
+};
 
 export default function HowToUsePage() {
   const dummyOpen = () => {}; // Placeholder for Header props

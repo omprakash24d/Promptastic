@@ -2,6 +2,7 @@
 "use client";
 
 import type React from 'react';
+import type { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer'; // Import Footer
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,6 +14,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
+export const metadata: Metadata = {
+    title: 'Contact Us',
+    description: 'Get in touch with the Promptastic! team. Send us your questions, feedback, or feature requests.',
+};
 
 export default function ContactUsPage() {
   const dummyOpen = () => {}; // Placeholder for Header props

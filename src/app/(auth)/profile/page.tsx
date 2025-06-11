@@ -2,7 +2,7 @@
 "use client";
 
 import type React from 'react';
-import type { Metadata } from 'next';
+// import type { Metadata } from 'next'; // Metadata export is for Server Components
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 // For Client Components, metadata is typically handled by the RootLayout or a parent Server Component.
-// We'll rely on the metadata set in `src/app/layout.tsx` which has a title template.
+// The title will be "Promptastic! - Modern Teleprompter & Script Tool" by default from layout.tsx
 // export const metadata: Metadata = {
 //   title: 'User Profile',
 //   description: 'Manage your Promptastic! user profile. Update your display name and profile picture.',
