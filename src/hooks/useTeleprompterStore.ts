@@ -10,27 +10,26 @@ const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
 const INITIAL_LINE_HEIGHT = 1.5;
 
-// Default text colors for different modes
 const INITIAL_TEXT_COLOR_LIGHT_MODE_HSL = 'hsl(0 0% 0%)'; // Black HSL
 const INITIAL_TEXT_COLOR_DARK_MODE_HSL = 'hsl(0 0% 100%)'; // White HSL
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 const INITIAL_FOCUS_LINE_PERCENTAGE = 0.33; // 33% from the top
+const INITIAL_IS_AUTO_SYNC_ENABLED = false;
+const INITIAL_IS_MIRRORED = false;
 
-// Default app theme is dark mode.
 const SERVER_DEFAULT_DARK_MODE = true;
-// Corresponding text color for default dark mode.
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
 const LONGER_DEFAULT_SCRIPT_TEXT = `Welcome to Promptastic!
 Your high-performance teleprompter.
-
+//PAUSE//
 This is a longer default script to help you test the scrolling functionality right away.
 You can paste your own script here, or use the "Manage Scripts" panel to load, save, and import scripts.
-
+//EMPHASIZE//
 The teleprompter will scroll automatically when you press the play button.
 You can adjust the font size, scroll speed, and line height using the settings panel (gear icon).
-
+//SLOWDOWN//
 Mirror mode is available for use with physical teleprompter setups.
 Dark mode can be toggled for different lighting conditions.
 
@@ -53,9 +52,8 @@ interface TeleprompterState extends TeleprompterSettings {
   activeScriptName: string | null;
   isPlaying: boolean;
   currentScrollPosition: number;
-  LONGER_DEFAULT_SCRIPT_TEXT: string; // Added to make it accessible to other parts if needed
+  LONGER_DEFAULT_SCRIPT_TEXT: string;
   
-  // Actions
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
   loadScript: (name: string) => void;
@@ -72,6 +70,7 @@ interface TeleprompterState extends TeleprompterSettings {
   setTextColor: (color: string) => void;
   setFontFamily: (font: string) => void;
   setFocusLinePercentage: (percentage: number) => void;
+  resetSettingsToDefaults: () => void;
 
   togglePlayPause: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -91,9 +90,9 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         fontSize: INITIAL_FONT_SIZE,
         scrollSpeed: INITIAL_SCROLL_SPEED,
         lineHeight: INITIAL_LINE_HEIGHT,
-        isMirrored: false,
+        isMirrored: INITIAL_IS_MIRRORED,
         darkMode: SERVER_DEFAULT_DARK_MODE, 
-        isAutoSyncEnabled: false,
+        isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
         textColor: SERVER_DEFAULT_TEXT_COLOR,
         fontFamily: INITIAL_FONT_FAMILY,
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
@@ -149,7 +148,22 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
         setTextColor: (color) => set({ textColor: color }), 
         setFontFamily: (font) => set({ fontFamily: font }),
-        setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)) }), // Clamp between 10% and 90%
+        setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)) }),
+
+        resetSettingsToDefaults: () => {
+          const currentDarkMode = get().darkMode; // Preserve current dark mode state
+          set({
+            fontSize: INITIAL_FONT_SIZE,
+            scrollSpeed: INITIAL_SCROLL_SPEED,
+            lineHeight: INITIAL_LINE_HEIGHT,
+            isMirrored: INITIAL_IS_MIRRORED,
+            // darkMode: SERVER_DEFAULT_DARK_MODE, // Or keep current dark mode? Let's keep current.
+            isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
+            textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
+            fontFamily: INITIAL_FONT_FAMILY,
+            focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
+          });
+        },
 
         togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
         setIsPlaying: (playing) => set({ isPlaying: playing }),
@@ -175,16 +189,12 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isAutoSyncEnabled: state.isAutoSyncEnabled,
         textColor: state.textColor,
         fontFamily: state.fontFamily,
-        focusLinePercentage: state.focusLinePercentage, // Persist focusLinePercentage
+        focusLinePercentage: state.focusLinePercentage,
       }),
     }
   )
 );
 
-// Simplified subscription:
-// Only responsible for resetting to default script text if all scripts are removed
-// and the current text isn't already the default.
-// Initial script loading based on activeScriptName is handled by PromptasticPage.tsx useEffect.
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
     const currentStore = useTeleprompterStore.getState();
@@ -194,4 +204,3 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
-

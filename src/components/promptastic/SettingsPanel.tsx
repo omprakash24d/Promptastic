@@ -1,13 +1,13 @@
 
 "use client";
 
-import React from 'react'; // Import React
+import React from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type, AlignCenterVertical } from 'lucide-react';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -22,6 +22,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface FontOption {
   label: string;
@@ -38,6 +50,7 @@ const FONT_OPTIONS: FontOption[] = [
 ];
 
 export const SettingsPanel = React.memo(function SettingsPanel() {
+  const { toast } = useToast();
   const {
     fontSize, setFontSize,
     scrollSpeed, setScrollSpeed,
@@ -48,7 +61,16 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     textColor, setTextColor,
     fontFamily, setFontFamily,
     focusLinePercentage, setFocusLinePercentage,
+    resetSettingsToDefaults,
   } = useTeleprompterStore();
+
+  const handleResetSettings = () => {
+    resetSettingsToDefaults();
+    toast({
+      title: "Settings Reset",
+      description: "All settings have been reset to their default values.",
+    });
+  };
 
   return (
     <TooltipProvider>
@@ -155,15 +177,14 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
               <Slider
                 id="focus-line-percentage"
                 aria-label={`Focus line position: ${Math.round(focusLinePercentage * 100)}% from top`}
-                min={0.1} // 10%
-                max={0.9} // 90%
+                min={0.1} 
+                max={0.9} 
                 step={0.01}
                 value={[focusLinePercentage]}
                 onValueChange={(value) => setFocusLinePercentage(value[0])}
                 className="mt-2"
               />
             </div>
-
 
              <div className="flex items-center justify-between pt-2">
               <Label htmlFor="mirror-mode" className="flex items-center text-sm">
@@ -252,8 +273,36 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
             </div>
           </CardContent>
         </Card>
+         <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">General</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" className="w-full">
+                  <RotateCcw className="mr-2 h-4 w-4" /> Reset All Settings
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will reset all appearance and playback settings to their default values. 
+                    Dark mode setting will be preserved. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleResetSettings} className="bg-destructive hover:bg-destructive/90">
+                    Reset Settings
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
       </div>
     </TooltipProvider>
   );
 });
-

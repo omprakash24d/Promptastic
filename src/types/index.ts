@@ -26,3 +26,9 @@ export interface TeleprompterState extends TeleprompterSettings {
   isSettingsPanelOpen: boolean;
 }
 
+// New type for visual cue parsing
+export interface ParsedLine {
+  type: 'text' | 'pause' | 'emphasize' | 'slowdown';
+  content: string;
+  originalMarker?: string;
+}

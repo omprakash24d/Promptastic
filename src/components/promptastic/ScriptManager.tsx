@@ -2,14 +2,14 @@
 "use client";
 
 import type React from 'react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle } from 'lucide-react';
+import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
@@ -24,6 +24,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { summarizeScript } from '@/ai/flows/summarize-script-flow';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
@@ -36,6 +38,8 @@ interface FileTypeOption {
   icon: React.ElementType;
   handler: (file: File) => Promise<string | null>;
 }
+
+const AVERAGE_WPM = 140; // Words per minute
 
 export function ScriptManager() {
   const { toast } = useToast();
@@ -54,10 +58,13 @@ export function ScriptManager() {
   const [isDirty, setIsDirty] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [scriptSummary, setScriptSummary] = useState<string | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
 
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
+    setScriptSummary(null); // Clear summary when script text changes
     setIsDirty(false);
   }, [scriptText]);
 
@@ -68,6 +75,16 @@ export function ScriptManager() {
       setIsDirty(false);
     }
   }, [currentEditingScriptText, scriptText]);
+
+  const estimatedReadingTime = useMemo(() => {
+    if (!currentEditingScriptText.trim()) return "Est. reading time: 0 min 0 sec";
+    const words = currentEditingScriptText.trim().split(/\s+/).filter(Boolean).length;
+    const minutes = words / AVERAGE_WPM;
+    const totalSeconds = Math.floor(minutes * 60);
+    const displayMinutes = Math.floor(totalSeconds / 60);
+    const displaySeconds = totalSeconds % 60;
+    return `Est. reading time: ${displayMinutes} min ${displaySeconds} sec`;
+  }, [currentEditingScriptText]);
 
   const handleConfirmDiscard = () => {
     if (pendingAction) {
@@ -186,6 +203,7 @@ export function ScriptManager() {
         setScriptText("");
         setCurrentEditingScriptText("");
         setNewScriptName("");
+        setScriptSummary(null);
         toast({ title: "New Script", description: "Ready for your new script."});
     });
   };
@@ -216,11 +234,11 @@ export function ScriptManager() {
 
   const processFileContent = (content: string, fileName: string) => {
     setActiveScriptName(null);
-    setScriptText(content);
+    setScriptText(content); // This will trigger useEffect to update currentEditingScriptText
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
     setNewScriptName(fileNameWithoutExtension);
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
-    setIsDirty(true);
+    setIsDirty(true); // Content has changed from potentially empty/default state
   };
 
   const fileTypes: FileTypeOption[] = [
@@ -289,6 +307,27 @@ export function ScriptManager() {
     }
   };
 
+  const handleSummarizeScript = async () => {
+    if (!currentEditingScriptText.trim()) {
+      toast({ title: "Cannot Summarize", description: "Script is empty.", variant: "destructive" });
+      return;
+    }
+    setIsSummarizing(true);
+    setScriptSummary(null);
+    try {
+      const result = await summarizeScript({ scriptText: currentEditingScriptText });
+      setScriptSummary(result.summary);
+      toast({ title: "Script Summarized", description: "Summary generated below the script editor." });
+    } catch (error) {
+      console.error("Error summarizing script:", error);
+      toast({ title: "Summarization Error", description: `Could not summarize script. ${error instanceof Error ? error.message : "Unknown error."}`, variant: "destructive" });
+      setScriptSummary("Error generating summary.");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+
   return (
     <div className="space-y-6">
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
@@ -317,7 +356,10 @@ export function ScriptManager() {
             <span>
               {activeScriptName ? `Editing: ${activeScriptName}` : "New/Imported Script"}
             </span>
-            {isDirty && <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2">(Unsaved changes)</span>}
+            <div className="flex items-center">
+              {isDirty && <span className="text-xs font-normal text-amber-600 dark:text-amber-400 ml-2 mr-2">(Unsaved changes)</span>}
+              <span className="text-xs font-normal text-muted-foreground">{estimatedReadingTime}</span>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -357,8 +399,25 @@ export function ScriptManager() {
                 <ft.icon className="mr-2 h-4 w-4" /> {ft.shortLabel}
               </Button>
             ))}
+            <Button onClick={handleSummarizeScript} variant="outline" disabled={isSummarizing || !currentEditingScriptText.trim()}>
+              {isSummarizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <BookOpenText className="mr-2 h-4 w-4" />}
+              {isSummarizing ? 'Summarizing...' : 'Summarize'}
+            </Button>
         </CardFooter>
       </Card>
+      
+      {scriptSummary && (
+        <Alert>
+          <BookOpenText className="h-4 w-4" />
+          <AlertTitle className="font-semibold">Script Summary</AlertTitle>
+          <AlertDescription className="mt-1 text-sm">
+            <ScrollArea className="h-[100px] w-full rounded-md p-1 bg-muted/20 border">
+             <p className="p-2">{scriptSummary}</p>
+            </ScrollArea>
+          </AlertDescription>
+        </Alert>
+      )}
+
 
       <input
         type="file"
@@ -423,6 +482,3 @@ export function ScriptManager() {
     </div>
   );
 }
-
-
-    

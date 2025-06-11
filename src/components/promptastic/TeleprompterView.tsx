@@ -5,16 +5,81 @@ import type React from 'react';
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { cn } from '@/lib/utils';
+import type { ParsedLine } from '@/types';
+import { PauseCircle, ChevronsDown } from 'lucide-react';
 
-// SSR-safe defaults
 const VIEW_SSR_DEFAULT_TEXT_COLOR = 'hsl(0 0% 100%)';
 const VIEW_SSR_DEFAULT_FONT_FAMILY = 'Arial, sans-serif';
 const VIEW_SSR_DEFAULT_DARK_MODE = true;
 
-// Threshold for detecting user scroll intervention during active playback.
 const USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR = 0.5;
-const MIN_SCROLL_INTERVENTION_THRESHOLD_PX = 5; // Minimum pixels for intervention
-const PLAYBACK_START_GRACE_PERIOD_MS = 200; // Grace period for ignoring scroll events after play
+const MIN_SCROLL_INTERVENTION_THRESHOLD_PX = 5;
+const PLAYBACK_START_GRACE_PERIOD_MS = 200;
+
+const SCRIPT_CUE_REGEX = /(\/\/PAUSE\/\/|\/\/EMPHASIZE\/\/|\/\/SLOWDOWN\/\/)/g;
+
+const parseLineForCues = (line: string): ParsedLine[] => {
+  if (!line.trim()) return [{ type: 'text', content: '\u00A0' }]; // Keep empty lines for spacing
+
+  const parts = line.split(SCRIPT_CUE_REGEX).filter(Boolean);
+  const parsed: ParsedLine[] = [];
+
+  parts.forEach(part => {
+    switch (part) {
+      case '//PAUSE//':
+        parsed.push({ type: 'pause', content: '', originalMarker: part });
+        break;
+      case '//EMPHASIZE//':
+        // This marker will affect the next text segment. We'll handle it by peeking.
+        // For now, just mark its position. If it's followed by text, that text gets emphasized.
+        // If it's alone or followed by another marker, it might not render visibly but is a placeholder.
+        break; // Handled by the next text part
+      case '//SLOWDOWN//':
+        parsed.push({ type: 'slowdown', content: '', originalMarker: part });
+        break;
+      default:
+        // Check if the previous part was an emphasize marker
+        const lastPushed = parsed[parsed.length -1];
+        if (parsed.length > 0 && lastPushed && lastPushed.type === 'text' && lastPushed.content === '//EMPHASIZE//_PLACEHOLDER_') {
+          parsed.pop(); // remove placeholder
+          parsed.push({ type: 'emphasize', content: part });
+        } else if (part === '//EMPHASIZE//_PLACEHOLDER_') { 
+          // If emphasize was at end of line or before another marker
+          parsed.push({ type: 'text', content: '' }); // Effectively ignore if no text follows
+        }
+         else {
+          // If the current part is where an //EMPHASIZE// marker *was*, it means the next actual text part should be emphasized
+          // This requires a slightly different logic in the rendering part.
+          // For simplicity in parsing, we check if the *original line part* should be emphasized.
+          parsed.push({ type: 'text', content: part });
+        }
+    }
+     // If an emphasize marker was encountered but not immediately followed by text, mark it for potential emphasis
+    if (part === '//EMPHASIZE//' && (parsed.length === 0 || parsed[parsed.length -1]?.type !== 'emphasize')) {
+        parsed.push({ type: 'text', content: '//EMPHASIZE//_PLACEHOLDER_' }); // Placeholder
+    }
+  });
+  
+  // Post-process to combine EMPHASIZE markers with subsequent text
+  const finalParsed: ParsedLine[] = [];
+  for (let i = 0; i < parsed.length; i++) {
+    if (parsed[i].content === '//EMPHASIZE//_PLACEHOLDER_') {
+      if (i + 1 < parsed.length && parsed[i+1].type === 'text' && parsed[i+1].content.trim() !== '') {
+        finalParsed.push({ type: 'emphasize', content: parsed[i+1].content });
+        i++; // Skip next element as it's consumed
+      } else {
+        // EMPHASIZE marker not followed by text, or at end, effectively ignored or rendered as minor space
+         if (parsed[i-1]?.type !== 'pause' && parsed[i-1]?.type !== 'slowdown') {
+            finalParsed.push({ type: 'text', content: '\u00A0' }); // Add a non-breaking space if it's not after another cue
+         }
+      }
+    } else {
+      finalParsed.push(parsed[i]);
+    }
+  }
+
+  return finalParsed.length > 0 ? finalParsed : [{ type: 'text', content: '\u00A0' }];
+};
 
 
 export function TeleprompterView() {
@@ -29,6 +94,7 @@ export function TeleprompterView() {
     isPlaying,
     setCurrentScrollPosition,
     setIsPlaying,
+    focusLinePercentage, // Already selected
   } = useTeleprompterStore(
     (state) => ({
       scriptText: state.scriptText,
@@ -41,39 +107,38 @@ export function TeleprompterView() {
       isPlaying: state.isPlaying,
       setCurrentScrollPosition: state.setCurrentScrollPosition,
       setIsPlaying: state.setIsPlaying,
+      focusLinePercentage: state.focusLinePercentage,
     })
   );
-  const focusLinePercentage = useTeleprompterStore(state => state.focusLinePercentage);
+  // Select scrollSpeed and currentScrollPosition individually for stability in callbacks
   const scrollSpeed = useTeleprompterStore(state => state.scrollSpeed);
-  const currentScrollPosition = useTeleprompterStore(state => state.currentScrollPosition);
-
+  const currentScrollPositionFromStore = useTeleprompterStore(state => state.currentScrollPosition);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameIdRef = useRef<number | null>(null);
   const lastTimestampRef = useRef<number>(0);
   const justStartedPlayingRef = useRef(false);
+  const playbackStartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const paragraphRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
   const [highlightedParagraphText, setHighlightedParagraphText] = useState("");
-
 
   useEffect(() => {
     setIsMounted(true);
     if (scrollContainerRef.current) {
       scrollContainerRef.current.focus();
     }
-
     const handleVisibilityChange = () => {
       if (document.hidden && useTeleprompterStore.getState().isPlaying) {
         setIsPlaying(false);
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (playbackStartTimerRef.current) clearTimeout(playbackStartTimerRef.current);
+      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
     };
   }, [setIsPlaying]);
 
@@ -88,7 +153,7 @@ export function TeleprompterView() {
       return;
     }
     const container = scrollContainerRef.current;
-    const currentFocusLine = container.scrollTop + container.clientHeight * focusLinePercentage;
+    const currentFocusLinePoint = container.scrollTop + container.clientHeight * focusLinePercentage;
 
     let newHighlightedIndex: number | null = null;
 
@@ -96,7 +161,7 @@ export function TeleprompterView() {
         const firstPRef = paragraphRefs.current[0];
         const pTop = firstPRef.offsetTop;
         const pBottom = pTop + firstPRef.offsetHeight;
-        if (currentFocusLine >= pTop && currentFocusLine < pBottom) {
+        if (currentFocusLinePoint >= pTop && currentFocusLinePoint < pBottom) {
              newHighlightedIndex = 0;
         }
     }
@@ -107,7 +172,7 @@ export function TeleprompterView() {
             if (pRef) {
                 const pTop = pRef.offsetTop;
                 const pBottom = pTop + pRef.offsetHeight;
-                if (currentFocusLine >= pTop && currentFocusLine < pBottom) {
+                if (currentFocusLinePoint >= pTop && currentFocusLinePoint < pBottom) {
                     newHighlightedIndex = i;
                     break;
                 }
@@ -131,7 +196,8 @@ export function TeleprompterView() {
 
 
   const scrollLoop = useCallback((timestamp: number) => {
-    if (!useTeleprompterStore.getState().isPlaying || !scrollContainerRef.current) {
+    const store = useTeleprompterStore.getState();
+    if (!store.isPlaying || !scrollContainerRef.current) {
       lastTimestampRef.current = 0;
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
@@ -150,95 +216,91 @@ export function TeleprompterView() {
     lastTimestampRef.current = timestamp;
 
     const container = scrollContainerRef.current;
-    const currentStoreScrollSpeed = useTeleprompterStore.getState().scrollSpeed;
-    const newScrollTop = container.scrollTop + currentStoreScrollSpeed * deltaTime;
+    const newScrollTop = container.scrollTop + store.scrollSpeed * deltaTime;
 
     if (newScrollTop >= container.scrollHeight - container.clientHeight) {
       container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      setCurrentScrollPosition(container.scrollTop);
-      setIsPlaying(false);
+      store.setCurrentScrollPosition(container.scrollTop);
+      store.setIsPlaying(false);
     } else {
       container.scrollTop = newScrollTop;
-      setCurrentScrollPosition(newScrollTop);
+      store.setCurrentScrollPosition(newScrollTop);
       animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
     }
     checkHighlightedParagraph();
-  }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
+  }, [checkHighlightedParagraph]); // setCurrentScrollPosition, setIsPlaying removed as they are stable actions from store
 
+  useEffect(() => {
+    if (isPlaying) {
+      const scrollPos = useTeleprompterStore.getState().currentScrollPosition;
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = scrollPos;
+      }
+      lastTimestampRef.current = 0;
+      justStartedPlayingRef.current = true;
+      if (playbackStartTimerRef.current) clearTimeout(playbackStartTimerRef.current);
+      playbackStartTimerRef.current = setTimeout(() => {
+        justStartedPlayingRef.current = false;
+      }, PLAYBACK_START_GRACE_PERIOD_MS);
+      animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
+    } else {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+        animationFrameIdRef.current = null;
+      }
+      if (playbackStartTimerRef.current) {
+        clearTimeout(playbackStartTimerRef.current);
+        playbackStartTimerRef.current = null;
+      }
+      justStartedPlayingRef.current = false;
+      lastTimestampRef.current = 0;
+      checkHighlightedParagraph();
+    }
+    return () => {
+      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
+      if (playbackStartTimerRef.current) clearTimeout(playbackStartTimerRef.current);
+    };
+  }, [isPlaying, scrollLoop, checkHighlightedParagraph]);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const storeState = useTeleprompterStore.getState();
+    const store = useTeleprompterStore.getState();
+    const currentPhysicalScroll = container.scrollTop;
 
-    if (justStartedPlayingRef.current && storeState.isPlaying) {
-      // During the grace period after play, do nothing. ScrollLoop handles it.
-      // This prevents click-induced micro-scrolls from immediately stopping playback.
+    if (justStartedPlayingRef.current && store.isPlaying) {
+      // During grace period and intended play, ONLY sync store's position to physical.
+      // Do NOT trigger stop or highlight checks. scrollLoop handles store updates.
+      // This line was causing immediate pause: store.setCurrentScrollPosition(currentPhysicalScroll);
       return;
     }
     
-    const currentPhysicalScroll = container.scrollTop;
-
-    if (!storeState.isPlaying) {
-       setCurrentScrollPosition(currentPhysicalScroll);
-       checkHighlightedParagraph();
+    if (!store.isPlaying) {
+       store.setCurrentScrollPosition(currentPhysicalScroll);
+       checkHighlightedParagraph(); // Check highlight when manually scrolling while paused
        return;
     }
     
-    const calculatedThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
+    // If playing and outside grace period, check for user intervention
+    const calculatedThreshold = store.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
     const scrollThreshold = Math.max(MIN_SCROLL_INTERVENTION_THRESHOLD_PX, calculatedThreshold);
 
-    if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollThreshold) {
-      setIsPlaying(false); 
-      setCurrentScrollPosition(currentPhysicalScroll); 
+    // store.currentScrollPosition should be updated by scrollLoop.
+    // We compare physical scroll to the store's authoritative position.
+    if (Math.abs(currentPhysicalScroll - store.currentScrollPosition) > scrollThreshold) {
+      store.setIsPlaying(false); 
+      store.setCurrentScrollPosition(currentPhysicalScroll); 
     } else {
-      setCurrentScrollPosition(currentPhysicalScroll);
+       // If the difference isn't large enough for intervention, but physical scroll changed,
+       // update the store to reflect the minor adjustment.
+       // This can happen with programmatic scrolls that aren't part of the main loop (e.g. click-to-start)
+       if (container.scrollTop !== store.currentScrollPosition) {
+           store.setCurrentScrollPosition(container.scrollTop);
+       }
     }
-  }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
-
-
-  useEffect(() => {
-    let gracePeriodTimerId: NodeJS.Timeout | null = null;
-    
-    if (isPlaying) {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
-      }
-
-      lastTimestampRef.current = 0; 
-      justStartedPlayingRef.current = true; 
-
-      gracePeriodTimerId = setTimeout(() => {
-        justStartedPlayingRef.current = false; 
-      }, PLAYBACK_START_GRACE_PERIOD_MS);
-
-      animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
-    } else {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-      if (gracePeriodTimerId) {
-        clearTimeout(gracePeriodTimerId);
-      }
-      justStartedPlayingRef.current = false; 
-      lastTimestampRef.current = 0; 
-      checkHighlightedParagraph(); 
-    }
-
-    return () => { 
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-      if (gracePeriodTimerId) {
-        clearTimeout(gracePeriodTimerId);
-      }
-      justStartedPlayingRef.current = false;
-    };
-  }, [isPlaying, scrollLoop, checkHighlightedParagraph]);
-
+    // checkHighlightedParagraph is called by scrollLoop or by manual scroll when paused
+  }, [checkHighlightedParagraph]); // Dependencies like setIsPlaying, setCurrentScrollPosition are stable store actions
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -248,42 +310,113 @@ export function TeleprompterView() {
   }, [handleScroll]);
 
   useEffect(() => {
-    setHighlightedParagraphIndex(null); // Reset before check
+    setHighlightedParagraphIndex(null);
     if (typeof document !== 'undefined' && document.fonts) {
         document.fonts.ready.then(() => {
+            if (scrollContainerRef.current) { // ensure ref is current
+                 scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
+            }
             checkHighlightedParagraph();
         }).catch(err => {
             console.warn("Error waiting for fonts, checking highlight immediately:", err);
-            checkHighlightedParagraph(); // Fallback if font ready promise fails
+            if (scrollContainerRef.current) {
+                 scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
+            }
+            checkHighlightedParagraph();
         });
     } else {
-        // Fallback for environments without document.fonts (e.g. older browsers, some test runners)
         const timer = setTimeout(() => {
+           if (scrollContainerRef.current) {
+               scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
+           }
            checkHighlightedParagraph();
-        }, 100); // Slightly longer delay if fonts API not available
+        }, 250); 
         return () => clearTimeout(timer);
     }
-  }, [scriptText, fontFamily, fontSize, lineHeight, checkHighlightedParagraph, focusLinePercentage]);
+  // Add currentScrollPositionFromStore to ensure re-sync if it changes externally while view is static
+  }, [scriptText, fontFamily, fontSize, lineHeight, checkHighlightedParagraph, focusLinePercentage, currentScrollPositionFromStore]);
 
+
+  const handleParagraphClick = useCallback((paragraphIndex: number) => {
+    const store = useTeleprompterStore.getState();
+    if (store.isPlaying || !scrollContainerRef.current || !paragraphRefs.current[paragraphIndex]) return;
+
+    const container = scrollContainerRef.current;
+    const paragraphEl = paragraphRefs.current[paragraphIndex];
+    if (!paragraphEl) return;
+
+    // Calculate target scroll to bring the top of the paragraph a bit above the focus line
+    // Or simply to its top, letting focus line naturally align.
+    let targetScrollTop = paragraphEl.offsetTop;
+    // Adjust so the focus line is near the top of the clicked paragraph
+    targetScrollTop = Math.max(0, targetScrollTop - (container.clientHeight * store.focusLinePercentage * 0.25));
+
+
+    container.scrollTop = targetScrollTop;
+    store.setCurrentScrollPosition(targetScrollTop);
+    checkHighlightedParagraph(); // Update highlight immediately
+  }, [checkHighlightedParagraph]); // focusLinePercentage is stable through store selector
 
   const formattedScriptText = useMemo(() => {
-    return scriptText.split('\n\n').map((paragraphBlock, index) => (
-      <div
-        key={index}
-        ref={(el) => (paragraphRefs.current[index] = el)}
-        className={cn(
-          "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out",
-          highlightedParagraphIndex === index ? "opacity-100" : "opacity-60",
-        )}
-      >
-        {paragraphBlock.split('\n').map((line, lineIndex) => (
-          <p key={lineIndex} className="mb-1 last:mb-0">
-            {line.trim() === "" ? <>&nbsp;</> : (line || <>&nbsp;</>)}
-          </p>
-        ))}
-      </div>
-    ));
-  }, [scriptText, highlightedParagraphIndex]);
+    return scriptText.split('\n\n').map((paragraphBlock, blockIndex) => {
+      const lines = paragraphBlock.split('\n');
+      return (
+        <div
+          key={blockIndex}
+          ref={(el) => (paragraphRefs.current[blockIndex] = el)}
+          className={cn(
+            "mb-4 last:mb-0 transition-opacity duration-200 ease-in-out cursor-default",
+            highlightedParagraphIndex === blockIndex ? "opacity-100" : "opacity-60",
+            !useTeleprompterStore.getState().isPlaying && "hover:opacity-80 cursor-pointer"
+          )}
+          onClick={() => handleParagraphClick(blockIndex)}
+          role="button"
+          tabIndex={!useTeleprompterStore.getState().isPlaying ? 0 : -1}
+          onKeyDown={(e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !useTeleprompterStore.getState().isPlaying) {
+              e.preventDefault();
+              handleParagraphClick(blockIndex);
+            }
+          }}
+          aria-label={!useTeleprompterStore.getState().isPlaying ? `Start from paragraph: ${paragraphBlock.substring(0, 50)}...` : undefined}
+        >
+          {lines.map((line, lineIndex) => {
+            const parsedSegments = parseLineForCues(line);
+            return (
+              <p key={lineIndex} className="mb-1 last:mb-0 min-h-[1em]">
+                {parsedSegments.map((segment, segmentIndex) => {
+                  switch (segment.type) {
+                    case 'pause':
+                      return (
+                        <span key={segmentIndex} className="inline-flex items-center mx-1 opacity-70 text-sm">
+                          <PauseCircle className="h-4 w-4 mr-1 text-blue-400" />
+                          <span className="italic">(pause)</span>
+                        </span>
+                      );
+                    case 'emphasize':
+                      return (
+                        <strong key={segmentIndex} className="font-bold text-primary">
+                          {segment.content}
+                        </strong>
+                      );
+                    case 'slowdown':
+                      return (
+                        <span key={segmentIndex} className="inline-flex items-center mx-1 opacity-80">
+                          <ChevronsDown className="h-4 w-4 mr-1 text-orange-400" />
+                          <span className="italic">(slow down)</span>
+                        </span>
+                      );
+                    default: // text
+                      return <span key={segmentIndex}>{segment.content}</span>;
+                  }
+                })}
+              </p>
+            );
+          })}
+        </div>
+      );
+    });
+  }, [scriptText, highlightedParagraphIndex, handleParagraphClick]); // isPlaying via store for hover effect
 
   const currentTextColorToUse = !isMounted ? VIEW_SSR_DEFAULT_TEXT_COLOR : textColor;
   const currentFontFamilyToUse = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
@@ -298,8 +431,6 @@ export function TeleprompterView() {
     transform: mirrorTransform,
     position: 'relative', 
   };
-
-  const scriptContentStyles: React.CSSProperties = {}; 
 
   const focusLineStyle: React.CSSProperties = {
     position: 'absolute',
@@ -336,7 +467,6 @@ export function TeleprompterView() {
       <div style={focusLineStyle} data-testid="focus-line-overlay" />
       <div
         className="select-none" 
-        style={scriptContentStyles}
       >
         {scriptText.trim() === "" ? (
           <p className="text-center opacity-50">
