@@ -51,7 +51,7 @@ export function TeleprompterView() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const animationFrameIdRef = useRef<number | null>(null);
   const lastTimestampRef = useRef<number>(0);
-  const justStartedPlayingRef = useRef(false); // Flag for initial grace period after play
+  const justStartedPlayingRef = useRef(false);
   const paragraphRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [highlightedParagraphIndex, setHighlightedParagraphIndex] = useState<number | null>(null);
   const [isMounted, setIsMounted] = useState(false);
@@ -84,6 +84,7 @@ export function TeleprompterView() {
   const checkHighlightedParagraph = useCallback(() => {
     if (!scrollContainerRef.current || paragraphRefs.current.length === 0) {
       setHighlightedParagraphIndex(null);
+      setHighlightedParagraphText("");
       return;
     }
     const container = scrollContainerRef.current;
@@ -91,7 +92,6 @@ export function TeleprompterView() {
 
     let newHighlightedIndex: number | null = null;
 
-    // Check first paragraph if at top
     if (container.scrollTop < 5 && paragraphRefs.current.length > 0 && paragraphRefs.current[0]) {
         const firstPRef = paragraphRefs.current[0];
         const pTop = firstPRef.offsetTop;
@@ -101,7 +101,6 @@ export function TeleprompterView() {
         }
     }
 
-    // Iterate if first paragraph not highlighted or not at top
     if (newHighlightedIndex === null) {
         for (let i = 0; i < paragraphRefs.current.length; i++) {
             const pRef = paragraphRefs.current[i];
@@ -151,7 +150,7 @@ export function TeleprompterView() {
     lastTimestampRef.current = timestamp;
 
     const container = scrollContainerRef.current;
-    const currentStoreScrollSpeed = useTeleprompterStore.getState().scrollSpeed; // Get fresh scroll speed
+    const currentStoreScrollSpeed = useTeleprompterStore.getState().scrollSpeed;
     const newScrollTop = container.scrollTop + currentStoreScrollSpeed * deltaTime;
 
     if (newScrollTop >= container.scrollHeight - container.clientHeight) {
@@ -173,8 +172,9 @@ export function TeleprompterView() {
 
     const storeState = useTeleprompterStore.getState();
 
-    // During grace period after play, do nothing, scrollLoop handles it.
     if (justStartedPlayingRef.current && storeState.isPlaying) {
+      // During the grace period after play, do nothing. ScrollLoop handles it.
+      // This prevents click-induced micro-scrolls from immediately stopping playback.
       return;
     }
     
@@ -186,16 +186,13 @@ export function TeleprompterView() {
        return;
     }
     
-    // Playback is active, and grace period is over. Check for user intervention.
     const calculatedThreshold = storeState.scrollSpeed * USER_SCROLL_INTERVENTION_THRESHOLD_FACTOR;
     const scrollThreshold = Math.max(MIN_SCROLL_INTERVENTION_THRESHOLD_PX, calculatedThreshold);
 
     if (Math.abs(currentPhysicalScroll - storeState.currentScrollPosition) > scrollThreshold) {
       setIsPlaying(false); 
       setCurrentScrollPosition(currentPhysicalScroll); 
-      // checkHighlightedParagraph() will be called by the isPlaying useEffect's cleanup/else path.
     } else {
-      // Sync store's position, usually minor drift or scrollLoop itself.
       setCurrentScrollPosition(currentPhysicalScroll);
     }
   }, [setCurrentScrollPosition, setIsPlaying, checkHighlightedParagraph]);
@@ -206,7 +203,6 @@ export function TeleprompterView() {
     
     if (isPlaying) {
       if (scrollContainerRef.current) {
-        // Sync physical scroll to store's position when playback starts
         scrollContainerRef.current.scrollTop = useTeleprompterStore.getState().currentScrollPosition;
       }
 
@@ -219,7 +215,6 @@ export function TeleprompterView() {
 
       animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
     } else {
-      // Cleanup when isPlaying becomes false
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
@@ -354,4 +349,3 @@ export function TeleprompterView() {
     </div>
   );
 }
-
