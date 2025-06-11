@@ -33,45 +33,18 @@ interface NavButtonConfig {
   href?: string;
   ariaLabel: string;
   showTextOnDesktop?: boolean;
-  isAuthAction?: boolean; // To identify login/logout buttons
-  requiresAuth?: boolean; // To hide if not authenticated
-  hideIfAuth?: boolean; // To hide if authenticated
+  isAuthAction?: boolean; 
+  requiresAuth?: boolean; 
+  hideIfAuth?: boolean; 
 }
 
 const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpenHelp }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
-  const { user, logout, loading } = useAuth(); // Get auth state
+  const { user, logout, loading } = useAuth(); 
 
   const toggleTheme = useCallback(() => {
     setDarkMode(!darkMode);
   }, [darkMode, setDarkMode]);
-
-  const navButtonsBase: Omit<NavButtonConfig, 'onClick' | 'href' | 'isAuthAction' | 'requiresAuth' | 'hideIfAuth'>[] = [
-    {
-      label: 'Scripts',
-      icon: FileText,
-      ariaLabel: 'Open script manager',
-      showTextOnDesktop: true,
-    },
-    {
-      label: 'Settings',
-      icon: SlidersHorizontal,
-      ariaLabel: 'Open settings',
-      showTextOnDesktop: true,
-    },
-    {
-      label: 'Help',
-      icon: HelpCircle,
-      ariaLabel: 'Open help documentation',
-      showTextOnDesktop: true,
-    },
-    {
-      label: darkMode ? 'Light Mode' : 'Dark Mode',
-      icon: darkMode ? Sun : Moon,
-      ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`,
-      showTextOnDesktop: false,
-    },
-  ];
 
   const getNavButtons = (): NavButtonConfig[] => {
     const dynamicButtons: NavButtonConfig[] = [
@@ -81,7 +54,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
         onClick: onOpenScripts,
         ariaLabel: 'Open script manager',
         showTextOnDesktop: true,
-        requiresAuth: true, // Example: Scripts only for logged-in users
+        requiresAuth: true, 
       },
       {
         label: 'Settings',
@@ -107,23 +80,17 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
     ];
 
     if (loading) {
-      return dynamicButtons.filter(b => !b.isAuthAction && !b.requiresAuth && !b.hideIfAuth); // Show basic non-auth buttons while loading
+      // Show only non-auth related buttons while auth state is loading
+      return dynamicButtons.filter(b => !b.requiresAuth && !b.isAuthAction && !b.hideIfAuth);
     }
 
-    if (user) {
-      // User is logged in - Scripts button is already handled by requiresAuth
-    } else {
-      dynamicButtons.push({
-        label: 'Login',
-        icon: LogIn,
-        href: '/login',
-        ariaLabel: 'Login to your account',
-        showTextOnDesktop: true,
-        isAuthAction: true,
-        hideIfAuth: true,
-      });
-    }
-    return dynamicButtons.filter(b => !(b.requiresAuth && !user) && !(b.hideIfAuth && user));
+    // Filter buttons based on auth state (requiresAuth, hideIfAuth)
+    // The UserNav component will handle the login/logout button itself.
+    return dynamicButtons.filter(b => {
+      if (b.requiresAuth && !user) return false; // Hide if requires auth and no user
+      if (b.hideIfAuth && user) return false;   // Hide if meant to be hidden when authenticated
+      return true;
+    });
   };
   
   const navButtons = getNavButtons();
@@ -131,7 +98,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
 
   const UserNav = () => {
     if (loading) {
-      return <Button variant="ghost" size="sm" disabled>Loading...</Button>;
+      return <Button variant="ghost" size="sm" className="h-8 w-20 animate-pulse bg-muted/50 rounded-md" disabled>&nbsp;</Button>;
     }
     if (!user) {
       return (
@@ -203,7 +170,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
 
           <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
             {navButtons.map((button) => (
-              button.href ? (
+              button.href ? ( // Should not be login button here as UserNav handles it
                 <Link key={button.label} href={button.href} passHref legacyBehavior>
                   <Button
                     variant="ghost"
@@ -232,32 +199,27 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
                 </Button>
               )
             ))}
-             <UserNav />
+             <UserNav /> {/* UserNav handles Login button or User Avatar */}
           </nav>
 
 
           <nav className="flex items-center md:hidden space-x-1" aria-label="Mobile navigation">
-            {navButtons.filter(b => !b.isAuthAction || (b.isAuthAction && b.hideIfAuth && !user)).map((button) => ( // Filter out login button if user exists for mobile
-              button.href ? (
-                <Link key={button.label} href={button.href} passHref legacyBehavior>
-                   <Button variant="ghost" size="icon" aria-label={button.ariaLabel} title={button.ariaLabel} asChild>
-                        <a><button.icon className="h-5 w-5" aria-hidden="true"/></a>
-                   </Button>
-                </Link>
-              ) : (
-                 <Button
+             {/* For mobile, we only show icon buttons from navButtons, UserNav handles login/avatar */}
+            {navButtons.map((button) => (
+                <Button
                     key={button.label}
                     variant="ghost"
                     size="icon"
                     onClick={button.onClick}
                     aria-label={button.ariaLabel}
                     title={button.ariaLabel}
-                  >
+                    // If it has an href, wrap with Link (but it won't be the login button)
+                    // This part might need adjustment if some of these navButtons had hrefs
+                >
                     <button.icon className="h-5 w-5" aria-hidden="true"/>
-                  </Button>
-              )
+                </Button>
             ))}
-             <UserNav /> {/* UserNav will handle login/logout button for mobile too */}
+             <UserNav /> 
           </nav>
         </div>
       </div>
