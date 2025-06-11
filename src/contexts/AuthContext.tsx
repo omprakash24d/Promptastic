@@ -5,19 +5,19 @@ import type React from 'react';
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import type { AuthUser } from '@/types';
 import { useRouter } from 'next/navigation';
-import { auth } from '@/firebase/config'; // Assuming firebase config is correctly set up
+import { auth } from '@/firebase/config';
 import {
   onAuthStateChanged,
   GoogleAuthProvider,
-  GithubAuthProvider,
-  PhoneAuthProvider, // Keep for future, though implementation is complex
+  // GithubAuthProvider, // Removed
+  // PhoneAuthProvider, // Removed
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
-  // RecaptchaVerifier // Needed for phone auth
+  // RecaptchaVerifier // Was for phone auth
 } from 'firebase/auth';
 
 
@@ -27,8 +27,8 @@ interface AuthContextType {
   error: string | null;
   successMessage: string | null;
   signInWithGoogle: () => Promise<void>;
-  signInWithGithub: () => Promise<void>;
-  signInWithPhoneNumber: (phoneNumber: string, appVerifier: any) => Promise<any>; 
+  // signInWithGithub: () => Promise<void>; // Removed
+  // signInWithPhoneNumber: (phoneNumber: string, appVerifier: any) => Promise<any>;  // Removed
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -65,30 +65,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleAuthSuccess = (message?: string) => {
-    router.push('/'); // Redirect to home page on successful auth
+    router.push('/'); 
     setError(null);
     if (message) setSuccessMessage(message);
-    else setSuccessMessage(null); // Clear any previous success if no new one
+    else setSuccessMessage(null);
   }
 
   const handleAuthError = (err: any) => {
-    setSuccessMessage(null); // Clear any success messages on error
+    setSuccessMessage(null);
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
     if (err.code && userCancellableErrors.includes(err.code)) {
-      // For user-cancellable errors, set the error message but don't log to console
-      // and ensure loading is false.
       if (err.code === 'auth/popup-closed-by-user') {
         setError('The sign-in popup was closed before the process could finish. If you\'d like to sign in, please try again.');
       } else if (err.code === 'auth/cancelled-popup-request') {
         setError('The sign-in attempt was cancelled. If you\'d like to sign in, please try again.');
       }
-      setLoading(false); // Explicitly set loading to false here for these cases
-      return; // Stop further processing for these specific errors
+      setLoading(false); 
+      return; 
     }
 
-    // For other errors, log them and set the message
-    console.error("Auth Error:", err);
+    // console.error("Auth Error:", err); // Log other errors
 
     if (err.code && err.message) {
       switch (err.code) {
@@ -106,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setError('This action requires a recent login. Please sign out and sign in again.');
           break;
         case 'auth/account-exists-with-different-credential':
-          setError('An account already exists with this email, but with a different sign-in method (e.g., Google, GitHub). Try signing in with that method.');
+          setError('An account already exists with this email, but with a different sign-in method (e.g., Google). Try signing in with that method.');
           break;
         case 'auth/invalid-email':
           setError('The email address is not valid.');
@@ -115,9 +112,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
              setError('This domain is not authorized for Firebase operations. Please check your Firebase project configuration (Authentication > Sign-in method > Authorized domains) or contact support.');
              break;
         default:
+          console.error("Unhandled Auth Error:", err); // Log unhandled errors
           setError(`An unexpected error occurred: ${err.message} (Code: ${err.code})`);
       }
     } else {
+      console.error("Generic Auth Error:", err); // Log generic errors
       setError(err.message || 'An unexpected error occurred during authentication.');
     }
   }
@@ -137,39 +136,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGithub = async () => {
-    setLoading(true);
-    clearAuthMessages();
-    try {
-      const provider = new GithubAuthProvider();
-      await signInWithPopup(auth, provider);
-      handleAuthSuccess();
-    } catch (err: any) {
-      handleAuthError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // signInWithGithub removed
 
-  const signInWithPhoneNumber = async (phoneNumber: string, appVerifier: any): Promise<any> => {
-    setLoading(true);
-    clearAuthMessages();
-    console.warn("Phone Sign-In: Advanced setup required (RecaptchaVerifier & OTP UI). This is a placeholder.");
-    // Placeholder: In a real scenario, you would integrate RecaptchaVerifier here
-    // and then call Firebase's signInWithPhoneNumber.
-    // For now, simulate an error or do nothing.
-    try {
-        // Example: const confirmationResult = await firebaseSignInWithPhoneNumber(auth, phoneNumber, appVerifier);
-        // return confirmationResult; 
-        alert("Phone Sign-In: Placeholder. Not implemented in this step. See AuthContext.tsx for guidance.");
-        throw new Error("Phone sign-in not fully implemented.");
-    } catch (err: any) {
-        handleAuthError(err);
-        return Promise.reject(err); // Ensure a promise is returned in error case too
-    } finally {
-        setLoading(false);
-    }
-  };
+  // signInWithPhoneNumber removed
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
     setLoading(true);
@@ -178,15 +147,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       if (userCredential.user) {
         await firebaseUpdateProfile(userCredential.user, { displayName });
-        // Update local user state to reflect displayName immediately
-        // onAuthStateChanged will also pick this up, but this provides faster UI update
         setUser(prev => {
             if (!userCredential.user) return null; 
             return {
                 uid: userCredential.user.uid,
                 email: userCredential.user.email,
-                displayName: displayName, // Use the displayName passed to the function
-                photoURL: userCredential.user.photoURL, // This will be null initially
+                displayName: displayName, 
+                photoURL: userCredential.user.photoURL, 
                 phoneNumber: userCredential.user.phoneNumber,
             };
         });
@@ -218,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await sendPasswordResetEmail(auth, email);
       setSuccessMessage("Password reset email sent! Check your inbox (and spam folder).");
-      setError(null); // Clear any previous error
+      setError(null);
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -236,15 +203,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       await firebaseUpdateProfile(auth.currentUser, updates);
-      // Update local user state to reflect changes immediately
-      // onAuthStateChanged will also pick this up, but this can be faster for UI
       setUser(prevUser => {
-        if (!prevUser || !auth.currentUser) return null; // Should not happen if currentUser check passed
-        const updatedFirebaseUser = auth.currentUser; // Get the fresh user object
+        if (!prevUser || !auth.currentUser) return null;
+        const updatedFirebaseUser = auth.currentUser; 
         return {
             ...prevUser,
-            displayName: updatedFirebaseUser.displayName, // Firebase's displayName
-            photoURL: updatedFirebaseUser.photoURL, // Firebase's photoURL
+            displayName: updatedFirebaseUser.displayName, 
+            photoURL: updatedFirebaseUser.photoURL, 
         };
       });
       setSuccessMessage("Profile updated successfully!");
@@ -260,8 +225,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages();
     try {
       await firebaseSignOut(auth);
-      setUser(null); // Explicitly set user to null
-      router.push('/login'); // Redirect to login page after logout
+      setUser(null); 
+      router.push('/login'); 
     } catch (err: any) {
       handleAuthError(err);
     } finally {
@@ -269,22 +234,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // useMemo to prevent context value from changing on every render
   const value = useMemo(() => ({
     user,
     loading,
     error,
     successMessage,
     signInWithGoogle,
-    signInWithGithub,
-    signInWithPhoneNumber,
+    // signInWithGithub, // Removed
+    // signInWithPhoneNumber, // Removed
     signUpWithEmail,
     signInWithEmail,
     sendPasswordReset,
     updateUserProfile,
     logout,
     clearAuthMessages,
-  }), [user, loading, error, successMessage]); // Add all dependencies that trigger re-creation
+  }), [user, loading, error, successMessage]); 
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -296,4 +260,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

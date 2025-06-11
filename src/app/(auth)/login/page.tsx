@@ -9,15 +9,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Chrome, Github, KeyRound, Mail, Phone, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Chrome, KeyRound, Mail, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
   const {
     signInWithGoogle,
-    signInWithGithub,
-    // signInWithPhoneNumber, // More complex, requires Recaptcha setup
+    // signInWithGithub, // Removed
+    // signInWithPhoneNumber, // Removed
     signUpWithEmail,
     signInWithEmail,
     sendPasswordReset,
@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [displayName, setDisplayName] = useState(''); // Added for sign-up
+  const [displayName, setDisplayName] = useState('');
   const [activeTab, setActiveTab] = useState<'signIn' | 'signUp'>('signIn');
 
   const [resetEmail, setResetEmail] = useState('');
@@ -50,7 +50,7 @@ export default function LoginPage() {
     setEmail('');
     setPassword('');
     setConfirmPassword('');
-    setDisplayName(''); // Clear display name on tab change
+    setDisplayName('');
     setActiveTab(value as 'signIn' | 'signUp');
   };
 
@@ -61,7 +61,7 @@ export default function LoginPage() {
 
     if (activeTab === 'signUp') {
       if (!displayName.trim()) {
-        setPasswordMismatchError("Display Name cannot be empty."); // Basic check for display name
+        setPasswordMismatchError("Display Name cannot be empty.");
         return;
       }
       if (password !== confirmPassword) {
@@ -84,9 +84,9 @@ export default function LoginPage() {
     await sendPasswordReset(resetEmail);
   };
 
-  const handlePhoneSignIn = () => {
-    alert("Phone Sign-In: Advanced setup required (RecaptchaVerifier). Not implemented in this placeholder.");
-  };
+  // const handlePhoneSignIn = () => { // Removed
+  //   alert("Phone Sign-In: Advanced setup required (RecaptchaVerifier). Not implemented in this placeholder.");
+  // };
 
   const getPasswordStrengthFeedback = () => {
     if (!password && activeTab === 'signUp') return null;
@@ -232,12 +232,7 @@ export default function LoginPage() {
                 <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={loading}>
                   <Chrome className="mr-2 h-5 w-5" /> Google
                 </Button>
-                <Button variant="outline" className="w-full" onClick={signInWithGithub} disabled={loading}>
-                  <Github className="mr-2 h-5 w-5" /> GitHub
-                </Button>
-                <Button variant="outline" className="w-full" onClick={handlePhoneSignIn} disabled={loading}>
-                  <Phone className="mr-2 h-5 w-5" /> Phone Number (Placeholder)
-                </Button>
+                {/* GitHub and Phone Buttons Removed */}
               </div>
             </>
           )}
