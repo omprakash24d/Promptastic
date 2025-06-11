@@ -23,7 +23,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 if (typeof window !== 'undefined') {
@@ -58,7 +57,7 @@ export function ScriptManager() {
 
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
-    setIsDirty(false); 
+    setIsDirty(false);
   }, [scriptText]);
 
   useEffect(() => {
@@ -91,7 +90,7 @@ export function ScriptManager() {
       action();
     }
   };
-  
+
   const handleSave = useCallback(() => {
     const nameToSave = activeScriptName || newScriptName.trim();
     if (!nameToSave) {
@@ -110,7 +109,7 @@ export function ScriptManager() {
 
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName(""); 
+    if (!activeScriptName) setNewScriptName("");
     setIsDirty(false);
   }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
 
@@ -130,64 +129,67 @@ export function ScriptManager() {
 
   const handleLoad = (name: string) => {
      executeOrConfirm(() => {
-        loadScript(name); 
+        loadScript(name);
         toast({ title: "Script Loaded", description: `Script "${name}" is now active.` });
      });
   };
 
   const handleDelete = (name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+    // Consider using AlertDialog for consistency with unsaved changes confirmation
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`);
+    if (confirmDelete) {
       const wasActive = activeScriptName === name;
-      const remainingScripts = scripts.filter(s => s.name !== name); 
+      const remainingScripts = scripts.filter(s => s.name !== name);
       deleteScript(name);
       toast({ title: "Script Deleted", description: `Script "${name}" has been deleted.` });
-      
+
       if (wasActive) {
-        if (remainingScripts.length > 0) { 
+        if (remainingScripts.length > 0) {
             const newActiveScript = remainingScripts[0];
             if (newActiveScript) {
-                loadScript(newActiveScript.name); 
+                loadScript(newActiveScript.name);
             }
         } else {
-             setScriptText(""); 
+             setScriptText("");
              setCurrentEditingScriptText("");
              setActiveScriptName(null);
         }
       }
-       setIsDirty(false); // Ensure dirty flag is reset if active script was deleted
+       setIsDirty(false);
     }
   };
 
   const handleRename = (name: string) => {
-    if (!renameValue.trim()) {
+    const trimmedRenameValue = renameValue.trim();
+    if (!trimmedRenameValue) {
       toast({ title: "Error", description: "New name cannot be empty.", variant: "destructive" });
       return;
     }
-    if (renameValue.trim() === name) {
+    if (trimmedRenameValue === name) {
         setRenamingScript(null);
         setRenameValue("");
-        return; 
+        return;
     }
-    if (scripts.some(s => s.name === renameValue.trim() && s.name !== name)) {
-      toast({ title: "Error", description: `A script named "${renameValue.trim()}" already exists.`, variant: "destructive" });
+    if (scripts.some(s => s.name === trimmedRenameValue && s.name !== name)) {
+      toast({ title: "Error", description: `A script named "${trimmedRenameValue}" already exists.`, variant: "destructive" });
       return;
     }
-    renameScript(name, renameValue.trim());
-    toast({ title: "Script Renamed", description: `Script "${name}" renamed to "${renameValue.trim()}".` });
+    renameScript(name, trimmedRenameValue);
+    toast({ title: "Script Renamed", description: `Script "${name}" renamed to "${trimmedRenameValue}".` });
     setRenamingScript(null);
     setRenameValue("");
   };
 
   const handleNewScript = () => {
     executeOrConfirm(() => {
-        setActiveScriptName(null); 
-        setScriptText(""); 
-        setCurrentEditingScriptText(""); 
+        setActiveScriptName(null);
+        setScriptText("");
+        setCurrentEditingScriptText("");
         setNewScriptName("");
         toast({ title: "New Script", description: "Ready for your new script."});
     });
   };
-  
+
   const handleExportTxt = () => {
     if (!currentEditingScriptText.trim()) {
       toast({ title: "Error", description: "No script content to export.", variant: "destructive" });
@@ -218,19 +220,19 @@ export function ScriptManager() {
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
     setNewScriptName(fileNameWithoutExtension);
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
-    setIsDirty(true); // Imported content is considered an unsaved change
+    setIsDirty(true);
   };
 
   const fileTypes: FileTypeOption[] = [
-    { 
-      label: "Import .txt", 
-      accept: ".txt", 
+    {
+      label: "Import .txt",
+      accept: ".txt",
       icon: FileUp,
       handler: async (file) => file.text(),
     },
-    { 
-      label: "Import .pdf", 
-      accept: ".pdf", 
+    {
+      label: "Import .pdf",
+      accept: ".pdf",
       icon: FileCode2,
       handler: async (file) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -242,11 +244,11 @@ export function ScriptManager() {
           textContent += text.items.map(item => ('str' in item ? item.str : '')).join(" ") + "\n";
         }
         return textContent;
-      } 
+      }
     },
-    { 
-      label: "Import .docx", 
-      accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+    {
+      label: "Import .docx",
+      accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       icon: FileText,
       handler: async (file) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -280,7 +282,7 @@ export function ScriptManager() {
       } else {
         toast({ title: "Import Error", description: "Unsupported file type. Please select .txt, .pdf, or .docx.", variant: "destructive" });
       }
-      if (event.target) event.target.value = ""; 
+      if (event.target) event.target.value = "";
     }
   };
 
@@ -321,8 +323,8 @@ export function ScriptManager() {
             value={currentEditingScriptText}
             onChange={(e) => setCurrentEditingScriptText(e.target.value)}
             placeholder="Paste or type your script here..."
-            className="min-h-[250px] text-sm bg-background" 
-            rows={15} 
+            className="min-h-[250px] text-sm bg-background"
+            rows={15}
           />
           {!activeScriptName && (
             <div>
@@ -354,13 +356,12 @@ export function ScriptManager() {
             ))}
         </CardFooter>
       </Card>
-      
+
       <input
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
         className="hidden"
-        // `accept` will be set dynamically by triggerFileInput
       />
 
       {scripts.length > 0 && (
@@ -372,32 +373,34 @@ export function ScriptManager() {
             <ScrollArea className="h-[200px] w-full rounded-md border p-1 bg-muted/20">
               <ul className="space-y-1">
                 {scripts.map((script) => (
-                  <li key={script.name} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-sm">
+                  <li key={script.name} className="flex items-center p-2 rounded-md hover:bg-muted text-sm">
                     {renamingScript === script.name ? (
-                      <div className="flex-grow flex items-center gap-2 min-w-0"> {/* Added min-w-0 here */}
+                      <div className="flex-grow flex items-center gap-2 min-w-0">
                         <Input
                           value={renameValue}
                           onChange={(e) => setRenameValue(e.target.value)}
-                          className="h-8 bg-background text-sm flex-1 min-w-0" // Added flex-1 and min-w-0 for input
+                          className="h-8 bg-background text-sm flex-1 min-w-0"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleRename(script.name);
                             if (e.key === 'Escape') { setRenamingScript(null); setRenameValue("");}
                           }}
                         />
-                        <Button size="sm" onClick={() => handleRename(script.name)}>Save</Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setRenamingScript(null); setRenameValue(""); }}>Cancel</Button>
+                        <Button size="sm" onClick={() => handleRename(script.name)} className="flex-shrink-0">Save</Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setRenamingScript(null); setRenameValue(""); }} className="flex-shrink-0">Cancel</Button>
                       </div>
                     ) : (
                       <>
-                        <span 
-                          className={`cursor-pointer hover:underline truncate flex-1 min-w-0 ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
-                          onClick={() => handleLoad(script.name)}
-                          title={script.name}
-                        >
-                          {script.name}
-                        </span>
-                        <div className="flex gap-0.5 shrink-0"> {/* Added shrink-0 to button group */}
+                        <div className="flex-1 min-w-0 mr-2">
+                          <span
+                            className={`block truncate cursor-pointer hover:underline ${activeScriptName === script.name ? 'font-semibold text-primary' : ''}`}
+                            onClick={() => handleLoad(script.name)}
+                            title={script.name}
+                          >
+                            {script.name}
+                          </span>
+                        </div>
+                        <div className="flex-shrink-0 flex items-center gap-0.5">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingScript(script.name); setRenameValue(script.name); }} aria-label={`Rename script ${script.name}`}>
                             <Edit3 className="h-3.5 w-3.5" />
                           </Button>
