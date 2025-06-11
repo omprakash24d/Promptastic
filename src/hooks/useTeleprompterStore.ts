@@ -635,6 +635,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         horizontalPadding: state.horizontalPadding,
         enableHighContrast: state.enableHighContrast,
         userSettingsProfiles: state.userSettingsProfiles,
+        // Do not persist currentUserId directly here, AuthContext will manage it
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -644,36 +645,24 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
           state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
-          state.scripts = state.currentUserId ? [] : (state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? []);
+          // Scripts are loaded based on currentUserId by AuthContext calling initializeUserScripts
+          // So, if state.currentUserId (from persisted storage) is null, it loads local scripts, otherwise AuthContext handles Firestore.
+          state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
           state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
           state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
           state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
           state.userSettingsProfiles = state.userSettingsProfiles ?? [];
           state.textColor = state.textColor ?? (state.darkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL);
-          state.currentUserId = auth.currentUser?.uid || null;
+          // currentUserId will be set by AuthContext after Firebase initializes
         }
       }
     }
   )
 );
 
-if (typeof window !== 'undefined') {
-  useTeleprompterStore.getState().setCurrentUserId(auth.currentUser?.uid || null);
-  auth.onAuthStateChanged(user => {
-    const store = useTeleprompterStore.getState();
-    if (user) {
-      if(store.currentUserId !== user.uid) { // Only re-initialize if user actually changed
-        store.setCurrentUserId(user.uid);
-        store.initializeUserScripts(user.uid);
-      }
-    } else {
-      if (store.currentUserId !== null) { // Only clear if there was a logged-in user
-        store.clearUserScripts();
-      }
-    }
-  });
-}
+// Remove the separate auth.onAuthStateChanged listener from here.
+// AuthContext is now the sole manager of this.
 
 const unsub = useTeleprompterStore.subscribe(
   (currentState) => {
@@ -683,3 +672,8 @@ const unsub = useTeleprompterStore.subscribe(
   }
 );
 
+// This ensures that AuthContext can set the initial user ID when it first loads.
+// This specific initialization from auth.currentUser on store load is now handled by AuthContext.
+// if (typeof window !== 'undefined') {
+//   useTeleprompterStore.getState().setCurrentUserId(auth.currentUser?.uid || null);
+// }
