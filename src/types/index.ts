@@ -7,6 +7,8 @@ export interface ScriptVersion {
 }
 
 export interface Script {
+  id?: string; // Firestore document ID (optional for local-only scripts)
+  userId?: string; // ID of the user who owns this script (optional)
   name: string;
   content: string;
   createdAt: number; // timestamp
@@ -46,7 +48,7 @@ export interface UserSettingsProfile {
 
 export interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
-  activeScript: Script | null;
+  activeScript: Script | null; // Changed from activeScriptName to potentially hold the full active script object
   isPlaying: boolean;
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
@@ -71,5 +73,6 @@ export interface AuthUser {
   displayName: string | null;
   phoneNumber?: string | null;
   photoURL?: string | null;
-  // Add other Firebase user properties as needed
+  isEmailVerified: boolean; // Ensured this is not optional
 }
+

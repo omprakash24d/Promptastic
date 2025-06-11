@@ -6,6 +6,13 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Script, TeleprompterSettings, FocusLineStyle, LayoutPreset, ScriptVersion, UserSettingsProfile } from '@/types';
 import { loadFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  fetchUserScripts,
+  saveUserScript as saveUserScriptToFirestore,
+  deleteUserScript as deleteUserScriptFromFirestore,
+  saveUserScriptVersion as saveUserScriptVersionToFirestore,
+} from '@/firebase/firestoreService';
+import { auth } from '@/firebase/config';
 
 
 const INITIAL_FONT_SIZE = 48; // px
@@ -98,7 +105,9 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
 interface TeleprompterStateStore extends TeleprompterSettings {
   scriptText: string;
   scripts: Script[];
-  activeScriptName: string | null;
+  activeScriptName: string | null; // Name of the active script, used as a key
+  currentUserId: string | null; // To track logged-in user for Firestore operations
+
   isPlaying: boolean;
   currentScrollPosition: number;
   LONGER_DEFAULT_SCRIPT_TEXT: string;
@@ -111,14 +120,19 @@ interface TeleprompterStateStore extends TeleprompterSettings {
 
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
-  loadScript: (name: string) => void;
-  saveScript: (name: string, content?: string) => void; // TODO: Modify for Firestore if user logged in
-  deleteScript: (name: string) => void; // TODO: Modify for Firestore
-  renameScript: (oldName: string, newName: string) => void; // TODO: Modify for Firestore
-  duplicateScript: (name: string) => string | null; // TODO: Modify for Firestore
-  saveScriptVersion: (scriptName: string, notes?: string) => void; // TODO: Modify for Firestore
-  loadScriptVersion: (scriptName: string, versionId: string) => void; // TODO: Modify for Firestore
-  // TODO: Add fetchUserScripts action to load scripts from Firestore on login
+  
+  loadScript: (scriptName: string) => void;
+  saveScript: (name: string, content?: string) => Promise<void>;
+  deleteScript: (scriptName: string) => Promise<void>;
+  renameScript: (oldName: string, newName: string) => Promise<void>;
+  duplicateScript: (scriptName: string) => Promise<string | null>;
+  saveScriptVersion: (scriptName: string, notes?: string) => Promise<void>;
+  loadScriptVersion: (scriptName: string, versionId: string) => void;
+  
+  initializeUserScripts: (userId: string) => Promise<void>;
+  clearUserScripts: () => void;
+  setCurrentUserId: (userId: string | null) => void;
+
 
   setFontSize: (size: number) => void;
   setScrollSpeed: (speed: number) => void;
@@ -176,6 +190,7 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         scriptText: LONGER_DEFAULT_SCRIPT_TEXT,
         scripts: [],
         activeScriptName: null,
+        currentUserId: null,
         LONGER_DEFAULT_SCRIPT_TEXT: LONGER_DEFAULT_SCRIPT_TEXT,
         layoutPresets: DEFAULT_LAYOUT_PRESETS,
         activeLayoutPresetName: "Default",
@@ -194,104 +209,242 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
         focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
         countdownEnabled: INITIAL_COUNTDOWN_ENABLED,
-        countdownDuration: INITIAL_COUNTDOWN_DURATION, // Max 60 in setter
+        countdownDuration: INITIAL_COUNTDOWN_DURATION,
         horizontalPadding: INITIAL_HORIZONTAL_PADDING,
         
         isPlaying: false,
         currentScrollPosition: 0,
         countdownValue: null,
 
+        setCurrentUserId: (userId) => set({ currentUserId: userId }),
+
+        initializeUserScripts: async (userId) => {
+          set({ currentUserId: userId, scripts: [], activeScriptName: null, scriptText: LONGER_DEFAULT_SCRIPT_TEXT }); // Clear local scripts first
+          try {
+            const firestoreScripts = await fetchUserScripts(userId);
+            set({ scripts: firestoreScripts });
+            if (firestoreScripts.length > 0) {
+              // Optionally, load the first script or most recently updated
+              get().loadScript(firestoreScripts[0].name);
+            } else {
+               set({ scriptText: LONGER_DEFAULT_SCRIPT_TEXT, activeScriptName: null });
+            }
+          } catch (error) {
+            console.error("Error initializing user scripts from Firestore:", error);
+            // Keep local store empty or with default script if fetch fails
+            set({ scripts: [], scriptText: LONGER_DEFAULT_SCRIPT_TEXT, activeScriptName: null });
+          }
+        },
+        clearUserScripts: () => {
+          set({
+            scripts: [],
+            activeScriptName: null,
+            scriptText: LONGER_DEFAULT_SCRIPT_TEXT,
+            currentScrollPosition: 0,
+            currentUserId: null,
+          });
+        },
+
         setScriptText: (text) => set({ scriptText: text, activeScriptName: null, currentScrollPosition: 0 }),
         setActiveScriptName: (name) => set({ activeScriptName: name }),
         
-        // TODO: When Firebase auth is integrated, these script functions will need to:
-        // 1. Check if a user is logged in.
-        // 2. If logged in, interact with Firestore (e.g., call functions from `src/firebase/firestore.ts`).
-        // 3. If not logged in, (optionally) fall back to local storage or disable the functionality.
-        // For now, they continue to use local storage-backed state.
-
-        loadScript: (name) => {
-          // TODO: If logged in, attempt to load from user's Firestore scripts first.
-          const script = get().scripts.find(s => s.name === name);
+        loadScript: (scriptName) => {
+          const script = get().scripts.find(s => s.name === scriptName);
           if (script) {
-            set({ scriptText: script.content, activeScriptName: name, currentScrollPosition: 0 });
+            set({ scriptText: script.content, activeScriptName: scriptName, currentScrollPosition: 0 });
           }
         },
-        saveScript: (name, content) => {
-          // TODO: If logged in, save to user's Firestore scripts.
-          const scriptContent = content ?? get().scriptText;
-          const now = Date.now();
-          let scripts = get().scripts;
-          const existingScriptIndex = scripts.findIndex(s => s.name === name);
 
-          if (existingScriptIndex > -1) {
-            scripts[existingScriptIndex] = { ...scripts[existingScriptIndex], content: scriptContent, updatedAt: now };
+        saveScript: async (name, content) => {
+          const { currentUserId, scripts } = get();
+          const scriptContentToSave = content ?? get().scriptText;
+          const now = Date.now();
+          
+          let scriptToSave: Script;
+          const existingScript = scripts.find(s => s.name === name);
+
+          if (existingScript) {
+            scriptToSave = { ...existingScript, content: scriptContentToSave, updatedAt: now };
           } else {
-            scripts.push({ name, content: scriptContent, createdAt: now, updatedAt: now, versions: [] });
+            scriptToSave = { name, content: scriptContentToSave, createdAt: now, updatedAt: now, versions: [] };
           }
-          set({ scripts: [...scripts], activeScriptName: name, scriptText: scriptContent });
+          
+          if (currentUserId) {
+            try {
+              const savedFirestoreScript = await saveUserScriptToFirestore(currentUserId, scriptToSave);
+              set(state => ({
+                scripts: state.scripts.map(s => s.name === name || s.id === savedFirestoreScript.id ? { ...savedFirestoreScript, userId: currentUserId } : s),
+                activeScriptName: savedFirestoreScript.name,
+                scriptText: savedFirestoreScript.content,
+              }));
+               if (!existingScript && !scripts.some(s => s.id === savedFirestoreScript.id)) {
+                 set(state => ({ scripts: [...state.scripts, { ...savedFirestoreScript, userId: currentUserId }]}));
+               }
+
+            } catch (error) {
+              console.error("Error saving script to Firestore:", error);
+              // Potentially fall back to local save or notify user
+            }
+          } else { // Local save
+            if (existingScript) {
+              set(state => ({
+                scripts: state.scripts.map(s => s.name === name ? scriptToSave : s),
+                activeScriptName: name,
+                scriptText: scriptContentToSave,
+              }));
+            } else {
+              set(state => ({
+                scripts: [...state.scripts, { ...scriptToSave, id: uuidv4() }], // Assign local UUID for new local scripts
+                activeScriptName: name,
+                scriptText: scriptContentToSave,
+              }));
+            }
+          }
         },
-        deleteScript: (name) => {
-          // TODO: If logged in, delete from user's Firestore scripts.
+
+        deleteScript: async (scriptName) => {
+          const { currentUserId, scripts, activeScriptName, LONGER_DEFAULT_SCRIPT_TEXT: defaultText } = get();
+          const scriptToDelete = scripts.find(s => s.name === scriptName);
+
+          if (!scriptToDelete) return;
+
+          if (currentUserId && scriptToDelete.id) {
+            try {
+              await deleteUserScriptFromFirestore(currentUserId, scriptToDelete.id);
+            } catch (error) {
+              console.error("Error deleting script from Firestore:", error);
+              // Optionally notify user and don't proceed with local deletion
+              return; 
+            }
+          }
+          
+          const updatedScripts = scripts.filter(s => s.name !== scriptName);
+          set({ scripts: updatedScripts });
+
+          if (activeScriptName === scriptName) {
+            if (updatedScripts.length > 0) {
+              get().loadScript(updatedScripts[0].name);
+            } else {
+              set({ activeScriptName: null, scriptText: defaultText, currentScrollPosition: 0 });
+            }
+          }
+        },
+
+        renameScript: async (oldName, newName) => {
+          const { currentUserId, scripts, activeScriptName } = get();
+          const scriptToRename = scripts.find(s => s.name === oldName);
+
+          if (!scriptToRename || !newName.trim() || scripts.some(s => s.name === newName.trim() && s.name !== oldName)) {
+            console.error("Invalid rename operation: script not found, new name empty, or new name already exists.");
+            return;
+          }
+
+          const updatedScript = { ...scriptToRename, name: newName.trim(), updatedAt: Date.now() };
+
+          if (currentUserId && scriptToRename.id) {
+            try {
+              // Firestore saveUserScript will update if ID exists
+              await saveUserScriptToFirestore(currentUserId, updatedScript); 
+            } catch (error) {
+              console.error("Error renaming script in Firestore:", error);
+              return;
+            }
+          }
+          
           set(state => ({
-            scripts: state.scripts.filter(s => s.name !== name),
+            scripts: state.scripts.map(s => s.name === oldName ? updatedScript : s),
+            activeScriptName: state.activeScriptName === oldName ? newName.trim() : state.activeScriptName,
+            scriptText: state.activeScriptName === oldName ? updatedScript.content : state.scriptText,
           }));
         },
-        renameScript: (oldName, newName) => {
-          // TODO: If logged in, rename in user's Firestore scripts.
-          set(state => ({
-            scripts: state.scripts.map(s => s.name === oldName ? { ...s, name: newName } : s),
-            activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
-          }));
-        },
-        duplicateScript: (name) => {
-          // TODO: If logged in, duplicate in user's Firestore scripts.
-          const originalScript = get().scripts.find(s => s.name === name);
+
+        duplicateScript: async (scriptName) => {
+          const { currentUserId, scripts } = get();
+          const originalScript = scripts.find(s => s.name === scriptName);
           if (!originalScript) return null;
 
-          const existingNames = get().scripts.map(s => s.name);
           let newName = `${originalScript.name} (Copy)`;
           let copyIndex = 2;
-          while (existingNames.includes(newName)) {
+          while (scripts.some(s => s.name === newName)) {
             newName = `${originalScript.name} (Copy ${copyIndex})`;
             copyIndex++;
           }
           
           const now = Date.now();
-          const duplicatedScript: Script = {
-            ...originalScript, 
+          const duplicatedScriptData: Omit<Script, 'id' | 'userId'> = {
             name: newName,
+            content: originalScript.content,
             createdAt: now,
             updatedAt: now,
+            versions: originalScript.versions.map(v => ({...v, versionId: uuidv4()})), // Duplicate versions with new IDs
           };
 
-          set(state => ({
-            scripts: [...state.scripts, duplicatedScript],
-            activeScriptName: newName, 
-            scriptText: duplicatedScript.content, 
-            currentScrollPosition: 0,
-          }));
-          return newName;
-        },
-        saveScriptVersion: (scriptName, notes) => {
-          // TODO: If logged in, save version to Firestore script.
-          const script = get().scripts.find(s => s.name === scriptName);
-          if (script) {
-            const currentContent = (get().activeScriptName === scriptName) ? get().scriptText : script.content;
-            const newVersion: ScriptVersion = {
-              versionId: uuidv4(),
-              content: currentContent,
-              timestamp: Date.now(),
-              notes: notes,
-            };
-            const updatedScript = { ...script, versions: [...(script.versions || []), newVersion] };
+          if (currentUserId) {
+            try {
+              const savedFirestoreScript = await saveUserScriptToFirestore(currentUserId, duplicatedScriptData);
+              const newCompleteScript = { ...savedFirestoreScript, userId: currentUserId };
+              set(state => ({
+                scripts: [...state.scripts, newCompleteScript],
+                activeScriptName: newCompleteScript.name,
+                scriptText: newCompleteScript.content,
+                currentScrollPosition: 0,
+              }));
+              return newCompleteScript.name;
+            } catch (error) {
+              console.error("Error duplicating script in Firestore:", error);
+              return null;
+            }
+          } else {
+            const localDuplicate = { ...duplicatedScriptData, id: uuidv4() };
             set(state => ({
-              scripts: state.scripts.map(s => s.name === scriptName ? updatedScript : s),
+              scripts: [...state.scripts, localDuplicate],
+              activeScriptName: localDuplicate.name,
+              scriptText: localDuplicate.content,
+              currentScrollPosition: 0,
             }));
+            return localDuplicate.name;
           }
         },
+
+        saveScriptVersion: async (scriptName, notes) => {
+          const { currentUserId, scripts, scriptText, activeScriptName: currentActiveScriptName } = get();
+          const script = scripts.find(s => s.name === scriptName);
+
+          if (!script) return;
+          if (!script.id && currentUserId) { // Script exists locally but not in Firestore for this user
+            console.warn("Cannot save version: Script not yet saved to Firestore.");
+            // TODO: Optionally prompt user to save script first.
+            return;
+          }
+
+          const contentToVersion = (currentActiveScriptName === scriptName) ? scriptText : script.content;
+          
+          const newVersionData: Omit<ScriptVersion, 'versionId'> = {
+            content: contentToVersion,
+            timestamp: Date.now(),
+            notes: notes,
+          };
+
+          let savedVersion: ScriptVersion;
+
+          if (currentUserId && script.id) {
+            try {
+              savedVersion = await saveUserScriptVersionToFirestore(currentUserId, script.id, newVersionData);
+            } catch (error) {
+              console.error("Error saving script version to Firestore:", error);
+              return;
+            }
+          } else {
+            savedVersion = { ...newVersionData, versionId: uuidv4() };
+          }
+          
+          const updatedScript = { ...script, versions: [...(script.versions || []), savedVersion] };
+          set(state => ({
+            scripts: state.scripts.map(s => s.name === scriptName ? updatedScript : s),
+          }));
+        },
+
         loadScriptVersion: (scriptName, versionId) => {
-          // TODO: If logged in, load version from Firestore script.
           const script = get().scripts.find(s => s.name === scriptName);
           const version = script?.versions.find(v => v.versionId === versionId);
           if (script && version) {
@@ -306,8 +459,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         setDarkMode: (newDarkModeValue) => {
           set({
             darkMode: newDarkModeValue,
-            // Text color is now primarily handled by CSS variables and high contrast mode
-            // textColor: newDarkModeValue ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
           });
         },
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
@@ -340,7 +491,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         },
 
         resetSettingsToDefaults: () => {
-          // const currentDarkMode = get().darkMode; // Dark mode itself is not reset by this
           const defaultPreset = get().layoutPresets.find(p => p.name === "Default");
           const defaultSettings = defaultPreset?.settings ?? {};
           set({
@@ -349,8 +499,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
             lineHeight: defaultSettings.lineHeight ?? INITIAL_LINE_HEIGHT,
             isMirrored: INITIAL_IS_MIRRORED,
             isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
-            // textColor is primarily theme-driven now
-            // textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
             fontFamily: defaultSettings.fontFamily ?? INITIAL_FONT_FAMILY,
             focusLinePercentage: defaultSettings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
             focusLineStyle: defaultSettings.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE,
@@ -418,15 +566,16 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
       }
     },
     {
-      name: 'promptastic-store', // Local storage key
+      name: 'promptastic-store', 
       storage: createJSONStorage(() => ({
         getItem: (name) => JSON.stringify(loadFromLocalStorage(name, {})),
         setItem: (name, value) => saveToLocalStorage(name, JSON.parse(value)),
         removeItem: (name) => typeof window !== 'undefined' ? localStorage.removeItem(name) : undefined,
       })),
       partialize: (state) => ({
-        scripts: state.scripts, // Scripts will be managed by Firestore for logged-in users
-        activeScriptName: state.activeScriptName,
+        // Only persist settings and non-user-specific script data for anonymous users
+        // Scripts for logged-in users will be fetched from Firestore
+        ...(state.currentUserId === null && { scripts: state.scripts, activeScriptName: state.activeScriptName }),
         fontSize: state.fontSize,
         scrollSpeed: state.scrollSpeed,
         lineHeight: state.lineHeight,
@@ -445,38 +594,49 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         enableHighContrast: state.enableHighContrast,
         userSettingsProfiles: state.userSettingsProfiles,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error("Error rehydrating Promptastic store:", error);
+        }
         if (state) {
           state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
           state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
-          state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
+          // Scripts for logged-out users are rehydrated, logged-in users will fetch from Firestore
+          state.scripts = state.currentUserId ? [] : (state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? []);
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
           state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
           state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
           state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
           state.userSettingsProfiles = state.userSettingsProfiles ?? [];
           state.textColor = state.textColor ?? (state.darkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL);
+          state.currentUserId = auth.currentUser?.uid || null; // Initialize based on current auth state
         }
       }
     }
   )
 );
 
-const unsub = useTeleprompterStore.subscribe(
-  (state) => {
-    const currentStore = useTeleprompterStore.getState();
-    if (currentStore.scripts.length === 0 && currentStore.activeScriptName === null && currentStore.scriptText !== currentStore.LONGER_DEFAULT_SCRIPT_TEXT) {
-        useTeleprompterStore.setState({ scriptText: currentStore.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
+// Initialize currentUserId on load and subscribe to auth changes
+if (typeof window !== 'undefined') {
+  useTeleprompterStore.getState().setCurrentUserId(auth.currentUser?.uid || null);
+  auth.onAuthStateChanged(user => {
+    useTeleprompterStore.getState().setCurrentUserId(user?.uid || null);
+    if (user) {
+        // This is now handled by AuthContext calling initializeUserScripts
+    } else {
+      useTeleprompterStore.getState().clearUserScripts();
     }
-  },
-  (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
+  });
+}
+
+
+// Default script logic if store is empty after rehydration (for non-logged-in users)
+const unsub = useTeleprompterStore.subscribe(
+  (currentState) => {
+    if (!currentState.currentUserId && currentState.scripts.length === 0 && currentState.activeScriptName === null && currentState.scriptText !== currentState.LONGER_DEFAULT_SCRIPT_TEXT) {
+        useTeleprompterStore.setState({ scriptText: currentState.LONGER_DEFAULT_SCRIPT_TEXT, currentScrollPosition: 0 });
+    }
+  }
 );
 
-// TODO for user:
-// 1. Create `src/firebase/config.ts` with your Firebase project configuration and export `auth` and `db` (Firestore instance).
-// 2. Implement actual Firebase calls in `src/contexts/AuthContext.tsx` replacing placeholders.
-// 3. Create `src/firebase/firestore.ts` for script CRUD operations.
-// 4. Update `useTeleprompterStore` script actions to call Firestore functions when a user is logged in.
-// 5. Set up Firestore security rules.
-// 6. For Phone Auth, implement RecaptchaVerifier.

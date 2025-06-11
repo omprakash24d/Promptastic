@@ -4,7 +4,7 @@
 import type React from 'react';
 import { createContext, useContext, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { AuthUser } from '@/types';
-import { usePathname, useRouter } from 'next/navigation'; // Import usePathname
+import { usePathname, useRouter } from 'next/navigation'; 
 import { auth } from '@/firebase/config';
 import {
   onAuthStateChanged,
@@ -16,10 +16,11 @@ import {
   signOut as firebaseSignOut,
   updateProfile as firebaseUpdateProfile,
   sendEmailVerification,
-  type User as FirebaseUser, // Import FirebaseUser type
+  type User as FirebaseUser, 
 } from 'firebase/auth';
+import { useTeleprompterStore } from '@/hooks/useTeleprompterStore'; // Import the store
 
-const MESSAGE_CLEAR_TIMEOUT = 7000; // 7 seconds
+const MESSAGE_CLEAR_TIMEOUT = 7000; 
 
 const FIREBASE_ERROR_MESSAGES: { [key: string]: string } = {
   'auth/user-not-found': 'Invalid email or password. Please try again.',
@@ -40,8 +41,8 @@ const FIREBASE_ERROR_MESSAGES: { [key: string]: string } = {
 
 interface AuthContextType {
   user: AuthUser | null;
-  isEmailVerified: boolean | undefined;
-  // Specific loading states
+  // isEmailVerified is part of AuthUser now
+  
   loginLoading: boolean;
   signupLoading: boolean;
   passwordResetLoading: boolean;
@@ -53,7 +54,7 @@ interface AuthContextType {
   successMessage: string | null;
 
   signInWithGoogle: () => Promise<void>;
-  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<boolean>; // Returns success boolean
+  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<boolean>; 
   signInWithEmail: (email: string, password: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<boolean>;
   updateUserProfile: (updates: { displayName?: string; photoURL?: string }) => Promise<void>;
@@ -64,7 +65,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to parse Firebase User
 const parseFirebaseUser = (firebaseUser: FirebaseUser | null): AuthUser | null => {
   if (!firebaseUser) return null;
   const { uid, email, displayName, phoneNumber, photoURL, emailVerified } = firebaseUser;
@@ -73,9 +73,8 @@ const parseFirebaseUser = (firebaseUser: FirebaseUser | null): AuthUser | null =
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [isEmailVerified, setIsEmailVerified] = useState<boolean | undefined>(undefined);
+  // isEmailVerified is now part of the user object
 
-  // Specific loading states
   const [loginLoading, setLoginLoading] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
   const [passwordResetLoading, setPasswordResetLoading] = useState(false);
@@ -84,15 +83,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [googleSignInLoading, setGoogleSignInLoading] = useState(false);
   const [initialAuthLoading, setInitialAuthLoading] = useState(true);
 
-
   const [error, setErrorState] = useState<string | null>(null);
   const [successMessage, setSuccessMessageState] = useState<string | null>(null);
   
   const router = useRouter();
-  const pathname = usePathname(); // Use usePathname hook
+  const pathname = usePathname(); 
 
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get Zustand actions
+  const initializeUserScripts = useTeleprompterStore((state) => state.initializeUserScripts);
+  const clearUserScripts = useTeleprompterStore((state) => state.clearUserScripts);
+  const setCurrentUserIdInStore = useTeleprompterStore((state) => state.setCurrentUserId);
+
 
   const clearAuthMessages = useCallback(() => {
     if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
@@ -102,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const setError = useCallback((message: string | null) => {
-    clearAuthMessages(); // Clear previous messages before setting a new one
+    clearAuthMessages(); 
     setErrorState(message);
     if (message) {
       errorTimeoutRef.current = setTimeout(() => setErrorState(null), MESSAGE_CLEAR_TIMEOUT);
@@ -110,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [clearAuthMessages]);
 
   const setSuccessMessage = useCallback((message: string | null) => {
-    clearAuthMessages(); // Clear previous messages before setting a new one
+    clearAuthMessages(); 
     setSuccessMessageState(message);
     if (message) {
       successTimeoutRef.current = setTimeout(() => setSuccessMessageState(null), MESSAGE_CLEAR_TIMEOUT);
@@ -119,10 +123,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       const parsedUser = parseFirebaseUser(firebaseUser);
       setUser(parsedUser);
-      setIsEmailVerified(firebaseUser?.emailVerified);
+      setCurrentUserIdInStore(parsedUser?.uid || null); // Update Zustand store
+      
+      if (parsedUser) {
+        await initializeUserScripts(parsedUser.uid); // Load scripts from Firestore
+      } else {
+        clearUserScripts(); // Clear scripts on logout
+      }
       setInitialAuthLoading(false);
     });
     return () => {
@@ -130,12 +140,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // initializeUserScripts and clearUserScripts are stable
 
 
   const handleAuthSuccess = useCallback((message?: string, options: { fromSignup?: boolean, redirectTo?: string, skipRedirect?: boolean } = {}) => {
     const { fromSignup = false, redirectTo = '/', skipRedirect = false } = options;
-    // setError(null); // setError calls clearAuthMessages which clears success too. Call setSuccessMessage directly.
     let finalMessage = message;
 
     if (fromSignup && auth.currentUser && !auth.currentUser.emailVerified) {
@@ -144,7 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       finalMessage = message || "Account created successfully!";
     }
     
-    setSuccessMessage(finalMessage || null); // This will clear error via its internal clearAuthMessages
+    setSuccessMessage(finalMessage || null); 
 
     if (!skipRedirect && pathname !== redirectTo) { 
         router.push(redirectTo);
@@ -152,22 +162,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [setSuccessMessage, router, pathname]);
 
   const handleAuthError = useCallback((err: any, operation?: 'passwordReset' | 'signup') => {
-    // setSuccessMessage(null); // setSuccessMessage(null) calls clearAuthMessages which clears error too. Call setError directly.
     const userCancellableErrors = ['auth/popup-closed-by-user', 'auth/cancelled-popup-request'];
 
     if (err.code && userCancellableErrors.includes(err.code)) {
-      clearAuthMessages(); // User cancelled, so clear everything silently
+      clearAuthMessages(); 
       return;
     }
     
     if (err.code === 'auth/user-not-found' && operation === 'passwordReset') {
-      // setError(null); // setError(null) clears success message. Call setSuccessMessage directly.
       setSuccessMessage("If an account exists for this email, a password reset link has been sent. Please check your inbox (and spam folder).");
       return;
     }
 
     const message = FIREBASE_ERROR_MESSAGES[err.code as string] || `An unexpected error occurred: ${err.message} (Code: ${err.code})`;
-    setError(message); // This will clear success via its internal clearAuthMessages
+    setError(message); 
     console.error("Firebase Auth Error:", err.code, err.message);
 
   }, [setError, setSuccessMessage, clearAuthMessages]);
@@ -179,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      // onAuthStateChanged will handle setUser, script loading, and setCurrentUserIdInStore
       handleAuthSuccess("Signed in with Google successfully! Redirecting...");
     } catch (err: any) {
       handleAuthError(err);
@@ -196,9 +205,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await firebaseUpdateProfile(userCredential.user, { displayName });
         await sendEmailVerification(userCredential.user);
 
+        // onAuthStateChanged will handle setUser, but we can call parseFirebaseUser for immediate UI update if needed
         const parsedUser = parseFirebaseUser(userCredential.user);
-        setUser(parsedUser);
-        setIsEmailVerified(userCredential.user.emailVerified);
+        setUser(parsedUser); // Update local context user immediately
+        setCurrentUserIdInStore(parsedUser?.uid || null); // Update Zustand
+        // Script loading will be triggered by onAuthStateChanged
       }
       handleAuthSuccess(undefined, { fromSignup: true, skipRedirect: true }); 
       return true;
@@ -215,6 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoginLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // onAuthStateChanged will handle setUser, script loading, and setCurrentUserIdInStore
       handleAuthSuccess("Signed in successfully! Redirecting...");
     } catch (err: any) { 
       handleAuthError(err);
@@ -228,8 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPasswordResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      // setError(null); // Explicitly clear error before setting success - Handled by handleAuthError's specific path for this
-      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); // Triggers generic success
+      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); 
       return true;
     } catch (err: any) {
       handleAuthError(err, 'passwordReset'); 
@@ -274,7 +285,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await firebaseUpdateProfile(auth.currentUser, updates);
       const parsedUser = parseFirebaseUser(auth.currentUser); 
       setUser(parsedUser);
-      if (auth.currentUser) setIsEmailVerified(auth.currentUser.emailVerified); 
+      // isEmailVerified is part of parsedUser
       setSuccessMessage("Profile updated successfully!");
     } catch (err: any) {
       handleAuthError(err);
@@ -285,22 +296,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     clearAuthMessages();
-    setGoogleSignInLoading(true); 
+    // setGoogleSignInLoading(true); // Use a generic logoutLoading or just rely on AuthStateChanged
     try {
       await firebaseSignOut(auth);
-      setUser(null);
-      setIsEmailVerified(undefined);
-      router.push('/login'); 
+      // onAuthStateChanged will handle setUser(null), clearUserScripts(), and setCurrentUserIdInStore(null)
+      if (pathname !== '/login') { // Only redirect if not already on login page
+        router.push('/login'); 
+      }
     } catch (err: any) {
       handleAuthError(err);
     } finally {
-      setGoogleSignInLoading(false);
+      // setGoogleSignInLoading(false);
     }
   };
 
   const value = useMemo(() => ({
     user,
-    isEmailVerified,
+    // isEmailVerified is part of user object now
     loginLoading,
     signupLoading,
     passwordResetLoading,
@@ -319,11 +331,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
-    user, isEmailVerified,
+    user, 
     loginLoading, signupLoading, passwordResetLoading, profileUpdateLoading, verificationResendLoading, googleSignInLoading,
     error, successMessage,
-    // router, pathname, are stable
-    // Callbacks (setError, setSuccessMessage, etc.) are memoized with useCallback
   ]);
 
   if (initialAuthLoading) {
@@ -340,3 +350,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
