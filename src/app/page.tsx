@@ -14,7 +14,7 @@ import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { HelpCircle, Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, Thermometer, AlertTriangle, MonitorPlay, LayoutList, Info, Mail, ShieldCheck, Gavel, Hammer } from 'lucide-react'; // Added Info, Mail, ShieldCheck, Gavel, Hammer
+import { Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, AlertTriangle, MonitorPlay, LayoutList, Info, Mail, ShieldCheck, Gavel, Hammer, TvMinimalPlay, BookOpenText, RotateCcw } from 'lucide-react'; 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -45,7 +45,7 @@ export default function PromptasticPage() {
 
     const persistedPrefs = loadFromLocalStorage<PersistedStorePreferences>(
       'promptastic-store',
-      {}
+      {} 
     );
 
     let resolvedDarkMode: boolean;
@@ -54,9 +54,9 @@ export default function PromptasticPage() {
     } else if (typeof window !== 'undefined') {
       resolvedDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     } else {
-      resolvedDarkMode = useTeleprompterStore.getState().darkMode;
+      resolvedDarkMode = useTeleprompterStore.getState().darkMode; 
     }
-
+    
     if (useTeleprompterStore.getState().darkMode !== resolvedDarkMode) {
       setDarkMode(resolvedDarkMode);
     }
@@ -257,7 +257,7 @@ export default function PromptasticPage() {
                 className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
                 aria-label="Exit Presentation Mode"
             >
-                <Maximize className="h-5 w-5" />
+                <Maximize className="h-5 w-5" /> {/* Or use TvMinimalPlay if you prefer consistency with the playbar button */}
             </Button>
         </div>
       )}
@@ -289,7 +289,7 @@ export default function PromptasticPage() {
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col overflow-y-auto">
           <SheetHeader className="p-4 border-b sticky top-0 bg-background z-10">
             <SheetTitle className="text-lg flex items-center">
-              <Hammer className="mr-2 h-5 w-5" /> {/* Changed icon */}
+              <Hammer className="mr-2 h-5 w-5" /> 
               Help & Information
             </SheetTitle>
           </SheetHeader>
@@ -297,59 +297,79 @@ export default function PromptasticPage() {
             <div className="p-6 space-y-6 text-sm">
               
               <section aria-labelledby="about-tool-heading" className="space-y-3">
-                <h3 id="about-tool-heading" className="text-xl font-semibold mb-3 flex items-center"><Info className="mr-2 h-5 w-5 text-primary"/>About Promptastic! & How to Use</h3>
-                <p>Promptastic is a high-performance teleprompter application designed to make your presentations, recordings, and speeches smooth and professional.</p>
-                 <h4 className="font-medium flex items-center pt-2"><Play className="mr-2 h-5 w-5"/>Teleprompter View & Core Playback</h4>
+                <h3 id="about-tool-heading" className="text-xl font-semibold mb-3 flex items-center"><Info className="mr-2 h-5 w-5 text-primary"/>About Promptastic!</h3>
+                <p>Promptastic! is a modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally. Built with Next.js, React, and ShadCN UI, it offers a clean, intuitive interface, real-time customization, and AI-powered enhancements for an optimal prompting experience.</p>
+              </section>
+
+              <Separator/>
+
+              <section aria-labelledby="core-features-heading" className="space-y-3">
+                <h3 id="core-features-heading" className="text-xl font-semibold mb-3 flex items-center"><LayoutList className="mr-2 h-5 w-5 text-primary"/>Core Features & Usage</h3>
+                
+                <h4 className="font-medium flex items-center pt-2"><Play className="mr-2 h-5 w-5"/>Teleprompter View & Playback</h4>
                 <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><strong>Play/Pause:</strong> Click the Play/Pause button or press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>.</li>
-                  <li><strong>Scrolling:</strong> When playing, the script scrolls automatically. You can manually scroll when paused. Click a paragraph while paused to set it as the new starting point.</li>
-                  <li><strong>Visuals:</strong> Adjust font size, line height, text color, font family, horizontal padding, and dark/mirror modes in Settings.</li>
-                  <li><strong>Focus Line/Area:</strong> A horizontal guide or shaded paragraph shows your current reading position. Adjust its vertical placement and style in Settings.</li>
-                  <li><strong>Countdown:</strong> Optionally enable a countdown timer (1-60s) in Settings before playback starts.</li>
-                  <li><strong>Rich Text:</strong> Use `**bold**`, `*italic*`, `_underline_`, and `//CUES//` like `//PAUSE//`, `//EMPHASIZE//` (colors text), `//SLOWDOWN//`.</li>
+                  <li><strong>Smooth Scrolling:</strong> The script scrolls automatically at an adjustable speed.</li>
+                  <li><strong>Playback Controls:</strong> Use the <Play className="inline h-4 w-4"/> Play, <RotateCcw className="inline h-4 w-4"/> Reset, and other controls in the footer.</li>
+                  <li><strong>Keyboard Control:</strong> Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code> to toggle play/pause.</li>
+                  <li><strong>Manual Scroll & Jump:</strong> When paused, you can manually scroll. Clicking on a paragraph while paused will set it as the new starting point for playback.</li>
+                  <li><strong>Rich Text & Cues:</strong> 
+                    The teleprompter supports basic formatting like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">**bold**</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">*italic*</code>, and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">_underline_</code>.
+                    Visual cues like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//PAUSE//</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//EMPHASIZE//</code> (highlights text in primary color), and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//SLOWDOWN//</code> are also displayed.
+                  </li>
                 </ul>
-                 <h4 className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
+
+                <h4 className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
                 <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><strong>New Script:</strong> Clear the editor for a new script. Type a name and save.</li>
-                  <li><strong>Editing:</strong> Modify script text directly in the textarea. Estimated reading time is shown.</li>
-                  <li><strong>Saving:</strong> Save new scripts or update existing ones. Changes are saved automatically if you edit an active script and click save.</li>
-                  <li><strong>Loading:</strong> Click a script name from the "Saved Scripts" list to load it.</li>
-                  <li><strong>Renaming & Deleting:</strong> Use the icons next to each saved script.</li>
-                  <li><strong>Importing:</strong> Click the ".txt", ".pdf", ".md", or ".docx" buttons to import scripts from files.</li>
-                  <li><strong>Exporting:</strong> Export the current script as a .txt file.</li>
-                  <li><strong>Script Versions:</strong> Save multiple versions of a script with notes. Load any version back into the editor.</li>
-                  <li><strong>AI Summary:</strong> Generate an AI-powered summary of your script (available in Script Manager and footer controls).</li>
+                  <li><strong>Access:</strong> Click the "Scripts" button in the header to open the Script Manager.</li>
+                  <li><strong>Create & Edit:</strong> Type or paste your script directly into the editor. The estimated reading time is shown.</li>
+                  <li><strong>Save Scripts:</strong> Save your work with a unique name. If you are logged in, scripts sync to the cloud (Firestore); otherwise, they are saved in your browser's local storage.</li>
+                  <li><strong>Load Scripts:</strong> Select a script from the "Saved Scripts" list to load it into the teleprompter.</li>
+                  <li><strong>Organize:</strong> Rename, duplicate, or delete scripts as needed.</li>
+                  <li><strong>Import:</strong> Import scripts from <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.txt</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.md</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.pdf</code>, and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.docx</code> files.</li>
+                  <li><strong>Export:</strong> Export the current script as a <code className="bg-muted px-1.5 py-0.5 rounded text-xs">.txt</code> file.</li>
+                  <li><strong>Versioning:</strong> Save multiple versions of a script with optional notes. You can load any previous version back into the editor.</li>
+                  <li><strong>AI Summary:</strong> Generate an AI-powered summary of your script using the "Summarize" button in the Script Manager or the <BookOpenText className="inline h-4 w-4"/> "Summary" button in the playback controls.</li>
                 </ul>
                  <div className="p-3 bg-muted/50 rounded-md border border-border mt-2">
                     <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage or synced with Firestore if logged in.</p>
                 </div>
+
                 <h4 className="font-medium flex items-center pt-2"><Settings className="mr-2 h-5 w-5"/>Settings Panel</h4>
                  <ul className="list-disc list-outside pl-5 space-y-1">
-                    <li><strong>Layout Presets & Profiles:</strong> Quickly apply predefined visual settings or save/load your custom configurations.</li>
-                    <li><strong>Appearance:</strong> Customize font size, line spacing, font family, text color, horizontal padding, focus line position/style, mirror mode, and themes (Light/Dark/High-Contrast).</li>
-                    <li><strong>Playback:</strong> Control scroll speed, AI scroll sync, and countdown timer settings.</li>
+                    <li><strong>Access:</strong> Click the "Settings" (gear) icon in the header.</li>
+                    <li><strong>Appearance:</strong> Customize font size, line spacing, font family (including Atkinson Hyperlegible for readability), text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, and themes (Light/Dark/High-Contrast).</li>
+                    <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (duration 1-60s).</li>
+                    <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets or save/load your custom combinations of settings as named profiles for different scenarios.</li>
                  </ul>
-                 <h4 className="font-medium flex items-center pt-2"><Mic className="mr-2 h-5 w-5"/>AI Scroll Sync</h4>
-                 <p>This experimental feature attempts to adjust scroll speed based on your voice. Enable in Settings, then use the "AI Sync" button in playback controls.</p>
+                
+                <h4 className="font-medium flex items-center pt-2"><Mic className="mr-2 h-5 w-5"/>AI Scroll Sync (Experimental)</h4>
+                 <p>This feature attempts to listen to your speech and adjust the teleprompter scroll speed accordingly. Enable it in Settings, then use the "AI Sync" button in the playback controls. Microphone access is required.</p>
                  <div className="p-3 bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
-                    <p className="flex items-center text-xs"><AlertTriangle className="mr-2 h-4 w-4"/>Microphone access is required. The actual speech-to-speed analysis is currently a placeholder.</p>
+                    <p className="flex items-center text-xs"><AlertTriangle className="mr-2 h-4 w-4"/>The speech analysis component of AI Scroll Sync is currently a placeholder and does not perform actual speech-to-speed calculations. This requires integration with a Speech-to-Text API.</p>
                 </div>
+
                  <h4 className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
-                 <p><strong>Fullscreen Mode:</strong> Click the "Full Screen" button to make the teleprompter view fill your screen. Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit.</p>
-                 <p><strong>Presentation Mode:</strong> Click the "Present" button (<MonitorPlay className="inline h-4 w-4"/> icon) for an even more immersive, distraction-free experience. This mode also goes fullscreen and hides all UI except the script and a subtle exit button. Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit.</p>
-                 <h4 className="font-medium flex items-center pt-2">Keyboard Shortcuts</h4>
+                 <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls to make the teleprompter view fill your entire screen. This helps minimize distractions.</p>
+                 <p><strong>Presentation Mode:</strong> Click the <MonitorPlay className="inline h-4 w-4"/> "Present" button for an even more immersive, UI-less experience. This mode also goes fullscreen and hides all UI elements except for the scrolling script and a subtle exit button. Ideal for actual delivery.</p>
+                 <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit either Fullscreen or Presentation mode.</p>
+              </section>
+              
+              <Separator/>
+
+              <section aria-labelledby="keyboard-shortcuts-heading">
+                <h3 id="keyboard-shortcuts-heading" className="text-lg font-semibold mb-2 flex items-center"><Palette className="mr-2 h-5 w-5 text-primary"/>Keyboard Shortcuts</h3>
                 <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling (when not focused on an input field).</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen or Presentation mode.</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script in Script Manager (if focus is within script manager context).</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script (when Script Manager is open and focused on the script editor).</li>
                 </ul>
               </section>
 
               <Separator />
 
               <section aria-labelledby="contact-heading">
-                <h3 id="contact-heading" className="text-lg font-semibold mb-2 flex items-center"><Mail className="mr-2 h-5 w-5 text-primary"/>Contact Us</h3>
-                <p>For support or inquiries, please reach out to us at:</p>
+                <h3 id="contact-heading" className="text-lg font-semibold mb-2 flex items-center"><Mail className="mr-2 h-5 w-5 text-primary"/>Contact & Support</h3>
+                <p>For support, feedback, or inquiries, please reach out:</p>
                 <p className="mt-1">Email: <a href="mailto:support@promptastic.com" className="underline hover:text-primary">support@promptastic.com</a> (Placeholder)</p>
                 <p className="mt-1">Instagram: <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">@omprakash24d</a></p>
               </section>
@@ -358,7 +378,7 @@ export default function PromptasticPage() {
 
               <section aria-labelledby="privacy-policy-heading">
                 <h3 id="privacy-policy-heading" className="text-lg font-semibold mb-2 flex items-center"><ShieldCheck className="mr-2 h-5 w-5 text-primary"/>Privacy Policy</h3>
-                <p>Your privacy is important to us. Our Privacy Policy explains how we collect, use, and protect your information.</p>
+                <p>Your privacy is important. Our Privacy Policy explains how we collect, use, and protect your information.</p>
                 <p className="mt-1"><a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Read our full Privacy Policy here.</a> (Placeholder)</p>
                  <p className="text-xs text-muted-foreground mt-1">Note: This is a placeholder link. A real privacy policy page needs to be created.</p>
               </section>
@@ -376,7 +396,7 @@ export default function PromptasticPage() {
 
               <section aria-labelledby="about-dev-heading" className="space-y-1">
                 <h3 id="about-dev-heading" className="text-lg font-semibold">About the Developer</h3>
-                <p>Promptastic! was designed and developed by Om Prakash. You can find more about his work on his <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Instagram</a>.</p>
+                <p>Promptastic! was designed and developed by Om Prakash. Connect with him on <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Instagram</a>.</p>
               </section>
             </div>
           </ScrollArea>

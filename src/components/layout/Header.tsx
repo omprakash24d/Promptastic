@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2, Hammer } from 'lucide-react'; // Added Hammer
+import { FileText, Moon, SlidersHorizontal, Sun, HelpCircle, LogIn, LogOut, UserCircle2, Hammer } from 'lucide-react'; // Hammer is already here
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -65,9 +65,9 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
       },
       {
         label: 'Help',
-        icon: Hammer, // Changed icon to Hammer
+        icon: Hammer, 
         onClick: onOpenHelp,
-        ariaLabel: 'Open help and information', // Updated aria-label
+        ariaLabel: 'Open help and information',
         showTextOnDesktop: true,
       },
       {
@@ -75,12 +75,13 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
         icon: darkMode ? Sun : Moon,
         onClick: toggleTheme,
         ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`,
-        showTextOnDesktop: false,
+        showTextOnDesktop: false, // This button will be icon-only on desktop too due to this
       },
     ];
 
     if (loading) {
-      return dynamicButtons.filter(b => !b.requiresAuth && !b.isAuthAction && !b.hideIfAuth);
+      // Show a minimal set or placeholders if auth state is loading
+      return dynamicButtons.filter(b => !b.requiresAuth && !b.isAuthAction && !b.hideIfAuth && b.label !== 'Scripts');
     }
 
     return dynamicButtons.filter(b => {
@@ -169,6 +170,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
             </span>
           </Link>
 
+          {/* Desktop Navigation */}
           <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
             {navButtons.map((button) => (
               button.href ? (
@@ -181,7 +183,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
                     asChild
                   >
                     <a>
-                     <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5", button.label === 'Help' && button.showTextOnDesktop && "mr-1.5")} aria-hidden="true" />
+                     <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
                      {button.showTextOnDesktop && button.label}
                     </a>
                   </Button>
@@ -195,7 +197,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
                   aria-label={button.ariaLabel}
                   title={button.ariaLabel}
                 >
-                  <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5", button.label === 'Help' && button.showTextOnDesktop && "mr-1.5")} aria-hidden="true" />
+                  <button.icon className={cn(button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5")} aria-hidden="true" />
                   {button.showTextOnDesktop && button.label}
                 </Button>
               )
@@ -203,20 +205,29 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
              <UserNav />
           </nav>
 
-          <nav className="flex items-center md:hidden space-x-1" aria-label="Mobile navigation">
-            {navButtons.filter(b => !b.showTextOnDesktop).map((button) => ( // Filter for icon-only buttons for mobile view compactness
+          {/* Mobile Navigation: Render all available buttons as icons */}
+          <nav className="flex items-center md:hidden space-x-0.5" aria-label="Mobile navigation">
+            {navButtons.map((button) => (
+              button.href ? ( // For link-based navigation (currently none in navButtons)
+                <Link key={button.label + "-mobile"} href={button.href} passHref legacyBehavior>
+                  <Button variant="ghost" size="icon" title={button.ariaLabel} aria-label={button.ariaLabel} asChild>
+                    <a><button.icon className="h-5 w-5" /></a>
+                  </Button>
+                </Link>
+              ) : button.onClick ? ( // For onClick based navigation
                 <Button
-                    key={button.label}
-                    variant="ghost"
-                    size="icon"
-                    onClick={button.onClick}
-                    aria-label={button.ariaLabel}
-                    title={button.ariaLabel}
+                  key={button.label + "-mobile"}
+                  variant="ghost"
+                  size="icon"
+                  onClick={button.onClick}
+                  title={button.ariaLabel}
+                  aria-label={button.ariaLabel}
                 >
-                    <button.icon className="h-5 w-5" aria-hidden="true"/>
+                  <button.icon className="h-5 w-5" />
                 </Button>
+              ) : null
             ))}
-             <UserNav />
+            <UserNav /> {/* UserNav is separate and already responsive */}
           </nav>
         </div>
       </div>
