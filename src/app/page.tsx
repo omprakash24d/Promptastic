@@ -116,7 +116,7 @@ export default function PromptasticPage() {
   }, [activeScriptName, scripts, loadScriptFromStore, LONGER_DEFAULT_SCRIPT_TEXT]);
 
 
-  const handleToggleFullScreen = () => {
+  const handleToggleFullScreen = useCallback(() => {
     if (!mainRef.current) return;
 
     if (!document.fullscreenElement) {
@@ -140,7 +140,7 @@ export default function PromptasticPage() {
         });
       }
     }
-  };
+  }, [toast]);
 
   const togglePresentationMode = () => {
     setIsPresentationMode(!isPresentationMode);
@@ -178,10 +178,13 @@ export default function PromptasticPage() {
       if ((event.code === 'Space' || event.code === 'Backspace') && !isTyping) {
         event.preventDefault();
         togglePlayPause();
-      } else if (event.key.toUpperCase() === 'R' && !isTyping) {
+      } else if (event.key.toUpperCase() === 'R' && !isTyping && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
         resetScroll();
         toast({ title: "Scroll Reset", description: "Teleprompter scroll position has been reset to the beginning." });
+      } else if (event.key.toUpperCase() === 'F' && !isTyping) {
+        event.preventDefault();
+        handleToggleFullScreen();
       } else if (event.key === 'Escape') {
         if (isPresentationMode) {
             setIsPresentationMode(false);
@@ -203,7 +206,7 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode]);
+  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode, handleToggleFullScreen]);
 
   const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
