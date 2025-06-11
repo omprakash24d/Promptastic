@@ -16,7 +16,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Export scripts as `.txt`.
     *   Estimated reading time display.
 *   **🖥️ Teleprompter View**:
-    *   Distraction-free, full-screen display.
+    *   Distraction-free, full-screen display (auto-scrolls with countdown on entering fullscreen).
     *   Smooth, adjustable auto-scrolling.
     *   Rich text support: `**bold**`, `*italic*`, `_underline_`.
     *   Visual cues: `//PAUSE//`, `//EMPHASIZE//` (highlights text), `//SLOWDOWN//`.
@@ -35,8 +35,8 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Clean, minimal, and responsive interface.
     *   Collapsible side panels for Scripts and Settings.
     *   Light, Dark, and High-Contrast themes.
-    *   Touchscreen and keyboard friendly.
-    *   Help panel with usage instructions.
+    *   Touchscreen and keyboard friendly (extensive keyboard shortcuts available).
+    *   Help panel with usage instructions and a dedicated Keyboard Shortcuts page.
 *   **Mirror Mode**: Flip text horizontally for use with physical teleprompter mirrors.
 *   **🎤 AI Scroll Sync (Experimental)**:
     *   AI listens to the speaker and attempts to sync scroll speed (currently uses placeholder speech analysis).
@@ -100,6 +100,10 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
                 allow read, write: if request.auth != null && request.auth.uid == userId;
               }
             }
+            // Add rules for userSettingsProfiles if you store them in Firestore
+            match /users/{userId}/settingsProfiles/{profileId} {
+               allow read, write: if request.auth != null && request.auth.uid == userId;
+            }
           }
         }
         ```
@@ -148,7 +152,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
 ## Key Functionalities
 
 ### Script Management
-Access the Script Manager via the "Scripts" button in the header. Here you can:
+Access the Script Manager via the "Scripts" button in the header (Shortcut: `Alt + S`). Here you can:
 *   Create new scripts or edit existing ones in a text area.
 *   View an estimated reading time for the current script.
 *   Save scripts with a name. Logged-in users' scripts sync to Firestore; anonymous users' scripts save to browser local storage.
@@ -157,11 +161,11 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   Import scripts from `.txt`, `.md`, `.pdf`, and `.docx` files.
 *   Export the current script as a `.txt` file.
 *   Save and load different versions of a script, with optional notes for each version.
-*   Generate an AI-powered summary of the current script.
+*   Generate an AI-powered summary of the current script (Shortcut: `Alt + M` on main page).
 
 ### Teleprompter Controls & Settings
 *   **Playback Bar**: Located at the bottom (hidden in Presentation Mode). Controls play/pause, reset, AI Sync toggle, script summary, fullscreen, and presentation mode.
-*   **Settings Panel**: Access via the gear icon in the header. Customize:
+*   **Settings Panel**: Access via the gear icon in the header (Shortcut: `Alt + E`). Customize:
     *   **Appearance**: Font size, line spacing, font family, text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, dark/light/high-contrast themes.
     *   **Playback**: Scroll speed, AI scroll sync (enable/disable), countdown timer (enable/disable, duration 1-60s).
     *   **Layouts & Profiles**: Apply predefined layout presets (e.g., "Default", "Studio Recording") or save/load your custom combinations of settings as named profiles.
@@ -171,31 +175,41 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   Users can sign up with an email and password, or sign in using Google.
 *   Password reset functionality is available.
 *   Logged-in users can update their display name and profile picture.
+*   Shortcut: `Alt + L` to go to Login page (if not logged in).
 
 ### AI Features
-*   **Script Summary**: Get a concise summary of the current script text using Genkit.
-*   **AI Scroll Sync (Experimental)**: When enabled in settings and activated via the playback controls, the application will attempt to listen to your speech and adjust the teleprompter scroll speed accordingly. (Note: The speech analysis part is currently a placeholder).
+*   **Script Summary**: Get a concise summary of the current script text using Genkit (Shortcut: `Alt + M` on main page).
+*   **AI Scroll Sync (Experimental)**: When enabled in settings and activated via the playback controls, the application will attempt to listen to your speech and adjust the teleprompter scroll speed accordingly.
 
 ## 🎨 Styling & Theming
 
 *   The application uses Tailwind CSS for utility-first styling.
-*   It supports **Light Mode**, **Dark Mode**, and a **High-Contrast Mode** for accessibility. Theme preferences are persisted.
+*   It supports **Light Mode**, **Dark Mode** (Shortcut: `Alt + T` to toggle), and a **High-Contrast Mode** for accessibility. Theme preferences are persisted.
 *   The primary color is a calming light blue (`#5DADE2`), with a light grey background (`#F0F4F8`) and a desaturated purple accent (`#A992E2`).
 *   The main font is 'Inter', with 'Atkinson Hyperlegible' available as a high-readability option.
 
 ## ⌨️ Keyboard Shortcuts
 
-(When not focused on an input field like the script editor or settings input):
+Promptastic! offers a range of keyboard shortcuts for quick access to features.
+See the dedicated [Keyboard Shortcuts page](/keyboard-shortcuts) in the app (accessible via Help menu or `Alt+H` then navigate) for a full list.
+
+**Common Shortcuts (when not focused on an input field):**
 
 *   **Spacebar / Backspace**: Toggle Play/Pause scrolling.
 *   **R**: Reset scroll to the beginning.
-*   **F**: Toggle Fullscreen mode.
+*   **F**: Toggle Fullscreen mode. (Scrolling starts automatically with a 3s countdown when entering fullscreen)
 *   **Esc**: Exit Fullscreen or Presentation mode.
 *   **[`**: Decrease scroll speed.
 *   **`]**: Increase scroll speed.
 *   **-** (Minus/Hyphen): Decrease font size.
 *   **=** (Equals/Plus): Increase font size.
-*   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and focused on the script editor).
+*   **Ctrl+S / Cmd+S**: Save current script (when Script Manager is open and script editor is focused).
+*   **Alt + S**: Toggle Script Manager Panel.
+*   **Alt + E**: Toggle Settings Panel.
+*   **Alt + M**: Show Script Summary (on main page).
+*   **Alt + T**: Toggle Dark/Light Mode.
+*   **Alt + L**: Go to Login Page (if not logged in).
+*   **Alt + H**: Go to How to Use Page.
 
 
 ## 🔮 Known Issues / Future Enhancements
@@ -208,6 +222,7 @@ Access the Script Manager via the "Scripts" button in the header. Here you can:
 *   **HTML File Import**: Support for importing HTML files with proper sanitization.
 *   **Debounce Script Input**: For very large scripts, debounce text area input to improve performance.
 *   **Draft Auto-Save**: Periodically auto-save script drafts to local storage for recovery.
+*   **User Settings Profile Sync**: Custom settings profiles are currently saved locally; could be synced to Firestore for logged-in users.
 
 ## 🤝 Contributing
 
@@ -226,7 +241,7 @@ Please ensure your code adheres to the project's coding style and guidelines.
 
 This project is licensed under the **MIT License**.
 
-See the [LICENSE](LICENSE.md) file for more details. (You would typically create a LICENSE.md file with the MIT license text).
+See the [LICENSE](LICENSE.md) file for more details.
 
 ## ©️ Copyright
 

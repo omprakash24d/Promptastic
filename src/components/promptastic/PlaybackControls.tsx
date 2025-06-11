@@ -2,7 +2,7 @@
 "use client";
 
 import type React from 'react';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize, Loader2, BookOpenText } from 'lucide-react';
@@ -30,7 +30,12 @@ interface PlaybackControlsProps {
   onToggleFullScreen: () => void;
 }
 
-export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackControlsProps) {
+export interface PlaybackControlsHandle {
+  triggerSummary: () => void;
+}
+
+export const PlaybackControls = forwardRef<PlaybackControlsHandle, PlaybackControlsProps>(
+  ({ isFullScreen, onToggleFullScreen }, ref) => {
   const { toast } = useToast();
   const {
     isPlaying, togglePlayPause,
@@ -180,7 +185,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     }
   }, [isAutoSyncEnabled, scriptText, toast, setScrollSpeed, isRecording, isAiSyncSupported, isProcessingAiSync]); 
 
-  const handleSummarizeFooter = async () => {
+  const handleSummarizeFooter = useCallback(async () => {
     if (!scriptText.trim()) {
       toast({ title: "Cannot Summarize", description: "Script is empty.", variant: "destructive" });
       return;
@@ -199,7 +204,17 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     } finally {
       setIsSummarizingFooter(false);
     }
-  };
+  }, [scriptText, toast]);
+
+  useImperativeHandle(ref, () => ({
+    triggerSummary: () => {
+      if (scriptText.trim()) {
+        handleSummarizeFooter();
+      } else {
+        toast({ title: "Summary", description: "Script is empty, cannot summarize.", variant: "default"});
+      }
+    }
+  }));
 
 
   const aiSyncButtonText = isRecording ? 'Stop Sync' : (isProcessingAiSync ? 'Syncing...' : 'AI Sync');
@@ -244,7 +259,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             variant="outline"
             size="lg"
             aria-label="Reset Scroll to beginning"
-            title="Reset Scroll"
+            title="Reset Scroll (R)"
             disabled={isRecording || isProcessingAiSync}
             className="px-4"
           >
@@ -276,7 +291,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
               variant="outline"
               size="lg"
               aria-label="Get Script Summary"
-              title="Get Script Summary"
+              title="Get Script Summary (Alt + M)"
               disabled={isSummarizingFooter || !scriptText.trim()}
               className="px-4"
           >
@@ -289,7 +304,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
               size="lg"
               aria-label={isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen'}
               aria-pressed={isFullScreen}
-              title={isFullScreen ? 'Exit Full Screen (Esc)' : 'Enter Full Screen'}
+              title={isFullScreen ? 'Exit Full Screen (Esc)' : 'Enter Full Screen (F)'}
               className="px-4"
             >
             {isFullScreen ? <Minimize className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize className="h-5 w-5 sm:h-6 sm:w-6" />}
@@ -330,5 +345,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
       )}
     </>
   );
-}
+});
+
+PlaybackControls.displayName = 'PlaybackControls';
 

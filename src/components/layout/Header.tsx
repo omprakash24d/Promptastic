@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { useCallback } from 'react';
-import { FileText, Moon, SlidersHorizontal, Sun, Hammer, LogIn, LogOut, UserCircle2, Info, FileQuestion, Mail, ShieldCheck, Gavel } from 'lucide-react';
+import { FileText, Moon, SlidersHorizontal, Sun, Hammer, LogIn, LogOut, UserCircle2, Info, FileQuestion, Mail, ShieldCheck, Gavel, Keyboard } from 'lucide-react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,7 @@ interface HeaderProps {
 const staticHelpPageItems = [
     { label: "About Promptastic!", href: "/about-us", icon: Info },
     { label: "How to Use", href: "/how-to-use", icon: FileQuestion },
+    { label: "Keyboard Shortcuts", href: "/keyboard-shortcuts", icon: Keyboard },
     { label: "Contact Us", href: "/contact-us", icon: Mail },
     { label: "Privacy Policy", href: "/privacy-policy", icon: ShieldCheck },
     { label: "Terms & Conditions", href: "/terms-conditions", icon: Gavel },
@@ -106,7 +107,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
         ) : !user ? (
           <Link href="/login" passHref legacyBehavior>
             <DropdownMenuItem asChild>
-              <a><LogIn className="mr-2 h-4 w-4" />Login</a>
+              <a><LogIn className="mr-2 h-4 w-4" />Login (Alt+L)</a>
             </DropdownMenuItem>
           </Link>
         ) : (
@@ -129,13 +130,13 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
         )}
         
         {onOpenScripts && (
-            <DropdownMenuItem onClick={onOpenScripts}>
-                <FileText className="mr-2 h-4 w-4" /> Scripts
+            <DropdownMenuItem onClick={onOpenScripts} aria-keyshortcuts="Alt+S">
+                <FileText className="mr-2 h-4 w-4" /> Scripts (Alt+S)
             </DropdownMenuItem>
         )}
         {onOpenSettings && (
-            <DropdownMenuItem onClick={onOpenSettings}>
-                <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings
+            <DropdownMenuItem onClick={onOpenSettings} aria-keyshortcuts="Alt+E">
+                <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings (Alt+E)
             </DropdownMenuItem>
         )}
 
@@ -149,8 +150,8 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
         <DropdownMenuLabel>Help & Information</DropdownMenuLabel>
         {staticHelpPageItems.map(item => (
           <Link key={item.href} href={item.href} passHref legacyBehavior>
-            <DropdownMenuItem asChild>
-              <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
+            <DropdownMenuItem asChild aria-keyshortcuts={item.href === "/how-to-use" ? "Alt+H" : undefined}>
+              <a><item.icon className="mr-2 h-4 w-4" />{item.label}{item.href === "/how-to-use" ? " (Alt+H)" : ""}</a>
             </DropdownMenuItem>
           </Link>
         ))}
@@ -188,7 +189,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
 
           {isMobile ? (
             <nav className="flex items-center space-x-1" aria-label="Mobile navigation">
-              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`}>
+              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode (Alt+T)`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode (Alt+T)`}>
                 {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
               {renderMobileMenu()}
@@ -196,12 +197,12 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
           ) : (
             <nav className="hidden items-center space-x-1 md:flex" aria-label="Main navigation">
               {onOpenScripts && (
-                <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager" title="Open script manager">
+                <Button variant="ghost" size="sm" onClick={onOpenScripts} aria-label="Open script manager (Alt+S)" title="Open script manager (Alt+S)">
                   <FileText className="mr-1 h-5 w-5" /> Scripts
                 </Button>
               )}
               {onOpenSettings && (
-                <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings" title="Open settings">
+                <Button variant="ghost" size="sm" onClick={onOpenSettings} aria-label="Open settings (Alt+E)" title="Open settings (Alt+E)">
                     <SlidersHorizontal className="mr-1 h-5 w-5" /> Settings
                 </Button>
               )}
@@ -214,14 +215,14 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
                 <DropdownMenuContent align="end">
                   {staticHelpPageItems.map(item => (
                     <Link key={item.href} href={item.href} passHref legacyBehavior>
-                      <DropdownMenuItem asChild>
-                        <a><item.icon className="mr-2 h-4 w-4" />{item.label}</a>
+                      <DropdownMenuItem asChild aria-keyshortcuts={item.href === "/how-to-use" ? "Alt+H" : undefined}>
+                        <a><item.icon className="mr-2 h-4 w-4" />{item.label}{item.href === "/how-to-use" ? " (Alt+H)" : ""}</a>
                       </DropdownMenuItem>
                     </Link>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode`}>
+              <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode (Alt+T)`} title={`Toggle theme to ${darkMode ? 'light' : 'dark'} mode (Alt+T)`}>
                 {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
               </Button>
               <UserNavDesktop />

@@ -20,17 +20,21 @@ export default function Footer() {
           </a>
           .
         </p>
-        <div className="mt-2 space-x-4">
+        <div className="mt-2 space-x-2 sm:space-x-4 flex flex-wrap justify-center">
           <Link href="/privacy-policy" className="hover:text-primary hover:underline">
             Privacy Policy
           </Link>
-          <span>&bull;</span>
+          <span className="hidden sm:inline">&bull;</span>
           <Link href="/terms-conditions" className="hover:text-primary hover:underline">
             Terms & Conditions
           </Link>
-           <span>&bull;</span>
+           <span className="hidden sm:inline">&bull;</span>
           <Link href="/contact-us" className="hover:text-primary hover:underline">
             Contact Us
+          </Link>
+          <span className="hidden sm:inline">&bull;</span>
+          <Link href="/keyboard-shortcuts" className="hover:text-primary hover:underline">
+            Keyboard Shortcuts
           </Link>
         </div>
       </div>

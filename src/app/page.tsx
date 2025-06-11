@@ -3,10 +3,13 @@
 
 import type React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import Link from 'next/link'; // Ensure Link is imported
+import Link from 'next/link'; 
+import { useRouter } from 'next/navigation';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
 import { PlaybackControls } from '@/components/promptastic/PlaybackControls';
+import type { PlaybackControlsHandle } from '@/components/promptastic/PlaybackControls';
 import { TeleprompterView } from '@/components/promptastic/TeleprompterView';
 import { loadFromLocalStorage } from '@/lib/localStorage';
 import Header from '@/components/layout/Header';
@@ -20,6 +23,7 @@ import { cn } from '@/lib/utils';
 
 const FONT_SIZE_STEP = 2;
 const SCROLL_SPEED_STEP = 5;
+const FULLSCREEN_AUTOSTART_COUNTDOWN = 3;
 
 interface PersistedStorePreferences {
   darkMode?: boolean;
@@ -30,20 +34,27 @@ export default function PromptasticPage() {
   const {
     darkMode, setDarkMode,
     scripts, activeScriptName, loadScript: loadScriptFromStore,
-    togglePlayPause,
+    togglePlayPause, isPlaying, setIsPlaying,
     resetScroll,
     isPresentationMode, setIsPresentationMode,
     enableHighContrast,
     LONGER_DEFAULT_SCRIPT_TEXT,
     setFontSize,
     setScrollSpeed,
+    setCountdownValue,
+    scriptText,
   } = useTeleprompterStore();
 
   const { toast } = useToast();
+  const router = useRouter();
+  const { user } = useAuth();
+
   const [settingsSheetOpen, setSettingsSheetOpen] = useState(false);
   const [scriptsSheetOpen, setScriptsSheetOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const playbackControlsRef = useRef<PlaybackControlsHandle>(null);
+
 
   useEffect(() => {
     const persistedPrefs: PersistedStorePreferences = loadFromLocalStorage<PersistedStorePreferences>(
@@ -123,6 +134,8 @@ export default function PromptasticPage() {
   const handleToggleFullScreen = useCallback(() => {
     if (!mainRef.current) return;
 
+    const store = useTeleprompterStore.getState();
+
     if (!document.fullscreenElement) {
       mainRef.current.requestFullscreen().catch(err => {
         console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
@@ -131,6 +144,12 @@ export default function PromptasticPage() {
           title: "Fullscreen Error",
           description: `Could not enter full-screen mode. ${err.message}`,
         });
+      }).then(() => {
+        // After successfully entering fullscreen
+        if (!store.isPlaying && store.scriptText.trim() && store.scriptText !== store.LONGER_DEFAULT_SCRIPT_TEXT) {
+           toast({ title: `Starting playback in ${FULLSCREEN_AUTOSTART_COUNTDOWN} seconds...`, description: "Press Space/Backspace to cancel." });
+           store.setCountdownValue(FULLSCREEN_AUTOSTART_COUNTDOWN);
+        }
       });
     } else {
       if (document.exitFullscreen) {
@@ -179,7 +198,42 @@ export default function PromptasticPage() {
       const activeElement = document.activeElement;
       const isTyping = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.getAttribute('role') === 'textbox');
 
-      if (isTyping) return; // Do not process shortcuts if typing
+      if (event.altKey) { // Global Alt-based shortcuts
+        switch (event.key.toUpperCase()) {
+          case 'S':
+            if (scriptsSheetOpen) setScriptsSheetOpen(false); else openScriptsSheet();
+            event.preventDefault();
+            break;
+          case 'E': // E for sEttings
+            if (settingsSheetOpen) setSettingsSheetOpen(false); else openSettingsSheet();
+            event.preventDefault();
+            break;
+          case 'T':
+            setDarkMode(!useTeleprompterStore.getState().darkMode);
+            toast({ description: `Dark mode ${useTeleprompterStore.getState().darkMode ? 'enabled' : 'disabled'}.` });
+            event.preventDefault();
+            break;
+          case 'L':
+            if (!user && window.location.pathname !== '/login') router.push('/login');
+            event.preventDefault();
+            break;
+          case 'H':
+            if (window.location.pathname !== '/how-to-use') router.push('/how-to-use');
+            event.preventDefault();
+            break;
+          case 'M':
+            if (playbackControlsRef.current?.triggerSummary) {
+              playbackControlsRef.current.triggerSummary();
+            } else {
+              toast({ title: "Summary", description: "Summary feature not available here or script is empty.", variant: "default" });
+            }
+            event.preventDefault();
+            break;
+        }
+        return; // Return early if an Alt-key shortcut was handled
+      }
+
+      if (isTyping) return; // Do not process other shortcuts if typing
 
       if ((event.code === 'Space' || event.code === 'Backspace')) {
         event.preventDefault();
@@ -191,22 +245,34 @@ export default function PromptasticPage() {
       } else if (event.key.toUpperCase() === 'F') {
         event.preventDefault();
         handleToggleFullScreen();
-      } else if (event.key === '[') { // Decrease scroll speed
+      } else if (event.key === '[') { 
         event.preventDefault();
-        setScrollSpeed(prev => prev - SCROLL_SPEED_STEP);
-        toast({ description: `Scroll speed decreased to ${useTeleprompterStore.getState().scrollSpeed}.` });
-      } else if (event.key === ']') { // Increase scroll speed
+        const oldSpeed = useTeleprompterStore.getState().scrollSpeed;
+        setScrollSpeed(prev => Math.max(1, prev - SCROLL_SPEED_STEP));
+        if (useTeleprompterStore.getState().scrollSpeed !== oldSpeed) {
+         toast({ description: `Scroll speed decreased to ${useTeleprompterStore.getState().scrollSpeed}.` });
+        }
+      } else if (event.key === ']') { 
         event.preventDefault();
-        setScrollSpeed(prev => prev + SCROLL_SPEED_STEP);
-        toast({ description: `Scroll speed increased to ${useTeleprompterStore.getState().scrollSpeed}.` });
-      } else if (event.key === '-') { // Decrease font size
+        const oldSpeed = useTeleprompterStore.getState().scrollSpeed;
+        setScrollSpeed(prev => Math.min(200, prev + SCROLL_SPEED_STEP));
+        if (useTeleprompterStore.getState().scrollSpeed !== oldSpeed) {
+          toast({ description: `Scroll speed increased to ${useTeleprompterStore.getState().scrollSpeed}.` });
+        }
+      } else if (event.key === '-') { 
         event.preventDefault();
-        setFontSize(prev => prev - FONT_SIZE_STEP);
-        toast({ description: `Font size decreased to ${useTeleprompterStore.getState().fontSize}px.` });
-      } else if (event.key === '=') { // Increase font size (equals key, often unshifted +)
+        const oldSize = useTeleprompterStore.getState().fontSize;
+        setFontSize(prev => Math.max(12, prev - FONT_SIZE_STEP));
+         if (useTeleprompterStore.getState().fontSize !== oldSize) {
+          toast({ description: `Font size decreased to ${useTeleprompterStore.getState().fontSize}px.` });
+        }
+      } else if (event.key === '=') { 
         event.preventDefault();
-        setFontSize(prev => prev + FONT_SIZE_STEP);
-        toast({ description: `Font size increased to ${useTeleprompterStore.getState().fontSize}px.` });
+        const oldSize = useTeleprompterStore.getState().fontSize;
+        setFontSize(prev => Math.min(150, prev + FONT_SIZE_STEP));
+        if (useTeleprompterStore.getState().fontSize !== oldSize) {
+          toast({ description: `Font size increased to ${useTeleprompterStore.getState().fontSize}px.` });
+        }
       } else if (event.key === 'Escape') {
         if (isPresentationMode) {
             setIsPresentationMode(false);
@@ -228,7 +294,11 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode, handleToggleFullScreen, setFontSize, setScrollSpeed]);
+  }, [
+    togglePlayPause, resetScroll, toast, isPresentationMode, setIsPresentationMode, 
+    handleToggleFullScreen, setFontSize, setScrollSpeed,
+    scriptsSheetOpen, settingsSheetOpen, router, user, setDarkMode // Added dependencies for new shortcuts
+  ]);
 
   const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
@@ -253,6 +323,7 @@ export default function PromptasticPage() {
           aria-label="Playback Controls and Information"
         >
           <PlaybackControls
+            ref={playbackControlsRef}
             isFullScreen={isFullScreen}
             onToggleFullScreen={handleToggleFullScreen}
           />
@@ -310,3 +381,4 @@ export default function PromptasticPage() {
     </div>
   );
 }
+
