@@ -30,6 +30,7 @@ export interface TeleprompterSettings {
   countdownEnabled: boolean;
   countdownDuration: number; // in seconds
   horizontalPadding: number; // percentage, e.g., 0 to 25
+  enableHighContrast: boolean; // New for accessibility
 }
 
 export interface LayoutPreset {
@@ -37,13 +38,20 @@ export interface LayoutPreset {
   settings: Partial<Pick<TeleprompterSettings, 'fontSize' | 'lineHeight' | 'focusLinePercentage' | 'fontFamily' | 'scrollSpeed'>>;
 }
 
+export interface UserSettingsProfile {
+  id: string;
+  name: string;
+  settings: Omit<TeleprompterSettings, 'darkMode' | 'enableHighContrast'>; // darkMode and highContrast are global toggles, not per-profile
+}
 
 export interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
-  activeScript: Script | null; 
+  activeScript: Script | null;
   isPlaying: boolean;
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
+  isPresentationMode: boolean; // New for Presentation Mode
+  userSettingsProfiles: UserSettingsProfile[]; // New for settings profiles
 }
 
 // Updated script segment parsing type

@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -33,7 +34,7 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 98%; /* Default ShadCN, can be updated if sidebar is used */
+    --sidebar-background: 0 0% 98%; 
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
@@ -67,7 +68,7 @@ body {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%; /* Default ShadCN dark, can be updated */
+    --sidebar-background: 240 5.9% 10%; 
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -75,6 +76,37 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .high-contrast {
+    --background: 0 0% 0%; /* Black */
+    --foreground: 60 100% 50%; /* Yellow */
+    --card: 0 0% 5%;
+    --card-foreground: 60 100% 50%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 60 100% 50%;
+    --primary: 60 100% 60%; 
+    --primary-foreground: 0 0% 0%; 
+    --secondary: 0 0% 15%; 
+    --secondary-foreground: 60 100% 50%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 60 90% 70%;
+    --accent: 180 100% 50%; /* Cyan as accent */
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 100% 50%; /* Bright Red */
+    --destructive-foreground: 0 0% 0%;
+    --border: 60 100% 30%;
+    --input: 0 0% 10%;
+    --ring: 60 100% 70%;
+    /* Sidebar colors for high contrast */
+    --sidebar-background: 0 0% 0%; 
+    --sidebar-foreground: 60 100% 50%;
+    --sidebar-primary: 60 100% 60%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent-foreground: 60 100% 50%;
+    --sidebar-border: 60 100% 30%;
+    --sidebar-ring: 60 100% 70%;
   }
 }
 

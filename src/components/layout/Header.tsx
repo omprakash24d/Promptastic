@@ -61,7 +61,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
   ];
 
   return (
-    <header className="border-b bg-card py-3 shadow-sm shrink-0" role="banner">
+    <header className="border-b bg-card py-3 shadow-sm shrink-0 print:hidden" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -127,5 +127,3 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings, onOpe
 });
 
 export default Header;
-
-    

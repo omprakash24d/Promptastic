@@ -13,17 +13,18 @@ import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { HelpCircle, Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, Thermometer, AlertTriangle } from 'lucide-react';
+import { HelpCircle, Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, Thermometer, AlertTriangle, MonitorPlay, LayoutList } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 
 export default function PromptasticPage() {
   const {
-    darkMode,
-    setDarkMode,
-    scripts,
-    activeScriptName,
-    loadScript: loadScriptFromStore,
+    darkMode, setDarkMode,
+    scripts, activeScriptName, loadScript: loadScriptFromStore,
     togglePlayPause,
+    isPresentationMode, setIsPresentationMode,
+    enableHighContrast,
   } = useTeleprompterStore();
 
   const { toast } = useToast();
@@ -34,8 +35,9 @@ export default function PromptasticPage() {
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined});
+    const persistedStore = loadFromLocalStorage('promptastic-store', {darkMode: undefined, enableHighContrast: undefined});
     let initialDarkMode = persistedStore.darkMode;
+    let initialHighContrast = persistedStore.enableHighContrast;
 
     if (initialDarkMode === undefined) {
       if (typeof window !== 'undefined') {
@@ -45,6 +47,15 @@ export default function PromptasticPage() {
       }
     }
     setDarkMode(initialDarkMode);
+
+    if (initialHighContrast === undefined) {
+        initialHighContrast = useTeleprompterStore.getState().enableHighContrast;
+    }
+    // The actual setting of enableHighContrast is handled by its own useEffect below
+    // to ensure class is applied correctly after hydration.
+    useTeleprompterStore.setState({ enableHighContrast: initialHighContrast });
+
+
   }, [setDarkMode]);
 
 
@@ -55,6 +66,14 @@ export default function PromptasticPage() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    if (enableHighContrast) {
+      document.documentElement.classList.add('high-contrast');
+    } else {
+      document.documentElement.classList.remove('high-contrast');
+    }
+  }, [enableHighContrast]);
 
 
   useEffect(() => {
@@ -107,14 +126,35 @@ export default function PromptasticPage() {
       }
     }
   };
+  
+  const togglePresentationMode = () => {
+    setIsPresentationMode(!isPresentationMode);
+    if (!isPresentationMode && !document.fullscreenElement && mainRef.current) {
+      mainRef.current.requestFullscreen().catch(err => {
+        toast({
+          variant: "destructive",
+          title: "Fullscreen Error",
+          description: `Could not enter full-screen mode for Presentation Mode. ${err.message}`,
+        });
+      });
+    } else if (isPresentationMode && document.fullscreenElement) {
+       if (document.exitFullscreen) document.exitFullscreen().catch(console.error);
+    }
+  };
+
 
   useEffect(() => {
     const fullscreenChangeHandler = () => {
-      setIsFullScreen(!!document.fullscreenElement);
+      const isCurrentlyFullscreen = !!document.fullscreenElement;
+      setIsFullScreen(isCurrentlyFullscreen);
+      if (!isCurrentlyFullscreen && isPresentationMode) {
+        // If exiting fullscreen externally while in presentation mode, also exit presentation mode
+        setIsPresentationMode(false);
+      }
     };
     document.addEventListener('fullscreenchange', fullscreenChangeHandler);
     return () => document.removeEventListener('fullscreenchange', fullscreenChangeHandler);
-  }, []);
+  }, [isPresentationMode, setIsPresentationMode]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -126,15 +166,20 @@ export default function PromptasticPage() {
         event.preventDefault();
         togglePlayPause();
       }
-      if (event.key === 'Escape' && document.fullscreenElement) {
-        document.exitFullscreen().catch(err => {
-          console.error(`Error attempting to exit full-screen mode via Escape: ${err.message} (${err.name})`);
-          toast({
-            variant: "destructive",
-            title: "Fullscreen Error",
-            description: "Could not exit full-screen mode.",
-          });
-        });
+      if (event.key === 'Escape') {
+        if (isPresentationMode) {
+            setIsPresentationMode(false); // Exit presentation mode first
+        }
+        if (document.fullscreenElement) { // Then exit fullscreen if still active
+            document.exitFullscreen().catch(err => {
+            console.error(`Error attempting to exit full-screen mode via Escape: ${err.message} (${err.name})`);
+            toast({
+                variant: "destructive",
+                title: "Fullscreen Error",
+                description: "Could not exit full-screen mode.",
+            });
+            });
+        }
       }
     };
 
@@ -142,45 +187,65 @@ export default function PromptasticPage() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [togglePlayPause, toast]);
+  }, [togglePlayPause, toast, isPresentationMode, setIsPresentationMode]);
 
   const openScriptsSheet = useCallback(() => setScriptsSheetOpen(true), []);
   const openSettingsSheet = useCallback(() => setSettingsSheetOpen(true), []);
   const openHelpSheet = useCallback(() => setHelpSheetOpen(true), []);
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      <Header
-        onOpenScripts={openScriptsSheet}
-        onOpenSettings={openSettingsSheet}
-        onOpenHelp={openHelpSheet}
-      />
+    <div className={cn("flex flex-col h-screen bg-background text-foreground overflow-hidden", isPresentationMode && "presentation-mode-active")}>
+      {!isPresentationMode && (
+        <Header
+          onOpenScripts={openScriptsSheet}
+          onOpenSettings={openSettingsSheet}
+          onOpenHelp={openHelpSheet}
+        />
+      )}
 
       <main ref={mainRef} className="flex-1 bg-background relative overflow-hidden">
         <TeleprompterView />
       </main>
 
-      <div
-        className="p-4 border-t print:hidden bg-card shadow-md shrink-0"
-        role="toolbar"
-        aria-label="Playback Controls and Information"
-      >
-        <PlaybackControls
-          isFullScreen={isFullScreen}
-          onToggleFullScreen={handleToggleFullScreen}
-        />
-        <p className="text-xs text-muted-foreground text-center mt-3">
-          Designed and developed by{" "}
-          <a
-            href="https://www.linkedin.com/in/om-prakash-yadav-0731b7256/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:text-primary"
-          >
-            Om Prakash
-          </a>
-        </p>
-      </div>
+      {!isPresentationMode && (
+        <div
+          className="p-4 border-t print:hidden bg-card shadow-md shrink-0"
+          role="toolbar"
+          aria-label="Playback Controls and Information"
+        >
+          <PlaybackControls
+            isFullScreen={isFullScreen}
+            onToggleFullScreen={handleToggleFullScreen}
+            isPresentationMode={isPresentationMode}
+            onTogglePresentationMode={togglePresentationMode}
+          />
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Designed and developed by{" "}
+            <a
+              href="https://www.linkedin.com/in/om-prakash-yadav-0731b7256/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-primary"
+            >
+              Om Prakash
+            </a>
+          </p>
+        </div>
+      )}
+      {isPresentationMode && (
+         <div className="fixed bottom-4 right-4 z-50 opacity-20 hover:opacity-100 transition-opacity">
+            <Button
+                onClick={togglePresentationMode}
+                variant="ghost"
+                size="icon"
+                title="Exit Presentation Mode (Esc)"
+                className="bg-black/30 hover:bg-black/50 text-white rounded-full h-10 w-10"
+            >
+                <Maximize className="h-5 w-5" /> {/* Using Maximize as "exit" icon here */}
+            </Button>
+        </div>
+      )}
+
 
       <Sheet open={scriptsSheetOpen} onOpenChange={setScriptsSheetOpen}>
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col">
@@ -224,9 +289,11 @@ export default function PromptasticPage() {
                 <p>The main area displays your script. Use the playback controls or keyboard shortcuts to manage scrolling:</p>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>Play/Pause:</strong> Click the Play/Pause button or press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>.</li>
-                  <li><strong>Scrolling:</strong> When playing, the script scrolls automatically. You can manually scroll when paused.</li>
-                  <li><strong>Visuals:</strong> Adjust font size, line height, text color, font family, and dark/mirror modes in Settings.</li>
-                  <li><strong>Focus Line:</strong> A horizontal guide shows your current reading position. Adjust its vertical placement in Settings.</li>
+                  <li><strong>Scrolling:</strong> When playing, the script scrolls automatically. You can manually scroll when paused. Click a paragraph while paused to set it as the new starting point.</li>
+                  <li><strong>Visuals:</strong> Adjust font size, line height, text color, font family, horizontal padding, and dark/mirror modes in Settings.</li>
+                  <li><strong>Focus Line/Area:</strong> A horizontal guide or shaded paragraph shows your current reading position. Adjust its vertical placement and style in Settings.</li>
+                  <li><strong>Countdown:</strong> Optionally enable a countdown timer (1-60s) in Settings before playback starts.</li>
+                  <li><strong>Rich Text:</strong> Use `**bold**`, `*italic*`, `_underline_`, and `//CUES//` like `//PAUSE//`, `//EMPHASIZE//` (colors text), `//SLOWDOWN//`.</li>
                 </ul>
               </section>
 
@@ -235,74 +302,81 @@ export default function PromptasticPage() {
                 <p>Click the "Scripts" button in the header to open the Script Manager:</p>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>New Script:</strong> Clear the editor for a new script. Type a name and save.</li>
-                  <li><strong>Editing:</strong> Modify script text directly in the textarea.</li>
+                  <li><strong>Editing:</strong> Modify script text directly in the textarea. Estimated reading time is shown.</li>
                   <li><strong>Saving:</strong> Save new scripts or update existing ones. Changes are saved automatically if you edit an active script and click save.</li>
                   <li><strong>Loading:</strong> Click a script name from the "Saved Scripts" list to load it.</li>
                   <li><strong>Renaming & Deleting:</strong> Use the icons next to each saved script.</li>
-                  <li><strong>Importing:</strong> Click the ".txt", ".pdf", or ".docx" buttons to import scripts from files. The imported content loads into the editor; name it and save.</li>
+                  <li><strong>Importing:</strong> Click the ".txt", ".pdf", or ".docx" buttons to import scripts from files.</li>
                   <li><strong>Exporting:</strong> Export the current script as a .txt file.</li>
+                  <li><strong>Script Versions:</strong> Save multiple versions of a script with notes. Load any version back into the editor.</li>
+                  <li><strong>AI Summary:</strong> Generate an AI-powered summary of your script (available in Script Manager and footer controls).</li>
                 </ul>
                  <div className="p-3 bg-muted/50 rounded-md border border-border">
-                    <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts and settings are automatically saved in your browser's local storage, so they'll be here when you return!</p>
+                    <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage.</p>
                 </div>
               </section>
 
               <section aria-labelledby="settings-panel-heading" className="space-y-3">
                 <h3 id="settings-panel-heading" className="text-lg font-semibold flex items-center"><Settings className="mr-2 h-5 w-5 text-primary"/>Settings Panel</h3>
                 <p>Click the "Settings" button (gear icon) in the header to customize your teleprompter experience:</p>
+                <h4 className="font-medium flex items-center"><LayoutList className="mr-2 h-4 w-4"/>Layout & Profiles:</h4>
+                 <ul className="list-disc list-outside pl-5 space-y-1">
+                    <li><strong>Layout Presets:</strong> Quickly apply predefined sets of visual settings.</li>
+                    <li><strong>Settings Profiles:</strong> Save your current combination of settings as a named profile. Load, rename, or delete your custom profiles.</li>
+                 </ul>
                 <h4 className="font-medium flex items-center"><Palette className="mr-2 h-4 w-4"/>Appearance:</h4>
                 <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><strong>Font Size:</strong> Adjust text size.</li>
-                  <li><strong>Line Spacing:</strong> Change space between lines.</li>
-                  <li><strong>Font Family:</strong> Select different fonts.</li>
-                  <li><strong>Text Color:</strong> Pick a custom text color (resets if you toggle dark/light mode).</li>
-                  <li><strong>Focus Line Position:</strong> Change the vertical position of the reading guide.</li>
-                  <li><strong>Mirror Mode:</strong> Flip text horizontally for physical teleprompter setups.</li>
-                  <li><strong>Dark Mode:</strong> Toggle between light and dark themes.</li>
+                  <li><strong>Font Size, Line Spacing, Font Family:</strong> Customize text appearance. Includes "Atkinson Hyperlegible" font for readability.</li>
+                  <li><strong>Text Color:</strong> Pick a custom text color (managed by High Contrast mode if active).</li>
+                  <li><strong>Horizontal Padding:</strong> Adjust side margins for the text area.</li>
+                  <li><strong>Focus Line Position & Style:</strong> Change the vertical position and style (line or shaded paragraph) of the reading guide.</li>
+                  <li><strong>Mirror Mode:</strong> Flip text horizontally.</li>
+                  <li><strong>Dark Mode & High Contrast Mode:</strong> Toggle between light/dark themes and a high-contrast theme for accessibility.</li>
                 </ul>
                 <h4 className="font-medium flex items-center"><Thermometer className="mr-2 h-4 w-4"/>Playback:</h4>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>Scroll Speed:</strong> Control how fast the text scrolls.</li>
                   <li><strong>AI Scroll Sync:</strong> Toggle the AI-powered automatic scroll speed adjustment feature.</li>
+                  <li><strong>Countdown Timer & Duration:</strong> Enable and set a countdown (1-60s) before scrolling starts.</li>
                 </ul>
+                 <h4 className="font-medium">General:</h4>
+                 <ul className="list-disc list-outside pl-5 space-y-1">
+                    <li><strong>Reset All Settings:</strong> Reverts core appearance and playback settings to 'Default' preset values.</li>
+                 </ul>
               </section>
 
               <section aria-labelledby="playback-controls-heading" className="space-y-3">
                 <h3 id="playback-controls-heading" className="text-lg font-semibold">Playback Controls Bar</h3>
-                <p>Located at the bottom of the screen:</p>
+                <p>Located at the bottom of the screen (hidden in Presentation Mode):</p>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>Play/Pause:</strong> Start or stop script scrolling.</li>
                   <li><strong>Reset:</strong> Return the scroll position to the top and pause.</li>
-                  <li><strong>AI Sync:</strong> (If enabled in Settings) Click to start recording audio. Speak a few lines, then click "Stop Sync". The app will adjust scroll speed. (Note: Speech analysis is currently a placeholder).</li>
-                  <li><strong>Full Screen:</strong> Toggle fullscreen mode for an immersive experience. Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit.</li>
+                  <li><strong>AI Sync:</strong> (If enabled) Click to start/stop audio recording for scroll speed adjustment.</li>
+                  <li><strong>Summary:</strong> Get an AI-generated summary of the current script.</li>
+                  <li><strong>Full Screen:</strong> Toggle standard fullscreen mode.</li>
+                  <li><strong>Presentation Mode:</strong> Toggle a distraction-free, minimal UI fullscreen mode.</li>
                 </ul>
               </section>
               
               <section aria-labelledby="ai-sync-heading" className="space-y-3">
                  <h3 id="ai-sync-heading" className="text-lg font-semibold flex items-center"><Mic className="mr-2 h-5 w-5 text-primary"/>AI Scroll Sync</h3>
-                 <p>This experimental feature attempts to adjust scroll speed based on your voice.</p>
-                 <ol className="list-decimal list-outside pl-5 space-y-1">
-                    <li>Enable "AI Scroll Sync" in the Settings panel.</li>
-                    <li>Click the "AI Sync" button in the playback controls. Your browser may ask for microphone permission.</li>
-                    <li>The button will change to "Stop Sync" and indicate recording. Speak a few lines from your script clearly.</li>
-                    <li>Click "Stop Sync". The app will analyze the audio (currently mocked) and adjust the scroll speed.</li>
-                 </ol>
+                 <p>This experimental feature attempts to adjust scroll speed based on your voice. Enable in Settings, then use the "AI Sync" button in playback controls.</p>
                  <div className="p-3 bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
-                    <p className="flex items-center text-xs"><AlertTriangle className="mr-2 h-4 w-4"/>Microphone access is required. If denied, the feature won't work. The actual speech-to-speed analysis is currently a placeholder and will use a mock speech rate.</p>
+                    <p className="flex items-center text-xs"><AlertTriangle className="mr-2 h-4 w-4"/>Microphone access is required. The actual speech-to-speed analysis is currently a placeholder.</p>
                 </div>
               </section>
 
-              <section aria-labelledby="fullscreen-heading" className="space-y-3">
-                 <h3 id="fullscreen-heading" className="text-lg font-semibold flex items-center"><Maximize className="mr-2 h-5 w-5 text-primary"/>Fullscreen Mode</h3>
-                 <p>Click the "Full Screen" button in the playback controls to make the teleprompter view fill your screen. This is ideal for minimizing distractions during delivery.</p>
-                 <p>To exit fullscreen mode, click the "Exit Full" button or press the <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> key on your keyboard.</p>
+              <section aria-labelledby="fullscreen-modes-heading" className="space-y-3">
+                 <h3 id="fullscreen-modes-heading" className="text-lg font-semibold flex items-center"><Maximize className="mr-2 h-5 w-5 text-primary"/>Fullscreen & Presentation Modes</h3>
+                 <p><strong>Fullscreen Mode:</strong> Click the "Full Screen" button to make the teleprompter view fill your screen. Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit.</p>
+                 <p><strong>Presentation Mode:</strong> Click the "Present" button (<MonitorPlay className="inline h-4 w-4"/> icon) for an even more immersive, distraction-free experience. This mode also goes fullscreen and hides all UI except the script and a subtle exit button. Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit.</p>
               </section>
 
               <section aria-labelledby="keyboard-shortcuts-heading" className="space-y-3">
                 <h3 id="keyboard-shortcuts-heading" className="text-lg font-semibold">Keyboard Shortcuts</h3>
                 <ul className="list-disc list-outside pl-5 space-y-1">
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling. (Not active if typing in an input/textarea).</li>
-                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen mode.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code>: Toggle Play/Pause scrolling.</li>
+                  <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code>: Exit Fullscreen or Presentation mode.</li>
                   <li><code className="bg-muted px-1.5 py-0.5 rounded text-xs">Ctrl+S</code> / <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Cmd+S</code>: Save current script in Script Manager.</li>
                 </ul>
               </section>
@@ -319,5 +393,3 @@ export default function PromptasticPage() {
     </div>
   );
 }
-
-    

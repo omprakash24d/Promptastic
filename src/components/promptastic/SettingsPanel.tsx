@@ -1,13 +1,14 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask, Gauge, MinusSquare, Timer } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask, Gauge, MinusSquare, Timer, Contrast, Save, Trash2, Edit3, ListChecks } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -25,7 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -38,7 +39,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { FocusLineStyle, LayoutPreset } from '@/types';
+import type { FocusLineStyle, LayoutPreset, TeleprompterSettings, UserSettingsProfile } from '@/types';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface FontOption {
   label: string;
@@ -52,6 +54,7 @@ const FONT_OPTIONS: FontOption[] = [
   { label: "Georgia", value: "Georgia, serif" },
   { label: "Times New Roman", value: "'Times New Roman', Times, serif" },
   { label: "Courier New", value: "'Courier New', Courier, monospace" },
+  { label: "Atkinson Hyperlegible", value: "'Atkinson Hyperlegible', sans-serif" },
 ];
 
 const FOCUS_LINE_STYLE_OPTIONS: { label: string; value: FocusLineStyle }[] = [
@@ -76,16 +79,66 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     countdownEnabled, setCountdownEnabled,
     countdownDuration, setCountdownDuration,
     horizontalPadding, setHorizontalPadding,
+    enableHighContrast, setEnableHighContrast,
+    userSettingsProfiles, saveUserSettingsProfile, loadUserSettingsProfile, deleteUserSettingsProfile, renameUserSettingsProfile,
     resetSettingsToDefaults,
   } = useTeleprompterStore();
+
+  const [newProfileName, setNewProfileName] = useState("");
+  const [renamingProfile, setRenamingProfile] = useState<UserSettingsProfile | null>(null);
+  const [renameProfileValue, setRenameProfileValue] = useState("");
+
 
   const handleResetSettings = () => {
     resetSettingsToDefaults();
     toast({
       title: "Settings Reset",
-      description: "All settings have been reset to their default values.",
+      description: "Core appearance and playback settings have been reset to their default values for the 'Default' preset. Theme and custom profiles are preserved.",
     });
   };
+
+  const handleSaveProfile = () => {
+    if (!newProfileName.trim()) {
+      toast({ title: "Error", description: "Profile name cannot be empty.", variant: "destructive" });
+      return;
+    }
+    if (userSettingsProfiles.some(p => p.name.toLowerCase() === newProfileName.trim().toLowerCase())) {
+      toast({ title: "Error", description: `A profile named "${newProfileName.trim()}" already exists.`, variant: "destructive" });
+      return;
+    }
+    saveUserSettingsProfile(newProfileName);
+    toast({ title: "Profile Saved", description: `Settings profile "${newProfileName}" saved.` });
+    setNewProfileName("");
+  };
+
+  const handleRenameProfile = () => {
+    if (!renamingProfile || !renameProfileValue.trim()) {
+        toast({ title: "Error", description: "New profile name cannot be empty.", variant: "destructive" });
+        return;
+    }
+    if (renameProfileValue.trim().toLowerCase() === renamingProfile.name.toLowerCase()) {
+        setRenamingProfile(null);
+        setRenameProfileValue("");
+        return;
+    }
+    if (userSettingsProfiles.some(p => p.name.toLowerCase() === renameProfileValue.trim().toLowerCase() && p.id !== renamingProfile.id)) {
+        toast({ title: "Error", description: `Another profile named "${renameProfileValue.trim()}" already exists.`, variant: "destructive" });
+        return;
+    }
+    renameUserSettingsProfile(renamingProfile.id, renameProfileValue);
+    toast({ title: "Profile Renamed", description: `Profile "${renamingProfile.name}" renamed to "${renameProfileValue}".`});
+    setRenamingProfile(null);
+    setRenameProfileValue("");
+  };
+
+
+  React.useEffect(() => {
+    if (enableHighContrast) {
+      document.documentElement.classList.add('high-contrast');
+    } else {
+      document.documentElement.classList.remove('high-contrast');
+    }
+  }, [enableHighContrast]);
 
   return (
     <TooltipProvider>
@@ -119,6 +172,86 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
              <p className="text-xs text-muted-foreground mt-1">
               Manually changing settings below will switch to a "Custom" layout.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center"><ListChecks className="mr-2 h-5 w-5" />Settings Profiles</CardTitle>
+            <CardDescription>Save and load your custom setting configurations.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex space-x-2">
+              <Input
+                id="new-profile-name"
+                placeholder="New profile name"
+                value={newProfileName}
+                onChange={(e) => setNewProfileName(e.target.value)}
+                className="flex-grow"
+              />
+              <Button onClick={handleSaveProfile} disabled={!newProfileName.trim()}>
+                <Save className="mr-2 h-4 w-4" /> Save Current
+              </Button>
+            </div>
+            {userSettingsProfiles.length > 0 && (
+              <div>
+                <Label className="text-xs text-muted-foreground">Saved Profiles</Label>
+                <ScrollArea className="h-[150px] mt-1 rounded-md border">
+                  <ul className="p-2 space-y-1">
+                    {userSettingsProfiles.map(profile => (
+                      <li key={profile.id} className="flex items-center justify-between p-1.5 rounded-md hover:bg-muted/50 text-sm">
+                        {renamingProfile?.id === profile.id ? (
+                          <div className="flex-grow flex items-center gap-2 min-w-0">
+                            <Input
+                              value={renameProfileValue}
+                              onChange={(e) => setRenameProfileValue(e.target.value)}
+                              className="h-8 bg-background text-sm flex-1 min-w-0"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameProfile();
+                                if (e.key === 'Escape') { setRenamingProfile(null); setRenameProfileValue(""); }
+                              }}
+                            />
+                            <Button size="sm" onClick={handleRenameProfile} className="flex-shrink-0">Save</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setRenamingProfile(null); setRenameProfileValue(""); }} className="flex-shrink-0">Cancel</Button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="truncate font-medium flex-1 cursor-pointer hover:underline" onClick={() => loadUserSettingsProfile(profile.id)} title={`Load profile: ${profile.name}`}>
+                              {profile.name}
+                            </span>
+                            <div className="flex items-center gap-0.5">
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setRenamingProfile(profile); setRenameProfileValue(profile.name); }} aria-label={`Rename profile ${profile.name}`}>
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`Delete profile ${profile.name}`}>
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Profile?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete the settings profile "{profile.name}"? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => deleteUserSettingsProfile(profile.id)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </ScrollArea>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -206,8 +339,13 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 onChange={(e) => setTextColor(e.target.value)}
                 className="w-10 h-8 p-0.5 border border-input rounded-md bg-background cursor-pointer"
                 aria-label="Choose text color"
+                disabled={enableHighContrast}
               />
             </div>
+             <p className="text-xs text-muted-foreground -mt-4">
+                (Text color is managed by High Contrast mode if active)
+            </p>
+
 
             <div>
               <Label htmlFor="horizontal-padding" className="flex items-center text-sm">
@@ -312,6 +450,21 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
               <Button id="dark-mode-toggle-button" variant="outline" size="icon" onClick={() => setDarkMode(!darkMode)} aria-label={`Toggle dark mode: currently ${darkMode ? 'on' : 'off'}`} className="h-8 w-8">
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <Label htmlFor="high-contrast-mode" className="flex items-center text-sm">
+                High Contrast Mode
+                <Tooltip>
+                  <TooltipTrigger asChild><Contrast className="ml-2 h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+                  <TooltipContent><p>Enable high contrast theme (e.g., yellow on black).</p></TooltipContent>
+                </Tooltip>
+              </Label>
+              <Switch
+                id="high-contrast-mode"
+                checked={enableHighContrast}
+                onCheckedChange={setEnableHighContrast}
+                aria-label={`High contrast mode: ${enableHighContrast ? 'on' : 'off'}`}
+              />
             </div>
           </CardContent>
         </Card>
@@ -425,8 +578,8 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will reset all appearance and playback settings to their default values. 
-                    Dark mode setting will be preserved. This action cannot be undone.
+                    This will reset core appearance and playback settings to their 'Default' preset values. 
+                    Dark mode, high contrast mode, and your saved custom profiles will be preserved. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

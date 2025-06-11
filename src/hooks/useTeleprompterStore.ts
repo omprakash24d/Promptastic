@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Script, TeleprompterSettings, FocusLineStyle, LayoutPreset, ScriptVersion } from '@/types';
+import type { Script, TeleprompterSettings, FocusLineStyle, LayoutPreset, ScriptVersion, UserSettingsProfile } from '@/types';
 import { loadFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -23,6 +23,7 @@ const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 const INITIAL_COUNTDOWN_ENABLED = false;
 const INITIAL_COUNTDOWN_DURATION = 3; // seconds
 const INITIAL_HORIZONTAL_PADDING = 0; // 0%
+const INITIAL_ENABLE_HIGH_CONTRAST = false;
 
 const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
@@ -86,7 +87,7 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
 ];
 
 
-interface TeleprompterState extends TeleprompterSettings {
+interface TeleprompterStateStore extends TeleprompterSettings {
   scriptText: string;
   scripts: Script[];
   activeScriptName: string | null;
@@ -95,8 +96,11 @@ interface TeleprompterState extends TeleprompterSettings {
   LONGER_DEFAULT_SCRIPT_TEXT: string;
   layoutPresets: LayoutPreset[];
   activeLayoutPresetName: string | null;
-  countdownValue: number | null; // For countdown timer
-  
+  countdownValue: number | null;
+  isPresentationMode: boolean;
+  enableHighContrast: boolean;
+  userSettingsProfiles: UserSettingsProfile[];
+
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
   loadScript: (name: string) => void;
@@ -119,9 +123,16 @@ interface TeleprompterState extends TeleprompterSettings {
   setCountdownEnabled: (enabled: boolean) => void;
   setCountdownDuration: (duration: number) => void;
   setHorizontalPadding: (padding: number) => void;
+  setEnableHighContrast: (enabled: boolean) => void;
+  setIsPresentationMode: (enabled: boolean) => void;
 
   resetSettingsToDefaults: () => void;
   applyLayoutPreset: (presetName: string) => void;
+
+  saveUserSettingsProfile: (name: string) => void;
+  loadUserSettingsProfile: (profileId: string) => void;
+  deleteUserSettingsProfile: (profileId: string) => void;
+  renameUserSettingsProfile: (profileId: string, newName: string) => void;
 
   togglePlayPause: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -130,9 +141,27 @@ interface TeleprompterState extends TeleprompterSettings {
   setCountdownValue: (value: number | null | ((prev: number | null) => number | null)) => void;
 }
 
-export const useTeleprompterStore = create<TeleprompterState>()(
+export const useTeleprompterStore = create<TeleprompterStateStore>()(
   persist(
     (set, get) => {
+      const getSettingsForProfile = (): Omit<TeleprompterSettings, 'darkMode' | 'enableHighContrast'> => {
+        const state = get();
+        return {
+          fontSize: state.fontSize,
+          scrollSpeed: state.scrollSpeed,
+          lineHeight: state.lineHeight,
+          isMirrored: state.isMirrored,
+          isAutoSyncEnabled: state.isAutoSyncEnabled,
+          textColor: state.textColor,
+          fontFamily: state.fontFamily,
+          focusLinePercentage: state.focusLinePercentage,
+          focusLineStyle: state.focusLineStyle,
+          countdownEnabled: state.countdownEnabled,
+          countdownDuration: state.countdownDuration,
+          horizontalPadding: state.horizontalPadding,
+        };
+      };
+
       return {
         scriptText: LONGER_DEFAULT_SCRIPT_TEXT,
         scripts: [],
@@ -140,6 +169,9 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         LONGER_DEFAULT_SCRIPT_TEXT: LONGER_DEFAULT_SCRIPT_TEXT,
         layoutPresets: DEFAULT_LAYOUT_PRESETS,
         activeLayoutPresetName: "Default",
+        isPresentationMode: false,
+        enableHighContrast: INITIAL_ENABLE_HIGH_CONTRAST,
+        userSettingsProfiles: [],
         
         fontSize: INITIAL_FONT_SIZE,
         scrollSpeed: INITIAL_SCROLL_SPEED,
@@ -234,6 +266,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setCountdownEnabled: (enabled) => set({ countdownEnabled: enabled }),
         setCountdownDuration: (duration) => set({ countdownDuration: Math.max(1, Math.min(60, duration)) }),
         setHorizontalPadding: (padding) => set({ horizontalPadding: Math.max(0, Math.min(25, padding)), activeLayoutPresetName: null }),
+        setEnableHighContrast: (enabled) => set({ enableHighContrast: enabled }),
+        setIsPresentationMode: (enabled) => set({ isPresentationMode: enabled }),
         
         applyLayoutPreset: (presetName) => {
           const preset = get().layoutPresets.find(p => p.name === presetName);
@@ -244,6 +278,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
 
         resetSettingsToDefaults: () => {
           const currentDarkMode = get().darkMode;
+          // High contrast is not reset here, it's a separate global toggle
           const defaultPreset = get().layoutPresets.find(p => p.name === "Default") || { settings: {} };
           set({
             fontSize: defaultPreset.settings.fontSize ?? INITIAL_FONT_SIZE,
@@ -260,6 +295,37 @@ export const useTeleprompterStore = create<TeleprompterState>()(
             horizontalPadding: INITIAL_HORIZONTAL_PADDING,
             activeLayoutPresetName: "Default",
           });
+        },
+
+        saveUserSettingsProfile: (name) => {
+          if (!name.trim()) return;
+          const newProfile: UserSettingsProfile = {
+            id: uuidv4(),
+            name: name.trim(),
+            settings: getSettingsForProfile(),
+          };
+          set(state => ({
+            userSettingsProfiles: [...state.userSettingsProfiles, newProfile]
+          }));
+        },
+        loadUserSettingsProfile: (profileId) => {
+          const profile = get().userSettingsProfiles.find(p => p.id === profileId);
+          if (profile) {
+            set(state => ({ ...state, ...profile.settings, activeLayoutPresetName: null }));
+          }
+        },
+        deleteUserSettingsProfile: (profileId) => {
+          set(state => ({
+            userSettingsProfiles: state.userSettingsProfiles.filter(p => p.id !== profileId)
+          }));
+        },
+        renameUserSettingsProfile: (profileId, newName) => {
+          if (!newName.trim()) return;
+          set(state => ({
+            userSettingsProfiles: state.userSettingsProfiles.map(p =>
+              p.id === profileId ? { ...p, name: newName.trim() } : p
+            )
+          }));
         },
 
         togglePlayPause: () => {
@@ -312,6 +378,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         countdownEnabled: state.countdownEnabled,
         countdownDuration: state.countdownDuration,
         horizontalPadding: state.horizontalPadding,
+        enableHighContrast: state.enableHighContrast,
+        userSettingsProfiles: state.userSettingsProfiles,
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -324,6 +392,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
           state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
           state.horizontalPadding = state.horizontalPadding ?? INITIAL_HORIZONTAL_PADDING;
+          state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
+          state.userSettingsProfiles = state.userSettingsProfiles ?? [];
         }
       }
     }
@@ -339,7 +409,3 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
-
-// Ensure that `setCountdownValue` in the store can accept a function for updates
-// based on the previous state, which is useful for interval-based decrements.
-// The type for `setCountdownValue` was updated for this.

@@ -5,7 +5,7 @@ import type React from 'react';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize, Loader2, BookOpenText } from 'lucide-react';
+import { Play, Pause, RotateCcw, Mic, MicOff, Maximize, Minimize, Loader2, BookOpenText, MonitorPlay, TvMinimalPlay } from 'lucide-react';
 import { scrollSyncWithSpeech, type ScrollSyncWithSpeechInput } from '@/ai/flows/scroll-sync-with-speech';
 import { summarizeScript, type SummarizeScriptInput, type SummarizeScriptOutput } from '@/ai/flows/summarize-script-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -28,9 +28,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface PlaybackControlsProps {
   isFullScreen: boolean;
   onToggleFullScreen: () => void;
+  isPresentationMode: boolean;
+  onTogglePresentationMode: () => void;
 }
 
-export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackControlsProps) {
+export function PlaybackControls({ isFullScreen, onToggleFullScreen, isPresentationMode, onTogglePresentationMode }: PlaybackControlsProps) {
   const { toast } = useToast();
   const {
     isPlaying, togglePlayPause,
@@ -53,7 +55,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
   useEffect(() => {
     if (typeof window !== 'undefined' && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder)) {
       setIsAiSyncSupported(false);
-      if (isAutoSyncEnabled) { // Only toast if the feature was intended to be used
+      if (isAutoSyncEnabled) { 
         toast({
           title: "AI Sync Not Supported",
           description: "Your browser does not support the necessary features for AI Scroll Sync.",
@@ -187,7 +189,7 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     }
     setIsSummarizingFooter(true);
     setSummaryResultFooter(null);
-    setShowSummaryDialog(true); // Open dialog to show loader initially
+    setShowSummaryDialog(true); 
     try {
       const result: SummarizeScriptOutput = await summarizeScript({ scriptText });
       setSummaryResultFooter(result.summary);
@@ -292,6 +294,17 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
             {isFullScreen ? <Minimize className="h-5 w-5 sm:h-6 sm:w-6" /> : <Maximize className="h-5 w-5 sm:h-6 sm:w-6" />}
             <span className="ml-2 hidden sm:inline">{isFullScreen ? 'Exit Full' : 'Full Screen'}</span>
           </Button>
+           <Button
+              onClick={onTogglePresentationMode}
+              variant="outline"
+              size="lg"
+              aria-label={isPresentationMode ? 'Exit Presentation Mode' : 'Enter Presentation Mode'}
+              title={isPresentationMode ? 'Exit Presentation Mode (Esc)' : 'Enter Presentation Mode'}
+              className="px-4"
+            >
+            {isPresentationMode ? <TvMinimalPlay className="h-5 w-5 sm:h-6 sm:w-6" /> : <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6" />}
+            <span className="ml-2 hidden sm:inline">{isPresentationMode ? 'Exit Present' : 'Present'}</span>
+          </Button>
         </div>
       </div>
       
@@ -328,4 +341,3 @@ export function PlaybackControls({ isFullScreen, onToggleFullScreen }: PlaybackC
     </>
   );
 }
-
