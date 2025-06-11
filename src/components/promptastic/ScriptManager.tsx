@@ -9,12 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2 } from 'lucide-react';
+import { FilePlus2, Save, Trash2, Edit3, Download, FileUp, FileText, FileCode2, AlertTriangle, BookOpenText, Loader2, CopyPlus, History, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import mammoth from 'mammoth';
 import { getDocument, GlobalWorkerOptions, version as pdfjsVersion } from 'pdfjs-dist/build/pdf.mjs';
-import { summarizeScript } from '@/ai/flows/summarize-script-flow'; // Added import
+import { summarizeScript } from '@/ai/flows/summarize-script-flow';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +26,8 @@ import {
   AlertDialogTitle as DialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { format } from 'date-fns';
+import type { ScriptVersion } from '@/types';
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
@@ -47,6 +49,7 @@ export function ScriptManager() {
     scriptText, setScriptText,
     scripts, activeScriptName,
     loadScript, saveScript, deleteScript, renameScript,
+    saveScriptVersion, loadScriptVersion,
     setActiveScriptName
   } = useTeleprompterStore();
 
@@ -60,21 +63,26 @@ export function ScriptManager() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [scriptSummary, setScriptSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
-
+  const [versionNotes, setVersionNotes] = useState("");
+  const [showVersionNotesDialog, setShowVersionNotesDialog] = useState(false);
+  const [pendingVersionSaveAction, setPendingVersionSaveAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
     setScriptSummary(null); 
     setIsDirty(false);
-  }, [scriptText]);
+  }, [scriptText, activeScriptName]); // Added activeScriptName to reset dirty on script load
 
   useEffect(() => {
-    if (currentEditingScriptText !== scriptText) {
+    if (activeScriptName && scripts.find(s => s.name === activeScriptName)?.content !== currentEditingScriptText) {
       setIsDirty(true);
-    } else {
+    } else if (!activeScriptName && currentEditingScriptText !== "") { // For new scripts
+      setIsDirty(true);
+    }
+     else {
       setIsDirty(false);
     }
-  }, [currentEditingScriptText, scriptText]);
+  }, [currentEditingScriptText, scriptText, activeScriptName, scripts]);
 
   const estimatedReadingTime = useMemo(() => {
     if (!currentEditingScriptText.trim()) return "Est. reading time: 0 min 0 sec";
@@ -101,11 +109,12 @@ export function ScriptManager() {
   };
 
   const executeOrConfirm = (action: () => void) => {
-    if (isDirty) {
+    if (isDirty && currentEditingScriptText.trim() !== "") { // Only show confirm if there's actual content and it's dirty
       setPendingAction(() => action);
       setShowConfirmDialog(true);
     } else {
       action();
+      setIsDirty(false); // Ensure dirty is reset if action proceeded without confirm
     }
   };
 
@@ -127,7 +136,7 @@ export function ScriptManager() {
 
     saveScript(nameToSave, currentEditingScriptText);
     toast({ title: "Script Saved", description: `Script "${nameToSave}" has been saved.` });
-    if (!activeScriptName) setNewScriptName("");
+    if (!activeScriptName) setNewScriptName(""); // Clear new script name input only if it was a new script
     setIsDirty(false);
   }, [activeScriptName, newScriptName, currentEditingScriptText, saveScript, toast, scripts]);
 
@@ -138,7 +147,7 @@ export function ScriptManager() {
         handleSave();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
@@ -167,12 +176,12 @@ export function ScriptManager() {
                 loadScript(newActiveScript.name);
             }
         } else {
-             setScriptText("");
+             setScriptText(""); // This should be handled by the store's default script logic
              setCurrentEditingScriptText("");
              setActiveScriptName(null);
         }
       }
-       setIsDirty(false);
+       setIsDirty(false); // Should be reset by loadScript or setActiveScriptName if wasActive
     }
   };
 
@@ -200,8 +209,8 @@ export function ScriptManager() {
   const handleNewScript = () => {
     executeOrConfirm(() => {
         setActiveScriptName(null);
-        setScriptText("");
-        setCurrentEditingScriptText("");
+        // setScriptText(""); // Let store handle default script
+        setCurrentEditingScriptText(useTeleprompterStore.getState().LONGER_DEFAULT_SCRIPT_TEXT); // Set editor to default
         setNewScriptName("");
         setScriptSummary(null);
         toast({ title: "New Script", description: "Ready for your new script."});
@@ -233,10 +242,10 @@ export function ScriptManager() {
   };
 
   const processFileContent = (content: string, fileName: string) => {
-    setActiveScriptName(null);
-    setScriptText(content); 
+    setActiveScriptName(null); // Indicate it's a new/imported script, not an existing active one
+    setCurrentEditingScriptText(content); // Update editor content
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
-    setNewScriptName(fileNameWithoutExtension);
+    setNewScriptName(fileNameWithoutExtension); // Suggest name for saving
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
     setIsDirty(true); 
   };
@@ -326,6 +335,38 @@ export function ScriptManager() {
       setIsSummarizing(false);
     }
   };
+  
+  const openSaveVersionDialog = () => {
+    if (!activeScriptName) {
+        toast({ title: "Cannot Save Version", description: "You must save the script first before saving versions.", variant: "destructive" });
+        return;
+    }
+    setVersionNotes(""); // Clear previous notes
+    setShowVersionNotesDialog(true);
+    setPendingVersionSaveAction(() => () => { // Store the action
+        saveScriptVersion(activeScriptName, versionNotes);
+        toast({ title: "Version Saved", description: `New version for "${activeScriptName}" saved.` });
+        setShowVersionNotesDialog(false);
+        setVersionNotes("");
+    });
+  };
+
+  const handleConfirmSaveVersion = () => {
+    if (pendingVersionSaveAction) {
+        pendingVersionSaveAction();
+    }
+  };
+
+  const handleLoadVersion = (scriptName: string, versionId: string) => {
+    executeOrConfirm(() => {
+        loadScriptVersion(scriptName, versionId);
+        toast({ title: "Version Loaded", description: `Version loaded for script "${scriptName}".` });
+    });
+  };
+
+  const activeScriptDetails = useMemo(() => {
+    return scripts.find(s => s.name === activeScriptName);
+  }, [scripts, activeScriptName]);
 
 
   return (
@@ -349,6 +390,28 @@ export function ScriptManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={showVersionNotesDialog} onOpenChange={setShowVersionNotesDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <DialogTitle>Save New Version</DialogTitle>
+            <AlertDialogDescription>
+              Enter optional notes for this version of "{activeScriptName}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={versionNotes}
+            onChange={(e) => setVersionNotes(e.target.value)}
+            placeholder="E.g., Final draft for client review"
+            className="mt-2"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowVersionNotesDialog(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSaveVersion}>Save Version</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <Card>
         <CardHeader>
@@ -386,8 +449,13 @@ export function ScriptManager() {
         </CardContent>
         <CardFooter className="flex flex-wrap justify-start gap-2 pt-4">
             <Button onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save Script'}
+              <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save New Script'}
             </Button>
+            {activeScriptName && (
+                <Button onClick={openSaveVersionDialog} variant="outline">
+                    <CopyPlus className="mr-2 h-4 w-4" /> Save Version
+                </Button>
+            )}
             <Button onClick={handleNewScript} variant="outline">
               <FilePlus2 className="mr-2 h-4 w-4" /> New
             </Button>
@@ -416,6 +484,33 @@ export function ScriptManager() {
             </ScrollArea>
           </AlertDescription>
         </Alert>
+      )}
+
+      {activeScriptDetails && activeScriptDetails.versions && activeScriptDetails.versions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center">
+                <History className="mr-2 h-5 w-5" /> Script Versions for "{activeScriptDetails.name}"
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[150px] w-full rounded-md border bg-muted/20">
+              <ul className="space-y-1 p-1">
+                {activeScriptDetails.versions.sort((a,b) => b.timestamp - a.timestamp).map((version) => (
+                  <li key={version.versionId} className="flex items-center justify-between p-2 rounded-md hover:bg-muted text-sm">
+                    <div>
+                      <span className="font-medium">{format(new Date(version.timestamp), "MMM d, yyyy HH:mm:ss")}</span>
+                      {version.notes && <p className="text-xs text-muted-foreground italic mt-0.5">{version.notes}</p>}
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => handleLoadVersion(activeScriptDetails.name, version.versionId)}>
+                      <Eye className="mr-1.5 h-3.5 w-3.5" /> Load
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       )}
 
 
@@ -482,4 +577,3 @@ export function ScriptManager() {
     </div>
   );
 }
-

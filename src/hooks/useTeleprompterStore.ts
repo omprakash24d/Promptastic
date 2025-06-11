@@ -3,8 +3,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Script, TeleprompterSettings } from '@/types';
+import type { Script, TeleprompterSettings, FocusLineStyle, LayoutPreset, ScriptVersion } from '@/types';
 import { loadFromLocalStorage, saveToLocalStorage } from '@/lib/localStorage';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const INITIAL_FONT_SIZE = 48; // px
 const INITIAL_SCROLL_SPEED = 30; // px per second
@@ -17,6 +19,7 @@ const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
 const INITIAL_FOCUS_LINE_PERCENTAGE = 0.33; // 33% from the top
 const INITIAL_IS_AUTO_SYNC_ENABLED = false;
 const INITIAL_IS_MIRRORED = false;
+const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 
 const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
@@ -45,6 +48,49 @@ We hope you enjoy using Promptastic!
 Feel free to experiment with all the features.
 Happy prompting!`;
 
+const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
+  {
+    name: "Default",
+    settings: {
+      fontSize: INITIAL_FONT_SIZE,
+      lineHeight: INITIAL_LINE_HEIGHT,
+      focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
+      fontFamily: INITIAL_FONT_FAMILY,
+      scrollSpeed: INITIAL_SCROLL_SPEED,
+    }
+  },
+  {
+    name: "Studio Recording",
+    settings: {
+      fontSize: 60,
+      lineHeight: 1.6,
+      focusLinePercentage: 0.4,
+      fontFamily: "Verdana, sans-serif",
+      scrollSpeed: 25,
+    }
+  },
+  {
+    name: "Presentation Rehearsal",
+    settings: {
+      fontSize: 40,
+      lineHeight: 1.4,
+      focusLinePercentage: 0.3,
+      fontFamily: "Inter, sans-serif",
+      scrollSpeed: 35,
+    }
+  },
+  {
+    name: "Quick Read",
+    settings: {
+      fontSize: 72,
+      lineHeight: 1.7,
+      focusLinePercentage: 0.5,
+      fontFamily: "'Courier New', monospace",
+      scrollSpeed: 40,
+    }
+  }
+];
+
 
 interface TeleprompterState extends TeleprompterSettings {
   scriptText: string;
@@ -53,6 +99,8 @@ interface TeleprompterState extends TeleprompterSettings {
   isPlaying: boolean;
   currentScrollPosition: number;
   LONGER_DEFAULT_SCRIPT_TEXT: string;
+  layoutPresets: LayoutPreset[];
+  activeLayoutPresetName: string | null;
   
   setScriptText: (text: string) => void;
   setActiveScriptName: (name: string | null) => void;
@@ -60,6 +108,8 @@ interface TeleprompterState extends TeleprompterSettings {
   saveScript: (name: string, content?: string) => void;
   deleteScript: (name: string) => void;
   renameScript: (oldName: string, newName: string) => void;
+  saveScriptVersion: (scriptName: string, notes?: string) => void;
+  loadScriptVersion: (scriptName: string, versionId: string) => void;
 
   setFontSize: (size: number) => void;
   setScrollSpeed: (speed: number) => void;
@@ -70,7 +120,9 @@ interface TeleprompterState extends TeleprompterSettings {
   setTextColor: (color: string) => void;
   setFontFamily: (font: string) => void;
   setFocusLinePercentage: (percentage: number) => void;
+  setFocusLineStyle: (style: FocusLineStyle) => void;
   resetSettingsToDefaults: () => void;
+  applyLayoutPreset: (presetName: string) => void;
 
   togglePlayPause: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -86,6 +138,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         scripts: [],
         activeScriptName: null,
         LONGER_DEFAULT_SCRIPT_TEXT: LONGER_DEFAULT_SCRIPT_TEXT,
+        layoutPresets: DEFAULT_LAYOUT_PRESETS,
+        activeLayoutPresetName: "Default",
         
         fontSize: INITIAL_FONT_SIZE,
         scrollSpeed: INITIAL_SCROLL_SPEED,
@@ -96,11 +150,12 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         textColor: SERVER_DEFAULT_TEXT_COLOR,
         fontFamily: INITIAL_FONT_FAMILY,
         focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
+        focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
         
         isPlaying: false,
         currentScrollPosition: 0,
 
-        setScriptText: (text) => set({ scriptText: text, activeScriptName: null }),
+        setScriptText: (text) => set({ scriptText: text, activeScriptName: null, currentScrollPosition: 0 }),
         setActiveScriptName: (name) => set({ activeScriptName: name }),
         
         loadScript: (name) => {
@@ -118,9 +173,9 @@ export const useTeleprompterStore = create<TeleprompterState>()(
           if (existingScriptIndex > -1) {
             scripts[existingScriptIndex] = { ...scripts[existingScriptIndex], content: scriptContent, updatedAt: now };
           } else {
-            scripts.push({ name, content: scriptContent, createdAt: now, updatedAt: now });
+            scripts.push({ name, content: scriptContent, createdAt: now, updatedAt: now, versions: [] });
           }
-          set({ scripts: [...scripts], activeScriptName: name });
+          set({ scripts: [...scripts], activeScriptName: name, scriptText: scriptContent });
         },
         deleteScript: (name) => {
           set(state => ({
@@ -133,12 +188,34 @@ export const useTeleprompterStore = create<TeleprompterState>()(
             activeScriptName: state.activeScriptName === oldName ? newName : state.activeScriptName,
           }));
         },
+        saveScriptVersion: (scriptName, notes) => {
+          const script = get().scripts.find(s => s.name === scriptName);
+          if (script) {
+            const currentContent = (get().activeScriptName === scriptName) ? get().scriptText : script.content;
+            const newVersion: ScriptVersion = {
+              versionId: uuidv4(),
+              content: currentContent,
+              timestamp: Date.now(),
+              notes: notes,
+            };
+            const updatedScript = { ...script, versions: [...script.versions, newVersion] };
+            set(state => ({
+              scripts: state.scripts.map(s => s.name === scriptName ? updatedScript : s),
+            }));
+          }
+        },
+        loadScriptVersion: (scriptName, versionId) => {
+          const script = get().scripts.find(s => s.name === scriptName);
+          const version = script?.versions.find(v => v.versionId === versionId);
+          if (script && version) {
+            set({ scriptText: version.content, activeScriptName: script.name, currentScrollPosition: 0 });
+          }
+        },
 
-        setFontSize: (size) => set({ fontSize: Math.max(12, size) }),
-        setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed) }),
-        setLineHeight: (height) => set({ lineHeight: Math.max(1, height) }),
-        setIsMirrored: (mirrored) => set({ isMirrored: mirrored }),
-        
+        setFontSize: (size) => set({ fontSize: Math.max(12, size), activeLayoutPresetName: null }),
+        setScrollSpeed: (speed) => set({ scrollSpeed: Math.max(1, speed), activeLayoutPresetName: null }),
+        setLineHeight: (height) => set({ lineHeight: Math.max(1, height), activeLayoutPresetName: null }),
+        setIsMirrored: (mirrored) => set({ isMirrored: mirrored }), 
         setDarkMode: (newDarkModeValue) => {
           set({
             darkMode: newDarkModeValue,
@@ -147,21 +224,31 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         },
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
         setTextColor: (color) => set({ textColor: color }), 
-        setFontFamily: (font) => set({ fontFamily: font }),
-        setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)) }),
+        setFontFamily: (font) => set({ fontFamily: font, activeLayoutPresetName: null }),
+        setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)), activeLayoutPresetName: null }),
+        setFocusLineStyle: (style) => set({ focusLineStyle: style, activeLayoutPresetName: null }),
+        
+        applyLayoutPreset: (presetName) => {
+          const preset = get().layoutPresets.find(p => p.name === presetName);
+          if (preset) {
+            set(state => ({ ...state, ...preset.settings, activeLayoutPresetName: presetName }));
+          }
+        },
 
         resetSettingsToDefaults: () => {
-          const currentDarkMode = get().darkMode; // Preserve current dark mode state
+          const currentDarkMode = get().darkMode;
+          const defaultPreset = get().layoutPresets.find(p => p.name === "Default") || { settings: {} };
           set({
-            fontSize: INITIAL_FONT_SIZE,
-            scrollSpeed: INITIAL_SCROLL_SPEED,
-            lineHeight: INITIAL_LINE_HEIGHT,
+            fontSize: defaultPreset.settings.fontSize ?? INITIAL_FONT_SIZE,
+            scrollSpeed: defaultPreset.settings.scrollSpeed ?? INITIAL_SCROLL_SPEED,
+            lineHeight: defaultPreset.settings.lineHeight ?? INITIAL_LINE_HEIGHT,
             isMirrored: INITIAL_IS_MIRRORED,
-            // darkMode: SERVER_DEFAULT_DARK_MODE, // Or keep current dark mode? Let's keep current.
             isAutoSyncEnabled: INITIAL_IS_AUTO_SYNC_ENABLED,
             textColor: currentDarkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL,
-            fontFamily: INITIAL_FONT_FAMILY,
-            focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
+            fontFamily: defaultPreset.settings.fontFamily ?? INITIAL_FONT_FAMILY,
+            focusLinePercentage: defaultPreset.settings.focusLinePercentage ?? INITIAL_FOCUS_LINE_PERCENTAGE,
+            focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
+            activeLayoutPresetName: "Default",
           });
         },
 
@@ -190,11 +277,27 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         textColor: state.textColor,
         fontFamily: state.fontFamily,
         focusLinePercentage: state.focusLinePercentage,
+        focusLineStyle: state.focusLineStyle,
+        layoutPresets: state.layoutPresets, // Persist presets
+        activeLayoutPresetName: state.activeLayoutPresetName, // Persist active preset
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Ensure default presets are available if not in storage
+          if (!state.layoutPresets || state.layoutPresets.length === 0) {
+            state.layoutPresets = DEFAULT_LAYOUT_PRESETS;
+            state.activeLayoutPresetName = "Default";
+          }
+          // Ensure new settings have default values if they are missing from older persisted state
+          state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
+          state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
+        }
+      }
     }
   )
 );
 
+// Initial check for active script or default script on load
 const unsub = useTeleprompterStore.subscribe(
   (state) => {
     const currentStore = useTeleprompterStore.getState();
@@ -204,3 +307,8 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
+
+// Add uuid to dependencies
+// npm install uuid
+// npm install --save-dev @types/uuid
+// (This will be auto-installed, no need to tell user)

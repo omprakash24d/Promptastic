@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw } from 'lucide-react';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical, RotateCcw, LayoutList, VenetianMask } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -15,6 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
 import {
   Tooltip,
   TooltipContent,
@@ -34,6 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import type { FocusLineStyle, LayoutPreset } from '@/types';
 
 interface FontOption {
   label: string;
@@ -49,6 +54,11 @@ const FONT_OPTIONS: FontOption[] = [
   { label: "Courier New", value: "'Courier New', Courier, monospace" },
 ];
 
+const FOCUS_LINE_STYLE_OPTIONS: { label: string; value: FocusLineStyle }[] = [
+    { label: "Line", value: "line" },
+    { label: "Shaded Paragraph", value: "shadedParagraph" },
+];
+
 export const SettingsPanel = React.memo(function SettingsPanel() {
   const { toast } = useToast();
   const {
@@ -61,6 +71,8 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     textColor, setTextColor,
     fontFamily, setFontFamily,
     focusLinePercentage, setFocusLinePercentage,
+    focusLineStyle, setFocusLineStyle,
+    layoutPresets, activeLayoutPresetName, applyLayoutPreset,
     resetSettingsToDefaults,
   } = useTeleprompterStore();
 
@@ -75,6 +87,41 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center"><LayoutList className="mr-2 h-5 w-5" />Layout Presets</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Label htmlFor="layout-preset" className="text-sm">Select a Preset</Label>
+            <Select
+              value={activeLayoutPresetName || "custom"}
+              onValueChange={(value) => {
+                if (value !== "custom") {
+                  applyLayoutPreset(value);
+                }
+              }}
+            >
+              <SelectTrigger id="layout-preset" className="w-full mt-1" aria-label="Select layout preset">
+                <SelectValue placeholder="Select preset" />
+              </SelectTrigger>
+              <SelectContent>
+                {layoutPresets.map(preset => (
+                  <SelectItem key={preset.name} value={preset.name}>
+                    {preset.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom" disabled={!activeLayoutPresetName}>
+                  {activeLayoutPresetName ? `Custom (based on ${activeLayoutPresetName})` : "Custom"}
+                </SelectItem>
+                 <SelectItem value="custom" disabled={activeLayoutPresetName === null}>Custom</SelectItem>
+              </SelectContent>
+            </Select>
+             <p className="text-xs text-muted-foreground mt-1">
+              Manually changing settings below will switch to a "Custom" layout.
+            </p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center"><Palette className="mr-2 h-5 w-5" />Appearance</CardTitle>
@@ -164,7 +211,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
 
             <div>
               <Label htmlFor="focus-line-percentage" className="flex items-center text-sm">
-                Focus Line: {Math.round(focusLinePercentage * 100)}%
+                Focus Line Position: {Math.round(focusLinePercentage * 100)}%
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <AlignCenterVertical className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -185,6 +232,27 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 className="mt-2"
               />
             </div>
+            
+            <div>
+                <Label htmlFor="focus-line-style" className="flex items-center text-sm mb-2">
+                    Focus Style
+                    <VenetianMask className="ml-2 h-4 w-4 text-muted-foreground" />
+                </Label>
+                <RadioGroup
+                    id="focus-line-style"
+                    value={focusLineStyle}
+                    onValueChange={(value) => setFocusLineStyle(value as FocusLineStyle)}
+                    className="flex space-x-4"
+                >
+                    {FOCUS_LINE_STYLE_OPTIONS.map(option => (
+                        <div key={option.value} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option.value} id={`focus-style-${option.value}`} />
+                            <Label htmlFor={`focus-style-${option.value}`} className="font-normal">{option.label}</Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+
 
              <div className="flex items-center justify-between pt-2">
               <Label htmlFor="mirror-mode" className="flex items-center text-sm">
