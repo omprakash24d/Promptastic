@@ -1,8 +1,8 @@
 
 "use client";
 
-import type React from 'react';
-// Removed Menu, X as they were for the unused generic mobile menu
+import React from 'react'; // Added React import
+import { useCallback } from 'react';
 import { FileText, Moon, SlidersHorizontal, Sun } from 'lucide-react';
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { Button } from '@/components/ui/button';
@@ -12,17 +12,47 @@ interface HeaderProps {
   onOpenSettings: () => void;
 }
 
-export default function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
+interface NavButtonConfig {
+  label: string;
+  icon: React.ElementType;
+  onClick: () => void;
+  ariaLabel: string;
+  showTextOnDesktop?: boolean;
+}
+
+const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
   const { darkMode, setDarkMode } = useTeleprompterStore();
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setDarkMode(!darkMode);
-  };
+  }, [darkMode, setDarkMode]);
 
-  // TODO: Consider more advanced theme management or custom theme options in the future.
+  const navButtons: NavButtonConfig[] = [
+    {
+      label: 'Scripts',
+      icon: FileText,
+      onClick: onOpenScripts,
+      ariaLabel: 'Open script manager',
+      showTextOnDesktop: true,
+    },
+    {
+      label: 'Settings',
+      icon: SlidersHorizontal,
+      onClick: onOpenSettings,
+      ariaLabel: 'Open settings',
+      showTextOnDesktop: true,
+    },
+    {
+      label: darkMode ? 'Light Mode' : 'Dark Mode',
+      icon: darkMode ? Sun : Moon,
+      onClick: toggleTheme,
+      ariaLabel: `Toggle theme to ${darkMode ? 'light' : 'dark'} mode`, // More descriptive aria-label
+      showTextOnDesktop: false,
+    },
+  ];
 
   return (
-    <header className="border-b bg-card py-3 shadow-sm">
+    <header className="border-b bg-card py-3 shadow-sm" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -32,6 +62,7 @@ export default function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
                 viewBox="0 0 24 24"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true" // Decorative SVG
               >
                 <path
                   d="M12 2L20 7V17L12 22L4 17V7L12 2Z"
@@ -48,74 +79,42 @@ export default function Header({ onOpenScripts, onOpenSettings }: HeaderProps) {
           </div>
 
           {/* Desktop Controls */}
-          <div className="hidden items-center space-x-2 md:flex">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onOpenScripts}
-              aria-label="Open script manager"
-            >
-              <FileText className="mr-1 h-5 w-5" />
-              Scripts
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onOpenSettings}
-              aria-label="Open settings"
-            >
-              <SlidersHorizontal className="mr-1 h-5 w-5" />
-              Settings
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-            >
-              {darkMode ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
+          <nav className="hidden items-center space-x-2 md:flex" aria-label="Main navigation">
+            {navButtons.map((button) => (
+              <Button
+                key={button.label}
+                variant="ghost"
+                size={button.showTextOnDesktop ? "sm" : "icon"}
+                onClick={button.onClick}
+                aria-label={button.ariaLabel}
+                title={button.ariaLabel} // Added title for tooltip on hover
+              >
+                <button.icon className={button.showTextOnDesktop ? "mr-1 h-5 w-5" : "h-5 w-5"} aria-hidden="true" />
+                {button.showTextOnDesktop && button.label}
+              </Button>
+            ))}
+          </nav>
 
           {/* Mobile Controls */}
-          <div className="flex items-center md:hidden">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mr-1"
-              onClick={onOpenScripts}
-              aria-label="Open script manager"
-            >
-              <FileText className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="mr-1"
-              onClick={onOpenSettings}
-              aria-label="Open settings"
-            >
-              <SlidersHorizontal className="h-5 w-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              aria-label="Toggle theme"
-            >
-              {darkMode ? (
-                <Sun className="h-5 w-5" />
-              ) : (
-                <Moon className="h-5 w-5" />
-              )}
-            </Button>
-          </div>
+          <nav className="flex items-center md:hidden" aria-label="Mobile navigation">
+            {navButtons.map((button, index) => (
+              <Button
+                key={button.label}
+                variant="ghost"
+                size="icon"
+                className={index < navButtons.length -1 ? "mr-1" : ""}
+                onClick={button.onClick}
+                aria-label={button.ariaLabel}
+                title={button.ariaLabel} // Added title for tooltip on hover
+              >
+                <button.icon className="h-5 w-5" aria-hidden="true"/>
+              </Button>
+            ))}
+          </nav>
         </div>
       </div>
     </header>
   );
-}
+});
+
+export default Header;
