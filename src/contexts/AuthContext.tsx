@@ -40,6 +40,8 @@ const FIREBASE_ERROR_MESSAGES: { [key: string]: string } = {
   'storage/unauthorized': 'You do not have permission to upload this file. Check storage security rules.',
   'storage/canceled': 'File upload was canceled.',
   'storage/unknown': 'An unknown error occurred during file upload. Please try again.',
+  'storage/object-too-large': 'File is too large. Maximum size is 5MB.',
+  'storage/invalid-file-type': 'Invalid file type. Please upload a JPG, PNG, GIF, or WEBP image.',
 };
 
 
@@ -101,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages();
     setErrorState(message);
     if (message) {
-      errorTimeoutRef.current = setTimeout(() => setErrorState(null), MESSAGE_CLEAR_TIMEOUT);
+      errorTimeoutRef.current = setTimeout(() => { setErrorState(null); }, MESSAGE_CLEAR_TIMEOUT);
     }
   }, [clearAuthMessages]);
 
@@ -109,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages();
     setSuccessMessageState(message);
     if (message) {
-      successTimeoutRef.current = setTimeout(() => setSuccessMessageState(null), MESSAGE_CLEAR_TIMEOUT);
+      successTimeoutRef.current = setTimeout(() => { setSuccessMessageState(null); }, MESSAGE_CLEAR_TIMEOUT);
     }
   }, [clearAuthMessages]);
 
@@ -134,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const handleAuthSuccess = useCallback((message?: string, options: { fromSignup?: boolean, redirectTo?: string, skipRedirect?: boolean } = {}) => {
+    clearAuthMessages();
     const { fromSignup = false, redirectTo = '/', skipRedirect = false } = options;
     let finalMessage = message;
     if (fromSignup && auth.currentUser && !auth.currentUser.emailVerified) {
@@ -145,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!skipRedirect && pathname !== redirectTo) {
         router.push(redirectTo);
     }
-  }, [setSuccessMessage, router, pathname]);
+  }, [setSuccessMessage, router, pathname, clearAuthMessages]);
 
   const handleAuthError = useCallback((err: any, operation?: 'passwordReset' | 'signup') => {
     clearAuthMessages();
@@ -216,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPasswordResetLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
-      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset');
+      handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); //This will show the success message due to special handling in handleAuthError
       return true;
     } catch (err: any) {
       handleAuthError(err, 'passwordReset');
@@ -256,17 +259,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
     try {
-      let photoURL = auth.currentUser.photoURL; // Keep existing photoURL if no new file
+      let photoURL = auth.currentUser.photoURL;
       if (photoFile) {
-        // Max file size (e.g., 5MB)
-        const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; 
+        const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
         if (photoFile.size > MAX_FILE_SIZE_BYTES) {
-          throw { code: 'storage/object-too-large', message: 'File is too large. Maximum size is 5MB.' };
+          throw { code: 'storage/object-too-large', message: FIREBASE_ERROR_MESSAGES['storage/object-too-large'] };
         }
-        // Allowed file types (client-side check, storage rules for server-side)
         const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
         if (!ALLOWED_TYPES.includes(photoFile.type)) {
-           throw { code: 'storage/invalid-file-type', message: 'Invalid file type. Please upload a JPG, PNG, GIF, or WEBP image.' };
+           throw { code: 'storage/invalid-file-type', message: FIREBASE_ERROR_MESSAGES['storage/invalid-file-type'] };
         }
 
         const imageRef = storageRef(storage, `profilePictures/${auth.currentUser.uid}/${photoFile.name}`);
@@ -274,13 +275,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         photoURL = await getDownloadURL(snapshot.ref);
       }
 
-      const profileUpdates: { displayName?: string; photoURL?: string } = { ...updates };
-      if (photoURL !== auth.currentUser.photoURL) { // Only include photoURL if it changed or was newly set
+      const profileUpdates: { displayName?: string; photoURL?: string | null } = { ...updates };
+       // Check if photoURL actually changed or if it's a new upload (photoURL was null before)
+      if (photoURL !== auth.currentUser.photoURL) {
         profileUpdates.photoURL = photoURL;
       }
-      
-      // Only call firebaseUpdateProfile if there are actual changes
-      if (Object.keys(profileUpdates).length > 0 || (photoFile && photoURL !== auth.currentUser.photoURL)) {
+
+
+      if (Object.keys(updates).length > 0 || (photoFile && photoURL !== auth.currentUser.photoURL) ) {
          await firebaseUpdateProfile(auth.currentUser, profileUpdates);
       }
 
@@ -296,13 +298,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     clearAuthMessages();
+    setLoginLoading(true); // Reuse loginLoading to indicate a general auth operation
     try {
       await firebaseSignOut(auth);
-      if (pathname !== '/login') {
+      // User state will be updated by onAuthStateChanged, which also calls clearUserScripts
+      // Redirect if not on login page already
+      if (pathname !== '/login' && pathname !== '/') {
         router.push('/login');
       }
     } catch (err: any) {
       handleAuthError(err);
+    } finally {
+      setLoginLoading(false);
     }
   };
 
@@ -329,11 +336,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     loginLoading, signupLoading, passwordResetLoading, profileUpdateLoading, verificationResendLoading, googleSignInLoading,
     error, successMessage,
+    // Callbacks are memoized with useCallback, so they are stable dependencies
   ]);
 
-  if (initialAuthLoading) {
-    return <div className="flex min-h-screen items-center justify-center bg-background"><p>Authenticating...</p></div>;
-  }
+  // Removed the initialAuthLoading block here.
+  // The app will render its children immediately.
+  // UI components should handle their loading states based on 'user' being null initially.
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
@@ -345,3 +353,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

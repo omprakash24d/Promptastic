@@ -4,6 +4,7 @@
 import type React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import type { Metadata } from 'next'; // Import Metadata type for page-specific metadata
+import Link from 'next/link'; // Added Link import
 import { useTeleprompterStore } from '@/hooks/useTeleprompterStore';
 import { SettingsPanel } from '@/components/promptastic/SettingsPanel';
 import { PlaybackControls } from '@/components/promptastic/PlaybackControls';
@@ -14,7 +15,7 @@ import { ScriptManager } from '@/components/promptastic/ScriptManager';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from "@/hooks/use-toast";
-import { Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, AlertTriangle, MonitorPlay, LayoutList, Info, Mail, ShieldCheck, Gavel, Hammer, TvMinimalPlay, BookOpenText, RotateCcw } from 'lucide-react'; 
+import { Settings, FileText, Play, Mic, Maximize, ListChecks, Palette, AlertTriangle, MonitorPlay, LayoutList, Info, Mail, ShieldCheck, Gavel, Hammer, TvMinimalPlay, BookOpenText, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -45,7 +46,7 @@ export default function PromptasticPage() {
 
     const persistedPrefs = loadFromLocalStorage<PersistedStorePreferences>(
       'promptastic-store',
-      {} 
+      {}
     );
 
     let resolvedDarkMode: boolean;
@@ -54,9 +55,9 @@ export default function PromptasticPage() {
     } else if (typeof window !== 'undefined') {
       resolvedDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     } else {
-      resolvedDarkMode = useTeleprompterStore.getState().darkMode; 
+      resolvedDarkMode = useTeleprompterStore.getState().darkMode;
     }
-    
+
     if (useTeleprompterStore.getState().darkMode !== resolvedDarkMode) {
       setDarkMode(resolvedDarkMode);
     }
@@ -141,7 +142,7 @@ export default function PromptasticPage() {
       }
     }
   };
-  
+
   const togglePresentationMode = () => {
     setIsPresentationMode(!isPresentationMode);
     if (!isPresentationMode && !document.fullscreenElement && mainRef.current) {
@@ -289,13 +290,13 @@ export default function PromptasticPage() {
         <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col overflow-y-auto">
           <SheetHeader className="p-4 border-b sticky top-0 bg-background z-10">
             <SheetTitle className="text-lg flex items-center">
-              <Hammer className="mr-2 h-5 w-5" /> 
+              <Hammer className="mr-2 h-5 w-5" />
               Help & Information
             </SheetTitle>
           </SheetHeader>
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6 text-sm">
-              
+
               <section aria-labelledby="about-tool-heading" className="space-y-3">
                 <h3 id="about-tool-heading" className="text-xl font-semibold mb-3 flex items-center"><Info className="mr-2 h-5 w-5 text-primary"/>About Promptastic!</h3>
                 <p>Promptastic! is a modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally. Built with Next.js, React, and ShadCN UI, it offers a clean, intuitive interface, real-time customization, and AI-powered enhancements for an optimal prompting experience.</p>
@@ -305,14 +306,14 @@ export default function PromptasticPage() {
 
               <section aria-labelledby="core-features-heading" className="space-y-3">
                 <h3 id="core-features-heading" className="text-xl font-semibold mb-3 flex items-center"><LayoutList className="mr-2 h-5 w-5 text-primary"/>Core Features & Usage</h3>
-                
+
                 <h4 className="font-medium flex items-center pt-2"><Play className="mr-2 h-5 w-5"/>Teleprompter View & Playback</h4>
                 <ul className="list-disc list-outside pl-5 space-y-1">
                   <li><strong>Smooth Scrolling:</strong> The script scrolls automatically at an adjustable speed.</li>
                   <li><strong>Playback Controls:</strong> Use the <Play className="inline h-4 w-4"/> Play, <RotateCcw className="inline h-4 w-4"/> Reset, and other controls in the footer.</li>
                   <li><strong>Keyboard Control:</strong> Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code> to toggle play/pause.</li>
                   <li><strong>Manual Scroll & Jump:</strong> When paused, you can manually scroll. Clicking on a paragraph while paused will set it as the new starting point for playback.</li>
-                  <li><strong>Rich Text & Cues:</strong> 
+                  <li><strong>Rich Text & Cues:</strong>
                     The teleprompter supports basic formatting like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">**bold**</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">*italic*</code>, and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">_underline_</code>.
                     Visual cues like <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//PAUSE//</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//EMPHASIZE//</code> (highlights text in primary color), and <code className="bg-muted px-1.5 py-0.5 rounded text-xs">//SLOWDOWN//</code> are also displayed.
                   </li>
@@ -341,7 +342,7 @@ export default function PromptasticPage() {
                     <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (duration 1-60s).</li>
                     <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets or save/load your custom combinations of settings as named profiles for different scenarios.</li>
                  </ul>
-                
+
                 <h4 className="font-medium flex items-center pt-2"><Mic className="mr-2 h-5 w-5"/>AI Scroll Sync (Experimental)</h4>
                  <p>This feature attempts to listen to your speech and adjust the teleprompter scroll speed accordingly. Enable it in Settings, then use the "AI Sync" button in the playback controls. Microphone access is required.</p>
                  <div className="p-3 bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
@@ -353,7 +354,7 @@ export default function PromptasticPage() {
                  <p><strong>Presentation Mode:</strong> Click the <MonitorPlay className="inline h-4 w-4"/> "Present" button for an even more immersive, UI-less experience. This mode also goes fullscreen and hides all UI elements except for the scrolling script and a subtle exit button. Ideal for actual delivery.</p>
                  <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit either Fullscreen or Presentation mode.</p>
               </section>
-              
+
               <Separator/>
 
               <section aria-labelledby="keyboard-shortcuts-heading">
@@ -373,7 +374,7 @@ export default function PromptasticPage() {
                 <p className="mt-1">Email: <a href="mailto:support@prompt.indhinditech.com" className="underline hover:text-primary">support@prompt.indhinditech.com</a> (Placeholder)</p>
                 <p className="mt-1">Instagram: <a href="https://www.instagram.com/omprakash24d/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">@omprakash24d</a></p>
               </section>
-              
+
               <Separator />
 
               <section aria-labelledby="privacy-policy-heading">
@@ -389,7 +390,7 @@ export default function PromptasticPage() {
                 <p>By using Promptastic!, you agree to our Terms and Conditions.</p>
                 <p className="mt-1"><Link href="/terms-conditions" className="underline hover:text-primary">Read our full Terms & Conditions here.</Link></p>
               </section>
-              
+
               <Separator />
 
               <section aria-labelledby="about-dev-heading" className="space-y-1">
@@ -404,3 +405,4 @@ export default function PromptasticPage() {
     </div>
   );
 }
+
