@@ -22,7 +22,7 @@ const INITIAL_IS_MIRRORED = false;
 const INITIAL_FOCUS_LINE_STYLE: FocusLineStyle = 'line';
 const INITIAL_COUNTDOWN_ENABLED = false;
 const INITIAL_COUNTDOWN_DURATION = 3; // seconds
-const INITIAL_HORIZONTAL_PADDING = 0; // 0%
+const INITIAL_HORIZONTAL_PADDING = 3; // 3% DEFAULT AS PER USER REQUEST
 const INITIAL_ENABLE_HIGH_CONTRAST = false;
 
 const SERVER_DEFAULT_DARK_MODE = true;
@@ -53,7 +53,7 @@ const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
       fontFamily: INITIAL_FONT_FAMILY,
       scrollSpeed: INITIAL_SCROLL_SPEED,
       focusLineStyle: INITIAL_FOCUS_LINE_STYLE,
-      horizontalPadding: INITIAL_HORIZONTAL_PADDING,
+      horizontalPadding: INITIAL_HORIZONTAL_PADDING, // UPDATED DEFAULT
     }
   },
   {
