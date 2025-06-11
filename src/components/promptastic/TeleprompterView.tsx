@@ -59,7 +59,7 @@ export function TeleprompterView() {
     let newHighlightedIndex: number | null = null;
 
     // Special case: if at the very top, and first paragraph is in view
-    if (container.scrollTop === 0 && paragraphRefs.current[0]) {
+    if (container.scrollTop < 5 && paragraphRefs.current[0]) { // Use a small tolerance for scrollTop check
       const firstPRef = paragraphRefs.current[0];
       if (firstPRef.offsetTop + firstPRef.offsetHeight > container.clientHeight / 4 && firstPRef.offsetTop < container.clientHeight / 2) {
          newHighlightedIndex = 0;
@@ -80,8 +80,10 @@ export function TeleprompterView() {
       }
     }
     
-    setHighlightedParagraphIndex(newHighlightedIndex);
-  }, [setHighlightedParagraphIndex]); // Dependencies are stable, primarily state setter
+    if (highlightedParagraphIndex !== newHighlightedIndex) {
+      setHighlightedParagraphIndex(newHighlightedIndex);
+    }
+  }, [highlightedParagraphIndex, setHighlightedParagraphIndex]); // Added highlightedParagraphIndex to dependency
 
 
   const scrollLoop = useCallback((timestamp: number) => {
@@ -128,19 +130,27 @@ export function TeleprompterView() {
   useEffect(() => {
     let timerId: NodeJS.Timeout | null = null;
     if (isPlaying) {
+      // Explicitly set scrollTop to currentScrollPosition from store when play begins
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = currentScrollPosition;
+      }
+      
       lastTimestampRef.current = 0;
       userInteractedRef.current = false;
       justStartedPlayingRef.current = true;
       
       timerId = setTimeout(() => {
         justStartedPlayingRef.current = false;
-      }, 150); // Ignore scroll events for 150ms after play starts
+      }, 150);
 
       animationFrameIdRef.current = requestAnimationFrame(scrollLoop);
     } else {
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
+      }
+      if (timerId) {
+        clearTimeout(timerId);
       }
       justStartedPlayingRef.current = false; 
     }
@@ -155,7 +165,7 @@ export function TeleprompterView() {
       }
       justStartedPlayingRef.current = false; 
     };
-  }, [isPlaying, scrollLoop]);
+  }, [isPlaying, scrollLoop, currentScrollPosition]); // Added currentScrollPosition to dependencies
 
 
   const handleScroll = useCallback(() => {
@@ -206,10 +216,10 @@ export function TeleprompterView() {
   }, [handleScroll]);
 
   useEffect(() => {
-    setHighlightedParagraphIndex(null); // Reset highlight
+    setHighlightedParagraphIndex(null); 
     const timer = setTimeout(() => {
-       checkHighlightedParagraph(); // Check after other state updates settle
-    }, 50); // Short delay to allow DOM updates from scriptText/style changes
+       checkHighlightedParagraph(); 
+    }, 50); 
     return () => clearTimeout(timer);
   }, [scriptText, fontFamily, fontSize, lineHeight, checkHighlightedParagraph]);
 
@@ -226,7 +236,7 @@ export function TeleprompterView() {
       >
         {paragraphBlock.split('\n').map((line, lineIndex) => (
           <p key={lineIndex} className="mb-1 last:mb-0">
-            {line || <>&nbsp;</>} {/* Render non-breaking space for empty lines to maintain height */}
+            {line || <>&nbsp;</>}
           </p>
         ))}
       </div>
@@ -237,19 +247,15 @@ export function TeleprompterView() {
   const currentFontFamily = !isMounted ? VIEW_SSR_DEFAULT_FONT_FAMILY : fontFamily;
   const mirrorTransform = isMounted && isMirrored ? 'scaleX(-1)' : 'none';
 
-  // Renamed style objects
   const teleprompterContainerStyles: React.CSSProperties = {
     color: currentTextColor,
     fontFamily: currentFontFamily,
     fontSize: `${fontSize}px`,
     lineHeight: lineHeight,
-    transform: mirrorTransform, // Mirror mode applied to the outer scroll container
+    transform: mirrorTransform,
   };
 
-  const scriptContentStyles: React.CSSProperties = {
-    // No transform needed here if outer container is mirrored
-    // transform: mirrorTransform,  // This would double-mirror if outer is also mirrored
-  };
+  const scriptContentStyles: React.CSSProperties = {};
 
   return (
     <div
@@ -266,7 +272,7 @@ export function TeleprompterView() {
     >
       <div
         className="select-none"
-        style={scriptContentStyles} // Apply inner styles
+        style={scriptContentStyles}
       >
         {scriptText.trim() === "" ? (
           <p className="text-center opacity-50">
