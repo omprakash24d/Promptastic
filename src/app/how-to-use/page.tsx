@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { ChevronLeft, HelpCircle, Play, FileText, Settings, Mic, Maximize, LayoutList, Palette, ListChecks, Hammer, Info, Share2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, RotateCcw, BookOpenText, MonitorPlay } from 'lucide-react'; 
-import { ShareButtons } from '@/components/promptastic/ShareButtons'; // Import the new component
+import { ShareButtons } from '@/components/promptastic/ShareButtons';
 
 export const metadata: Metadata = {
     title: 'How to Use Promptastic!',
@@ -39,8 +39,8 @@ export default function HowToUsePage() {
             <section aria-labelledby="core-features-heading" className="space-y-3">
                 <h3 id="core-features-heading" className="text-xl font-semibold mb-3 flex items-center"><LayoutList className="mr-2 h-5 w-5 text-primary"/>Core Features & Usage</h3>
 
-                <h4 className="font-medium flex items-center pt-2"><Play className="mr-2 h-5 w-5"/>Teleprompter View & Playback</h4>
-                <ul className="list-disc list-outside pl-5 space-y-1">
+                <h4 id="teleprompter-view-heading" className="font-medium flex items-center pt-2"><Play className="mr-2 h-5 w-5"/>Teleprompter View & Playback</h4>
+                <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="teleprompter-view-heading">
                   <li><strong>Smooth Scrolling:</strong> The script scrolls automatically at an adjustable speed.</li>
                   <li><strong>Playback Controls:</strong> Use the <Play className="inline h-4 w-4"/> Play/Pause, <RotateCcw className="inline h-4 w-4"/> Reset, and other controls in the footer of the main teleprompter page.</li>
                   <li><strong>Keyboard Control:</strong> Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Spacebar</code> or <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Backspace</code> to toggle play/pause when not focused on an input field.</li>
@@ -51,9 +51,9 @@ export default function HowToUsePage() {
                   </li>
                 </ul>
 
-                <h4 className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
+                <h4 id="script-management-heading" className="font-medium flex items-center pt-2"><FileText className="mr-2 h-5 w-5"/>Script Management</h4>
                 <p>Access the Script Manager by clicking the "Scripts" (<FileText className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
-                <ul className="list-disc list-outside pl-5 space-y-1">
+                <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="script-management-heading">
                   <li><strong>Create & Edit:</strong> Type or paste your script directly into the editor. The estimated reading time is shown.</li>
                   <li><strong>Save Scripts:</strong> Save your work with a unique name. If you are logged in, scripts sync to the cloud (Firebase Firestore); otherwise, they are saved in your browser's local storage.</li>
                   <li><strong>Load Scripts:</strong> Select a script from the "Saved Scripts" list to load it into the teleprompter.</li>
@@ -67,22 +67,22 @@ export default function HowToUsePage() {
                     <p className="flex items-center text-xs text-muted-foreground"><ListChecks className="mr-2 h-4 w-4"/>Your scripts, versions, and settings (including custom profiles) are automatically saved in your browser's local storage or synced with Firestore if logged in.</p>
                 </div>
 
-                <h4 className="font-medium flex items-center pt-2"><Settings className="mr-2 h-5 w-5"/>Settings Panel</h4>
+                <h4 id="settings-panel-heading" className="font-medium flex items-center pt-2"><Settings className="mr-2 h-5 w-5"/>Settings Panel</h4>
                 <p>Access Teleprompter Settings by clicking the "Settings" (<Settings className="inline h-4 w-4"/> icon) button in the header (or from the main menu on mobile).</p>
-                 <ul className="list-disc list-outside pl-5 space-y-1">
+                 <ul className="list-disc list-outside pl-5 space-y-1" aria-labelledby="settings-panel-heading">
                     <li><strong>Appearance:</strong> Customize font size, line spacing, font family (including Atkinson Hyperlegible for readability), text color, horizontal text padding, focus line position and style (line or shaded paragraph), mirror mode, and themes (Light/Dark/High-Contrast).</li>
                     <li><strong>Playback:</strong> Adjust scroll speed, enable/disable AI Scroll Sync, and configure the optional countdown timer (duration 1-60s).</li>
                     <li><strong>Layouts & Profiles:</strong> Quickly apply predefined layout presets or save/load your custom combinations of settings as named profiles for different scenarios.</li>
                     <li><strong>General:</strong> Reset core settings to their "Default" preset values.</li>
                  </ul>
 
-                <h4 className="font-medium flex items-center pt-2"><Mic className="mr-2 h-5 w-5"/>AI Scroll Sync (Experimental)</h4>
+                <h4 id="ai-scroll-sync-heading" className="font-medium flex items-center pt-2"><Mic className="mr-2 h-5 w-5"/>AI Scroll Sync (Experimental)</h4>
                  <p>This feature attempts to listen to your speech and adjust the teleprompter scroll speed accordingly. Enable it in Settings, then use the "AI Sync" button in the playback controls on the main page. Microphone access is required.</p>
                  <div className="p-3 bg-destructive/10 text-destructive border border-destructive/30 rounded-md">
                     <p className="flex items-center text-xs"><AlertTriangle className="mr-2 h-4 w-4"/>The speech analysis component of AI Scroll Sync is currently a placeholder and does not perform actual speech-to-speed calculations. This requires integration with a Speech-to-Text API.</p>
                 </div>
 
-                 <h4 className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
+                 <h4 id="fullscreen-presentation-heading" className="font-medium flex items-center pt-2"><Maximize className="mr-2 h-5 w-5"/>Fullscreen & Presentation Modes</h4>
                  <p><strong>Fullscreen Mode:</strong> Click the <Maximize className="inline h-4 w-4"/> "Full Screen" button in the playback controls on the main page to make the teleprompter view fill your entire screen. This helps minimize distractions. (Presentation mode is currently combined with Fullscreen).</p>
                  <p>Press <code className="bg-muted px-1.5 py-0.5 rounded text-xs">Esc</code> to exit Fullscreen mode.</p>
               </section>
@@ -100,7 +100,6 @@ export default function HowToUsePage() {
 
             <Separator/>
 
-            {/* Share Buttons Section */}
             <section aria-labelledby="share-guide-heading">
               <ShareButtons className="mt-6" />
             </section>
@@ -120,3 +119,4 @@ export default function HowToUsePage() {
     </div>
   );
 }
+

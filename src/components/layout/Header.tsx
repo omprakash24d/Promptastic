@@ -163,7 +163,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
     <header className="border-b bg-card py-3 shadow-sm shrink-0 print:hidden" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center cursor-pointer" passHref>
+          <Link href="/" className="flex items-center cursor-pointer" passHref aria-label="Promptastic! Homepage">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
                 <svg
                     className="h-5 w-5 text-primary-foreground"
@@ -234,3 +234,4 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
 });
 
 export default Header;
+

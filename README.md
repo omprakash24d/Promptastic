@@ -3,8 +3,8 @@
 
 Promptastic! is a modern, feature-rich teleprompter application designed for presenters, content creators, and anyone who needs to deliver scripts smoothly and professionally. Built with Next.js, React, and ShadCN UI, it offers a clean, intuitive interface, real-time customization, and AI-powered enhancements.
 
-[![Promptastic Screenshot](/home/user/studio/public/cover_image.png)](#)
-*Caption: Placeholder for a screenshot of the Promptastic! interface.*
+[![Promptastic Screenshot](/public/cover_image.png)](#)
+*Caption: Homepage of Promptastic*
 
 ## ✨ Core Features
 
@@ -36,7 +36,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     *   Light, Dark, and High-Contrast themes.
     *   Touchscreen and keyboard friendly.
     *   Help panel with usage instructions.
-*   ** зеркало Mirror Mode**: Flip text horizontally for use with physical teleprompter mirrors.
+*   **Mirror Mode**: Flip text horizontally for use with physical teleprompter mirrors.
 *   **🎤 AI Scroll Sync (Experimental)**:
     *   AI listens to the speaker and attempts to sync scroll speed (currently uses placeholder speech analysis).
 *   **🎬 Presentation Mode**: An even more immersive, UI-less fullscreen mode for delivery.
@@ -144,7 +144,7 @@ Promptastic! is a modern, feature-rich teleprompter application designed for pre
     ```
     This typically starts on `http://localhost:3400`.
 
-##  주요 기능 설명 (Key Functionalities)
+## Key Functionalities
 
 ### Script Management
 Access the Script Manager via the "Scripts" button in the header. Here you can:
@@ -219,9 +219,8 @@ See the [LICENSE](LICENSE.md) file for more details. (You would typically create
 
 ## ©️ Copyright
 
-Copyright (c) 2024 [Your Name or Organization Name Here]. All Rights Reserved.
+Copyright (c) 2025 Om Prakash. All Rights Reserved.
 
-*(Replace "[Your Name or Organization Name Here]" with the actual copyright holder.)*
 
 ## 🙏 Acknowledgements
 

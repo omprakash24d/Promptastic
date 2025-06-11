@@ -7,6 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticRoutes: Array<{ path: string; changeFrequency: 'yearly' | 'monthly' | 'weekly' | 'daily' | 'always' | 'hourly' | 'never'; priority: number }> = [
     { path: '/', changeFrequency: 'weekly', priority: 1.0 },
     { path: '/login', changeFrequency: 'yearly', priority: 0.5 },
+    { path: '/profile', changeFrequency: 'monthly', priority: 0.4 },
     { path: '/privacy-policy', changeFrequency: 'yearly', priority: 0.3 },
     { path: '/terms-conditions', changeFrequency: 'yearly', priority: 0.3 },
     { path: '/about-us', changeFrequency: 'monthly', priority: 0.7 },
@@ -21,3 +22,4 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: route.priority,
   }));
 }
+
