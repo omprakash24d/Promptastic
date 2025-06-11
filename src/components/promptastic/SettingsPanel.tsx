@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Info, Palette, Type } from 'lucide-react';
+import { Sun, Moon, Info, Palette, Type, AlignCenterVertical } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -47,6 +47,7 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     isAutoSyncEnabled, setIsAutoSyncEnabled,
     textColor, setTextColor,
     fontFamily, setFontFamily,
+    focusLinePercentage, setFocusLinePercentage,
   } = useTeleprompterStore();
 
   return (
@@ -136,6 +137,30 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
                 onChange={(e) => setTextColor(e.target.value)}
                 className="w-10 h-8 p-0.5 border border-input rounded-md bg-background cursor-pointer"
                 aria-label="Choose text color"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="focus-line-percentage" className="flex items-center text-sm">
+                Focus Line: {Math.round(focusLinePercentage * 100)}%
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <AlignCenterVertical className="ml-2 h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Adjust the vertical position of the reading focus line (percentage from top).</p>
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Slider
+                id="focus-line-percentage"
+                aria-label={`Focus line position: ${Math.round(focusLinePercentage * 100)}% from top`}
+                min={0.1} // 10%
+                max={0.9} // 90%
+                step={0.01}
+                value={[focusLinePercentage]}
+                onValueChange={(value) => setFocusLinePercentage(value[0])}
+                className="mt-2"
               />
             </div>
 
@@ -231,3 +256,4 @@ export const SettingsPanel = React.memo(function SettingsPanel() {
     </TooltipProvider>
   );
 });
+

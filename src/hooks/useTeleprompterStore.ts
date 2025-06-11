@@ -13,10 +13,9 @@ const INITIAL_LINE_HEIGHT = 1.5;
 // Default text colors for different modes
 const INITIAL_TEXT_COLOR_LIGHT_MODE_HSL = 'hsl(0 0% 0%)'; // Black HSL
 const INITIAL_TEXT_COLOR_DARK_MODE_HSL = 'hsl(0 0% 100%)'; // White HSL
-const BLACK_HEX = '#000000';
-const WHITE_HEX = '#ffffff';
 
 const INITIAL_FONT_FAMILY = 'Arial, sans-serif';
+const INITIAL_FOCUS_LINE_PERCENTAGE = 0.33; // 33% from the top
 
 // Default app theme is dark mode.
 const SERVER_DEFAULT_DARK_MODE = true;
@@ -72,6 +71,7 @@ interface TeleprompterState extends TeleprompterSettings {
   setIsAutoSyncEnabled: (enabled: boolean) => void;
   setTextColor: (color: string) => void;
   setFontFamily: (font: string) => void;
+  setFocusLinePercentage: (percentage: number) => void;
 
   togglePlayPause: () => void;
   setIsPlaying: (playing: boolean) => void;
@@ -96,6 +96,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         isAutoSyncEnabled: false,
         textColor: SERVER_DEFAULT_TEXT_COLOR,
         fontFamily: INITIAL_FONT_FAMILY,
+        focusLinePercentage: INITIAL_FOCUS_LINE_PERCENTAGE,
         
         isPlaying: false,
         currentScrollPosition: 0,
@@ -148,6 +149,7 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         setIsAutoSyncEnabled: (enabled) => set({ isAutoSyncEnabled: enabled }),
         setTextColor: (color) => set({ textColor: color }), 
         setFontFamily: (font) => set({ fontFamily: font }),
+        setFocusLinePercentage: (percentage) => set({ focusLinePercentage: Math.max(0.1, Math.min(0.9, percentage)) }), // Clamp between 10% and 90%
 
         togglePlayPause: () => set(state => ({ isPlaying: !state.isPlaying })),
         setIsPlaying: (playing) => set({ isPlaying: playing }),
@@ -172,7 +174,8 @@ export const useTeleprompterStore = create<TeleprompterState>()(
         darkMode: state.darkMode,
         isAutoSyncEnabled: state.isAutoSyncEnabled,
         textColor: state.textColor,
-        fontFamily: state.fontFamily, // Persist fontFamily
+        fontFamily: state.fontFamily,
+        focusLinePercentage: state.focusLinePercentage, // Persist focusLinePercentage
       }),
     }
   )
@@ -191,3 +194,4 @@ const unsub = useTeleprompterStore.subscribe(
   },
   (state) => ({ scripts: state.scripts, activeScriptName: state.activeScriptName, scriptText: state.scriptText, LONGER_DEFAULT_SCRIPT_TEXT: state.LONGER_DEFAULT_SCRIPT_TEXT }) 
 );
+

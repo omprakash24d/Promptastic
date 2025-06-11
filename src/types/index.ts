@@ -15,6 +15,7 @@ export interface TeleprompterSettings {
   isAutoSyncEnabled: boolean;
   textColor: string; // e.g., '#FFFFFF' or 'hsl(0, 0%, 100%)'
   fontFamily: string; // e.g., 'Inter, sans-serif', 'Arial'
+  focusLinePercentage: number; // e.g., 0.33 for 33% from the top
 }
 
 export interface TeleprompterState extends TeleprompterSettings {
@@ -24,3 +25,4 @@ export interface TeleprompterState extends TeleprompterSettings {
   currentScrollPosition: number; // px
   isSettingsPanelOpen: boolean;
 }
+
