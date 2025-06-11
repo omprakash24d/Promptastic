@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   },
   description: APP_DESCRIPTION,
   keywords: ['teleprompter', 'Next.js', 'React', 'presentation tool', 'script management', 'public speaking', 'content creation', 'AI teleprompter'],
-  manifest: `${APP_URL}manifest.json`,
+  manifest: '/site.webmanifest', // Updated manifest path
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     images: [
       {
-        url: `${APP_URL}og-image.png`,
+        url: `${APP_URL}og-image.png`, // Ensure this image exists at public/og-image.png
         width: 1200,
         height: 630,
         alt: 'Promptastic! Teleprompter Application Interface',
@@ -50,12 +50,18 @@ export const metadata: Metadata = {
       default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
     },
     description: APP_DESCRIPTION,
-    images: [`${APP_URL}twitter-image.png`],
+    images: [`${APP_URL}twitter-image.png`], // Ensure this image exists at public/twitter-image.png
   },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: [ // For general favicons
+      { url: '/favicon.ico', type: 'image/x-icon', sizes: 'any' }, // Standard .ico
+      { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
+      { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: [ // For Apple touch icons
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
+    ],
+    // 'shortcut' is generally covered by the .ico in the 'icon' array for modern browsers
   },
 };
 
@@ -75,21 +81,16 @@ export default function RootLayout({
         var serializedStore = localStorage.getItem('promptastic-store');
         if (serializedStore) {
           var store = JSON.parse(serializedStore);
-          if (store && store.state) { // Check if store and store.state exist
+          if (store && store.state && typeof store.state === 'object') { 
             var prefs = store.state;
-            // Check for enableHighContrast first
             if (typeof prefs.enableHighContrast === 'boolean' && prefs.enableHighContrast) {
               document.documentElement.classList.add('high-contrast');
             } else if (typeof prefs.darkMode === 'boolean' && prefs.darkMode) {
               document.documentElement.classList.add('dark');
             }
-            // If prefs.darkMode is explicitly false, or if neither highContrast nor darkMode are true,
-            // no theme class is added by this script, and CSS defaults (light theme) will apply initially.
           }
         }
       } catch (e) {
-        // Fails silently if localStorage is unavailable or data is corrupted.
-        // The main app logic in page.tsx will still attempt to set the theme.
         console.warn('Initial theme script error:', e);
       }
     })();
