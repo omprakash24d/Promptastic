@@ -31,6 +31,7 @@ if (typeof window !== 'undefined') {
 
 interface FileTypeOption {
   label: string;
+  shortLabel: string;
   accept: string;
   icon: React.ElementType;
   handler: (file: File) => Promise<string | null>;
@@ -135,7 +136,6 @@ export function ScriptManager() {
   };
 
   const handleDelete = (name: string) => {
-    // Consider using AlertDialog for consistency with unsaved changes confirmation
     const confirmDelete = window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`);
     if (confirmDelete) {
       const wasActive = activeScriptName === name;
@@ -226,12 +226,14 @@ export function ScriptManager() {
   const fileTypes: FileTypeOption[] = [
     {
       label: "Import .txt",
+      shortLabel: ".txt",
       accept: ".txt",
       icon: FileUp,
       handler: async (file) => file.text(),
     },
     {
       label: "Import .pdf",
+      shortLabel: ".pdf",
       accept: ".pdf",
       icon: FileCode2,
       handler: async (file) => {
@@ -248,6 +250,7 @@ export function ScriptManager() {
     },
     {
       label: "Import .docx",
+      shortLabel: ".docx",
       accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       icon: FileText,
       handler: async (file) => {
@@ -340,18 +343,18 @@ export function ScriptManager() {
           )}
         </CardContent>
         <CardFooter className="flex flex-wrap justify-start gap-2 pt-4">
-            <Button onClick={handleSave} className="flex-grow sm:flex-grow-0">
+            <Button onClick={handleSave}>
               <Save className="mr-2 h-4 w-4" /> {activeScriptName ? 'Save Changes' : 'Save Script'}
             </Button>
-            <Button onClick={handleNewScript} variant="outline" className="flex-grow sm:flex-grow-0">
+            <Button onClick={handleNewScript} variant="outline">
               <FilePlus2 className="mr-2 h-4 w-4" /> New
             </Button>
-             <Button onClick={handleExportTxt} variant="outline" className="flex-grow sm:flex-grow-0">
+             <Button onClick={handleExportTxt} variant="outline">
               <Download className="mr-2 h-4 w-4" /> Export .txt
             </Button>
             {fileTypes.map(ft => (
-              <Button key={ft.label} onClick={() => triggerFileInput(ft.accept)} variant="outline" className="flex-grow sm:flex-grow-0">
-                <ft.icon className="mr-2 h-4 w-4" /> {ft.label.replace("Import ", "")}
+              <Button key={ft.label} onClick={() => triggerFileInput(ft.accept)} variant="outline">
+                <ft.icon className="mr-2 h-4 w-4" /> {ft.shortLabel}
               </Button>
             ))}
         </CardFooter>
@@ -370,8 +373,8 @@ export function ScriptManager() {
             <CardTitle className="text-lg">Saved Scripts</CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[200px] w-full rounded-md border p-1 bg-muted/20">
-              <ul className="space-y-1">
+            <ScrollArea className="h-[200px] w-full rounded-md border bg-muted/20">
+              <ul className="space-y-1 p-1">
                 {scripts.map((script) => (
                   <li key={script.name} className="flex items-center p-2 rounded-md hover:bg-muted text-sm">
                     {renamingScript === script.name ? (
@@ -421,3 +424,5 @@ export function ScriptManager() {
   );
 }
 
+
+    
