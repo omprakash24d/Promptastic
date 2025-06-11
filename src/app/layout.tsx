@@ -10,13 +10,10 @@ const APP_URL = 'https://prompt.indhinditech.com/';
 
 export const metadata: Metadata = {
   applicationName: APP_NAME,
-  title: {
-    template: `%s | ${APP_NAME}`,
-    default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
-  },
+  title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static title for all pages
   description: APP_DESCRIPTION,
   keywords: ['teleprompter', 'Next.js', 'React', 'presentation tool', 'script management', 'public speaking', 'content creation', 'AI teleprompter'],
-  manifest: '/site.webmanifest', // Updated manifest path
+  manifest: '/site.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -28,15 +25,12 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: APP_NAME,
-    title: {
-      template: `%s | ${APP_NAME}`,
-      default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
-    },
+    title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static OG title
     description: APP_DESCRIPTION,
     url: APP_URL,
     images: [
       {
-        url: `${APP_URL}og-image.png`, // Ensure this image exists at public/og-image.png
+        url: `${APP_URL}og-image.png`,
         width: 1200,
         height: 630,
         alt: 'Promptastic! Teleprompter Application Interface',
@@ -45,23 +39,19 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: {
-      template: `%s | ${APP_NAME}`,
-      default: `${APP_NAME} - Modern Teleprompter & Script Tool`,
-    },
+    title: `${APP_NAME} - Modern Teleprompter & Script Tool`, // Static Twitter title
     description: APP_DESCRIPTION,
-    images: [`${APP_URL}twitter-image.png`], // Ensure this image exists at public/twitter-image.png
+    images: [`${APP_URL}twitter-image.png`],
   },
   icons: {
-    icon: [ // For general favicons
-      { url: '/favicon.ico', type: 'image/x-icon', sizes: 'any' }, // Standard .ico
+    icon: [
+      { url: '/favicon.ico', type: 'image/x-icon', sizes: 'any' },
       { url: '/favicon-16x16.png', type: 'image/png', sizes: '16x16' },
       { url: '/favicon-32x32.png', type: 'image/png', sizes: '32x32' },
     ],
-    apple: [ // For Apple touch icons
+    apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }
     ],
-    // 'shortcut' is generally covered by the .ico in the 'icon' array for modern browsers
   },
 };
 
