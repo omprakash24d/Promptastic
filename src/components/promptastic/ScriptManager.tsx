@@ -22,10 +22,9 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as DialogTitle, // Renamed to avoid conflict if AlertTitle is also used from AlertDialog
 } from "@/components/ui/alert-dialog";
-import { summarizeScript } from '@/ai/flows/summarize-script-flow';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Correct import for Alert components
 
 if (typeof window !== 'undefined') {
   GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsVersion}/pdf.worker.mjs`;
@@ -64,7 +63,7 @@ export function ScriptManager() {
 
   useEffect(() => {
     setCurrentEditingScriptText(scriptText);
-    setScriptSummary(null); // Clear summary when script text changes
+    setScriptSummary(null); 
     setIsDirty(false);
   }, [scriptText]);
 
@@ -234,11 +233,11 @@ export function ScriptManager() {
 
   const processFileContent = (content: string, fileName: string) => {
     setActiveScriptName(null);
-    setScriptText(content); // This will trigger useEffect to update currentEditingScriptText
+    setScriptText(content); 
     const fileNameWithoutExtension = fileName.replace(/\.[^/.]+$/, "");
     setNewScriptName(fileNameWithoutExtension);
     toast({ title: "File Imported", description: `Content of "${fileName}" loaded. You can now save it as a new script.` });
-    setIsDirty(true); // Content has changed from potentially empty/default state
+    setIsDirty(true); 
   };
 
   const fileTypes: FileTypeOption[] = [
@@ -333,10 +332,10 @@ export function ScriptManager() {
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
+            <DialogTitle className="flex items-center"> {/* Changed from AlertDialogTitle to DialogTitle */}
               <AlertTriangle className="mr-2 h-5 w-5 text-destructive" />
               Unsaved Changes
-            </AlertDialogTitle>
+            </DialogTitle>
             <AlertDialogDescription>
               You have unsaved changes. Do you want to discard them and continue?
             </AlertDialogDescription>
@@ -482,3 +481,5 @@ export function ScriptManager() {
     </div>
   );
 }
+
+    
