@@ -18,15 +18,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useIsMobile } from '@/hooks/use-mobile'; // Import useIsMobile
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface HeaderProps {
   onOpenScripts: () => void;
   onOpenSettings: () => void;
-  // onOpenHelp is removed as help is now a dropdown linking to pages
 }
 
-// This definition can be outside if it's static and doesn't depend on component state/props
 const staticHelpPageItems = [
     { label: "About Promptastic!", href: "/about-us", icon: Info },
     { label: "How to Use", href: "/how-to-use", icon: FileQuestion },
@@ -98,7 +96,7 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
   const renderMobileMenu = () => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Open main menu">
+        <Button variant="ghost" size="icon" aria-label="Open main menu" title="Open main menu">
           <Hammer className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
@@ -122,9 +120,6 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onOpenScripts}>
-              <FileText className="mr-2 h-4 w-4" /> Scripts
-            </DropdownMenuItem>
              <Link href="/profile" passHref legacyBehavior>
               <DropdownMenuItem asChild>
                 <a><UserCircle2 className="mr-2 h-4 w-4" />Profile</a>
@@ -132,9 +127,15 @@ const Header = React.memo(function Header({ onOpenScripts, onOpenSettings }: Hea
             </Link>
           </>
         )}
+        
+        {/* Scripts and Settings are always available in mobile menu */}
+        <DropdownMenuItem onClick={onOpenScripts}>
+          <FileText className="mr-2 h-4 w-4" /> Scripts
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={onOpenSettings}>
           <SlidersHorizontal className="mr-2 h-4 w-4" /> Settings
         </DropdownMenuItem>
+
         {user && !loading && (
              <DropdownMenuItem onClick={logout}>
                 <LogOut className="mr-2 h-4 w-4" /> Logout
