@@ -96,7 +96,7 @@ export default function LoginPage() {
   useEffect(() => {
     clearAuthMessages();
     setAuthAttemptError(null); 
-    setSignupSuccessful(false);
+    // setSignupSuccessful(false); // Do not reset signupSuccessful on general effect if we want to show the message
 
     if (activeTab !== 'signUp') {
       setPasswordValidation(initialPasswordValidation);
@@ -141,7 +141,7 @@ export default function LoginPage() {
   const handleTabChange = (value: string) => {
     clearAuthMessages(); 
     setAuthAttemptError(null);
-    setSignupSuccessful(false);
+    setSignupSuccessful(false); // Reset this when user manually changes tab
     setEmail('');
     setPassword('');
     setConfirmPassword('');
@@ -185,7 +185,7 @@ export default function LoginPage() {
     e.preventDefault();
     clearAuthMessages(); 
     setAuthAttemptError(null); 
-    setSignupSuccessful(false);
+    // setSignupSuccessful(false); // Do not reset this here, success path will set it
 
     if (!email.trim()) {
         setAuthAttemptError("Email cannot be empty.");
@@ -214,8 +214,8 @@ export default function LoginPage() {
       }
       const success = await signUpWithEmail(email, password, displayName);
       if (success) {
-        // Success message is handled by AuthContext and useEffect above
-        // User stays on signup tab, message shown, fields are NOT cleared
+        // AuthContext's handleAuthSuccess (with skipRedirect) will set successMessage.
+        // useEffect will set signupSuccessful=true. The UI will then show the message and "Proceed to Sign In" button.
       }
     } else {
       await signInWithEmail(email, password);
@@ -244,13 +244,13 @@ export default function LoginPage() {
   const toggleForgotPasswordView = (show: boolean, prefillEmail?: string) => {
     clearAuthMessages();
     setAuthAttemptError(null);
-    setSignupSuccessful(false);
+    // setSignupSuccessful(false); // Should not be relevant if on forgot password
     setShowForgotPassword(show);
     if (show && prefillEmail) {
       setResetEmail(prefillEmail);
     } else if (!show) {
-      // setResetEmail(''); // Do not clear if coming from successful reset send
-      if (isResetCooldown) {
+       setResetEmail(''); 
+       if (isResetCooldown) {
         if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
         setIsResetCooldown(false);
         setCurrentCooldownSeconds(RESET_COOLDOWN_SECONDS);
@@ -332,7 +332,7 @@ export default function LoginPage() {
           {successMessage && (
             <div className={cn("mb-4 rounded-md border p-3 text-center text-sm",
                 signupSuccessful ? "border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400" 
-                                 : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400"
+                                 : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400" // This blue is for non-signup success, like password reset success.
             )} role="status">
               <CheckCircle2 className="mr-2 inline h-4 w-4" /> {successMessage}
               {signupSuccessful && (
@@ -528,7 +528,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col items-center space-y-2 pt-4">
           {showForgotPassword ? (
-            <Button variant="link" size="sm" onClick={() => { toggleForgotPasswordView(false); setResetEmail(''); }} className="text-sm text-muted-foreground hover:text-primary" disabled={passwordResetLoading}>
+            <Button variant="link" size="sm" onClick={() => { toggleForgotPasswordView(false); }} className="text-sm text-muted-foreground hover:text-primary" disabled={passwordResetLoading}>
               Back to Sign In
             </Button>
           ) : !signupSuccessful ? (
@@ -547,4 +547,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

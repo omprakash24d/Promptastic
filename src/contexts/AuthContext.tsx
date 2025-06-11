@@ -230,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     clearAuthMessages(); 
     try {
       await sendPasswordResetEmail(auth, email);
-      // The generic success message (even for user-not-found) is handled in handleAuthError
+      setError(null); // Explicitly clear error before setting success
       handleAuthError({ code: 'auth/user-not-found' }, 'passwordReset'); // Triggers generic success
       return true;
     } catch (err: any) {
