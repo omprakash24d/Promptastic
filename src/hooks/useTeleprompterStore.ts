@@ -36,19 +36,46 @@ const SERVER_DEFAULT_DARK_MODE = true;
 const SERVER_DEFAULT_TEXT_COLOR = INITIAL_TEXT_COLOR_DARK_MODE_HSL;
 
 const LONGER_DEFAULT_SCRIPT_TEXT = `Welcome to Promptastic!
-Your high-performance teleprompter.
-//PAUSE//
-This is a longer default script.
-You can use **bold text**, *italic text*, or _underlined text_.
-These can be combined, like ***bold and italic***.
-//EMPHASIZE//
-This part will be in the primary color.
-//SLOWDOWN//
-This part asks you to slow down.
-Combine with formatting: **//EMPHASIZE//Formatted and Emphasized!**
+Your modern teleprompter for smooth presentations.
 
-Try out the AI Scroll Sync feature!
-Happy prompting!`;
+This is a sample script to demonstrate features.
+You can manage your scripts using the "Scripts" button in the header.
+//PAUSE//
+(This "//PAUSE//" cue indicates a brief pause in delivery.)
+
+Customize your view using the "Settings" button.
+Adjust **font size**, *scroll speed*, _line spacing_, and more!
+
+Formatting is simple:
+Use **double asterisks for bold text**.
+*Single asterisks for italic text*.
+_Underscores for underlined text_.
+You can even combine them, like ***bold and italic***.
+
+Special Cues:
+//EMPHASIZE//
+The text following this cue will be highlighted in your primary color. This helps draw attention.
+
+//SLOWDOWN//
+This cue suggests you slow down your speaking pace for this section.
+
+Combine formatting with cues: **//EMPHASIZE//This is bold and emphasized!**
+
+Other Features:
+- Save and load scripts. Logged-in users sync to the cloud!
+- Import scripts from .txt, .md, .pdf, and .docx files.
+- Export your current script as a .txt file.
+- Create versions of your scripts.
+- Use Mirror Mode for physical teleprompter setups.
+- Try the experimental AI Scroll Sync feature (enable in Settings, then use the Mic button in playback controls).
+
+//PAUSE//
+
+Explore the "Settings" panel to tailor Promptastic to your needs.
+You can save your favorite combinations as "Settings Profiles".
+
+Happy prompting and successful presentations!
+`;
 
 const DEFAULT_LAYOUT_PRESETS: LayoutPreset[] = [
   {
@@ -635,7 +662,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
         horizontalPadding: state.horizontalPadding,
         enableHighContrast: state.enableHighContrast,
         userSettingsProfiles: state.userSettingsProfiles,
-        // Do not persist currentUserId directly here, AuthContext will manage it
       }),
       onRehydrateStorage: () => (state, error) => {
         if (error) {
@@ -645,8 +671,6 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.layoutPresets = state.layoutPresets && state.layoutPresets.length > 0 ? state.layoutPresets : DEFAULT_LAYOUT_PRESETS;
           state.activeLayoutPresetName = state.activeLayoutPresetName ?? "Default";
           state.focusLineStyle = state.focusLineStyle ?? INITIAL_FOCUS_LINE_STYLE;
-          // Scripts are loaded based on currentUserId by AuthContext calling initializeUserScripts
-          // So, if state.currentUserId (from persisted storage) is null, it loads local scripts, otherwise AuthContext handles Firestore.
           state.scripts = state.scripts?.map(s => ({ ...s, versions: s.versions ?? [] })) ?? [];
           state.countdownEnabled = state.countdownEnabled ?? INITIAL_COUNTDOWN_ENABLED;
           state.countdownDuration = state.countdownDuration ?? INITIAL_COUNTDOWN_DURATION;
@@ -654,15 +678,11 @@ export const useTeleprompterStore = create<TeleprompterStateStore>()(
           state.enableHighContrast = state.enableHighContrast ?? INITIAL_ENABLE_HIGH_CONTRAST;
           state.userSettingsProfiles = state.userSettingsProfiles ?? [];
           state.textColor = state.textColor ?? (state.darkMode ? INITIAL_TEXT_COLOR_DARK_MODE_HSL : INITIAL_TEXT_COLOR_LIGHT_MODE_HSL);
-          // currentUserId will be set by AuthContext after Firebase initializes
         }
       }
     }
   )
 );
-
-// Remove the separate auth.onAuthStateChanged listener from here.
-// AuthContext is now the sole manager of this.
 
 const unsub = useTeleprompterStore.subscribe(
   (currentState) => {
@@ -672,8 +692,3 @@ const unsub = useTeleprompterStore.subscribe(
   }
 );
 
-// This ensures that AuthContext can set the initial user ID when it first loads.
-// This specific initialization from auth.currentUser on store load is now handled by AuthContext.
-// if (typeof window !== 'undefined') {
-//   useTeleprompterStore.getState().setCurrentUserId(auth.currentUser?.uid || null);
-// }
